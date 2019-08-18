@@ -11,7 +11,7 @@ Download the <a href = "https://github.com/mwganson/MeshRemodel/blob/master/Reso
 Can be installed via the AddonManager in Tools menu -> AddonManager if you have a very recent build.  In the AddonManger click Configure, then add https://github.com/mwganson/MeshRemodel to the list of custom repositories.  After restarting the AddonManager you should find MeshRemodel in the list of workbenches you can install.
 <br/>
 ## Overview
-Use this workbench to aid in remodeling imported mesh objects.<br/>
+Use this workbench to aid in remodeling imported mesh objects.  The workflow is generally to first create a points object, then use those points in creating circles, arcs, lines, and polygons, which are then combined into wires, and then made into sketches.  Select 3 points to create a circle or arc, 2 points to create a line, 3 or more points to create a polygon / polyline.  These tools also work with any selectable points in the 3d view, not just points objects created with the workbench.<br/>
 <br/>
 ## Create Points Object
 <img src="Resources/icons/CreatePointsObject.png" alt="create points object"><br/>
