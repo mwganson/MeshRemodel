@@ -54,6 +54,18 @@ Select one or more wire objects to enable this command.  It uses Draft.makeSketc
 <img src="Resources/icons/MergeSketches.png" alt = "merge sketches"><br/>
 Select 2 or more sketches to enable this command.  This uses Sketcher workbench merge sketches command.  It is here as a convenience. 
 <br/>
+<br/>
+## Settings
+<img src="Resources/icons/Settings.png" alt="settings"><br/>
+### Keep toolbar active
+This setting will keep the toolbar active after leaving the workbench, but you have to open the workbench at least once each session.  After that, if this is enabled, when you leave the workbench the toolbar will appear in the new workbench after a couple seconds.<br/>
+<br/>
+### Point size
+This sets the point size on all points created with the workbench.  It does not affect objects already created after the setting is changed, only those created after the setting is changed.  Does not affect wire objects or sketch objects, only the centers of arcs, circles, and polygons, and the midpoints of lines.  Default 4.0<br/>
+<br/>
+### Line width
+This sets the line width on all lines created with the workbench.  It does not affect objects already created after the setting is changed, only those created after the setting is changed.  Does not affect wire objects or sketch objects, only the edges of arcs, circles, lines, and polygons.  Default: 5.0<br/>
+<br/>
 
 #### Release notes:<br/>
 * 2019.08.18 (version 1.02)<br/>
