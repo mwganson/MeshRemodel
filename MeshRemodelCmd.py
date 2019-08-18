@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2019.08.18"
-__version__ = "1.01"
-version = 1.01
+__version__ = "1.02"
+version = 1.02
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -64,7 +64,7 @@ class MeshRemodelSettingsCommandClass(object):
         window = QtGui.QApplication.activeWindow()
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         keep = pg.GetBool('KeepToolbar',False)
-        items=["Keep the toolbar active","Do not keep the toolbar active","Cancel"]
+        items=["Keep the toolbar active","Do not keep the toolbar active","Change point size","Change line width","Cancel"]
         item,ok = QtGui.QInputDialog.getItem(window,'MeshRemodel','Settings\n\nSelect the settings option\n',items,0,False)
         if ok and item == items[-1]:
             return
@@ -74,6 +74,16 @@ class MeshRemodelSettingsCommandClass(object):
         elif ok and item==items[1]:
             keep = False
             pg.SetBool('KeepToolbar', keep)
+        elif ok and item==items[2]:
+            point_size = pg.GetFloat("PointSize", 4.0)
+            new_point_size,ok = QtGui.QInputDialog.getDouble(window,"Point size", "Enter point size", point_size,1,50,.25)
+            if ok:
+                pg.SetFloat("PointSize", new_point_size)
+        elif ok and item==items[3]:
+            line_width = pg.GetFloat("LineWidth", 5.0)
+            new_line_width,ok = QtGui.QInputDialog.getDouble(window,"Line width", "Enter line width", line_width,1,50,.25)
+            if ok:
+                pg.SetFloat("LineWidth", new_line_width)
         return
    
     def IsActive(self):
@@ -98,14 +108,18 @@ class MeshRemodelCreatePointsObjectCommandClass(object):
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        point_size = pg.GetFloat("PointSize",4.0)
         QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         doc.openTransaction("Create points object")
 
         pts=[]
         meshpts = self.mesh.Mesh.Points
         for m in meshpts:
-            pts.append(Part.Point(m.Vector).toShape())
+            p = Part.Point(m.Vector)
+            pts.append(p.toShape())
         Part.show(Part.makeCompound(pts),"MR_Points")
+        doc.ActiveObject.ViewObject.PointSize = point_size
         doc.recompute()
 
         doc.commitTransaction()
@@ -142,6 +156,9 @@ class MeshRemodelCreateLineCommandClass(object):
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        line_width = pg.GetFloat("LineWidth",5.0)
+        point_size = pg.GetFloat("PointSize",4.0)
         modifiers = QtGui.QApplication.keyboardModifiers()
         #ctrl + click to include midpoint
         #ctrl + shift + click to include only the midpoint
@@ -153,9 +170,11 @@ class MeshRemodelCreateLineCommandClass(object):
         if not modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             Part.show(line,"MR_Line")
             lineName = doc.ActiveObject.Name
+            doc.ActiveObject.ViewObject.LineWidth=line_width
             FreeCAD.Console.PrintMessage(lineName+": length = "+str(line.Length)+"\n  midpoint at "+str(self.midpoint(self.pts[0],self.pts[1]))+"\n")
         if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             Part.show(Part.Point(self.midpoint(self.pts[0],self.pts[1])).toShape(),lineName+"_Mid")
+            doc.ActiveObject.ViewObject.PointSize = point_size
         doc.recompute()
         doc.commitTransaction()
         #QtGui.QApplication.restoreOverrideCursor()
@@ -205,6 +224,9 @@ class MeshRemodelCreatePolygonCommandClass(object):
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        line_width = pg.GetFloat("LineWidth",5.0)
+        point_size = pg.GetFloat("PointSize",4.0)
         #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         doc.openTransaction("Create polygon")
         modifiers = QtGui.QApplication.keyboardModifiers()
@@ -215,9 +237,11 @@ class MeshRemodelCreatePolygonCommandClass(object):
         if not modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.ControlModifier):
             Part.show(poly, "MR_Polygon")
             polyName = doc.ActiveObject.Name
+            doc.ActiveObject.ViewObject.LineWidth=line_width
             FreeCAD.Console.PrintMessage(polyName+": length = "+str(poly.Length)+"\n  Center of mass: "+str(poly.CenterOfMass)+"\n")
         if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.ControlModifier):
             Part.show(Part.Point(poly.CenterOfMass).toShape(),polyName+"_CoM")
+            doc.ActiveObject.ViewObject.PointSize = point_size
 
         doc.recompute()
         doc.commitTransaction()
@@ -262,6 +286,9 @@ class MeshRemodelCreateCircleCommandClass(object):
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        line_width = pg.GetFloat("LineWidth",5.0)
+        point_size = pg.GetFloat("PointSize",4.0)
         #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
 
 
@@ -326,9 +353,11 @@ class MeshRemodelCreateCircleCommandClass(object):
         if not modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.ControlModifier):
             Part.show(circle,"MR_Circle")
             circName = doc.ActiveObject.Name
+            doc.ActiveObject.ViewObject.LineWidth=line_width
             FreeCAD.Console.PrintMessage(circName+": radius = "+str(radius)+"\n  center at "+str(I)+"\n")
         if modifiers == QtCore.Qt.ControlModifier or modifiers==QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             Part.show(Part.Point(I).toShape(),circName+"_Ctr") #show the center point on ctrl click or shift+ctrl click
+            doc.ActiveObject.ViewObject.PointSize = point_size
 
         doc.recompute()
         doc.commitTransaction()
@@ -399,7 +428,9 @@ class MeshRemodelCreateArcCommandClass(object):
 
     def Activated(self):
         doc = FreeCAD.ActiveDocument
-
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        line_width = pg.GetFloat("LineWidth",5.0)
+        point_size = pg.GetFloat("PointSize",4.0)
         modifiers = QtGui.QApplication.keyboardModifiers()
         poly = Part.makePolygon(self.pts)
 #        Part.show(poly)
@@ -422,9 +453,11 @@ class MeshRemodelCreateArcCommandClass(object):
         if not modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             Part.show(arc.toShape(),"MR_Arc")
             arcName = doc.ActiveObject.Name
+            doc.ActiveObject.ViewObject.LineWidth=line_width
             FreeCAD.Console.PrintMessage(arcName+": radius = "+str(radius)+"\n  center at "+str(I)+"\n")
         if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             Part.show(Part.Point(I).toShape(),arcName+"_Ctr") #show the center point
+            doc.ActiveObject.ViewObject.PointSize = point_size
         doc.recompute()
         doc.commitTransaction()
         #QtGui.QApplication.restoreOverrideCursor()
