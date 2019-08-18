@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2019.08.16"
-__version__ = "1.00"
-version = 1.00
+__date__    = "2019.08.18"
+__version__ = "1.01"
+version = 1.01
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -153,6 +153,7 @@ class MeshRemodelCreateLineCommandClass(object):
         if not modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             Part.show(line,"MR_Line")
             lineName = doc.ActiveObject.Name
+            FreeCAD.Console.PrintMessage(lineName+": length = "+str(line.Length)+"\n  midpoint at "+str(self.midpoint(self.pts[0],self.pts[1]))+"\n")
         if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             Part.show(Part.Point(self.midpoint(self.pts[0],self.pts[1])).toShape(),lineName+"_Mid")
         doc.recompute()
@@ -200,7 +201,7 @@ class MeshRemodelCreatePolygonCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreatePolygon.png') ,
             'MenuText': "&Create Polygon" ,
-            'ToolTip' : "Create a Polygon from 3 or more selected points\n(Shift+Click to not close polygon)"}
+            'ToolTip' : "Create a Polygon from 3 or more selected points\n(Shift+Click to not close polygon)\n(Ctrl+Click to add Center of Mass)\n(Ctrl+Shift+Click for only Center of Mass)"}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
@@ -210,7 +211,13 @@ class MeshRemodelCreatePolygonCommandClass(object):
         if not modifiers == QtCore.Qt.ShiftModifier:
             self.pts.append(self.pts[0]) #don't close polygon on shift+click
         poly = Part.makePolygon(self.pts)
-        Part.show(poly, "MR_Polygon")
+        polyName = "MR_Ref"
+        if not modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.ControlModifier):
+            Part.show(poly, "MR_Polygon")
+            polyName = doc.ActiveObject.Name
+            FreeCAD.Console.PrintMessage(polyName+": length = "+str(poly.Length)+"\n  Center of mass: "+str(poly.CenterOfMass)+"\n")
+        if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.ControlModifier):
+            Part.show(Part.Point(poly.CenterOfMass).toShape(),polyName+"_CoM")
 
         doc.recompute()
         doc.commitTransaction()
@@ -319,6 +326,7 @@ class MeshRemodelCreateCircleCommandClass(object):
         if not modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.ControlModifier):
             Part.show(circle,"MR_Circle")
             circName = doc.ActiveObject.Name
+            FreeCAD.Console.PrintMessage(circName+": radius = "+str(radius)+"\n  center at "+str(I)+"\n")
         if modifiers == QtCore.Qt.ControlModifier or modifiers==QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             Part.show(Part.Point(I).toShape(),circName+"_Ctr") #show the center point on ctrl click or shift+ctrl click
 
@@ -414,6 +422,7 @@ class MeshRemodelCreateArcCommandClass(object):
         if not modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             Part.show(arc.toShape(),"MR_Arc")
             arcName = doc.ActiveObject.Name
+            FreeCAD.Console.PrintMessage(arcName+": radius = "+str(radius)+"\n  center at "+str(I)+"\n")
         if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             Part.show(Part.Point(I).toShape(),arcName+"_Ctr") #show the center point
         doc.recompute()
