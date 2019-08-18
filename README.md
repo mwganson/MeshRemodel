@@ -20,22 +20,26 @@ Select the mesh object in the tree, then use this command to create a points obj
 ## Create Line
 <img src="Resources/icons/CreateLine.png" alt = "create line"><br/>
 Select 2 points in the 3d view to enable this command.  It creates a Part Line object using the 2 selected points as a reference.  Note: any 2 selectable points may be used, even points that are part of an edge (the edge is shown selected in the 3d view, but the point at the mouse position is the one used), sketch, 3d object vertex, circle, etc.  If you can see it in the 3d view and select it, then it most likely can be used with this function.<br/>
+<br/>
 Use Ctrl+Click to include a point at the midpoint of the line.  Use Ctrl+Shift+Click if only the midpoint is desired.<br/>
 In the report view you will find some basic information about the line, including its length and coordinates of its midpoint.<br/>
 <br/>
 ## Create Polygon
 <img src="Resources/icons/CreatePolygon.png" alt = "create polygon"><br/>
 Select 3 or more points in the 3d view to enable this command.  It creates a polygon from the selected points.  Note: this is not a regular polygon, meaning the side lengths are not necessarily all equal to each other.  The order of selection is important.  By default the polygon will be closed, but you can prevent this with Shift+Click.  Use Ctrl+Click to include a point at the center of mass of the polygon.  Use Ctrl+Shift+Click of only the center of mass point is desired.  The points need not all lie on the same plane, but if they are not all on the same plane you will not be able to create a sketch from this later.<br/>
+<br/>
 In the report view you will find some basic information about the polygon, including its overall length and coordinates of its center of mass.<br/>
 <br/>
 ## Create Circle
 <img src="Resources/icons/CreateCircle.png" alt = "create circle"><br/>
 Select 3 points in the 3d view to enable this command.  It creates a circle from those 3 points.  Use Ctrl+Click to add a point at the center of the new circle.  Use Ctrl+Shift+Click if only the center is desired.<br/>
+<br/>
 In the report view you will find some basic information about the circle, including its radius and coordinates of the center.<br/>
 <br/>
 ## Create Arc
 <img src="Resources/icons/CreateArc.png" alt = "create arc"><br/>
 Select 3 points in the 3d view to enable this command.  It creates a Part Arc (internally using Part.ArcOfCircle() function) from those 3 selected points.  Use Ctrl+Click to include a point at the center of the arc.  Use Ctrl+Shift+Click if only the center is desired.<br/>
+<br/>
 In the report view you will find some basic information about the arc, including its radius and coordinates of its center.<br/>
 <br/>
 ## Create Wire
