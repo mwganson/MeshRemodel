@@ -1,5 +1,8 @@
 # MeshRemodel Workbench
 <img src="Resources/icons/MeshRemodelLogo.png" alt="icon">
+<br/>
+This workbench is currently under construction<br/>
+<br/>
 
 ## Toolbar Icon
 Download the <a href = "https://github.com/mwganson/MeshRemodel/blob/master/Resources/icons/MeshRemodelSVGLogo.svg">SVG Toolbar Icon</a><br/>
