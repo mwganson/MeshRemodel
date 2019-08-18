@@ -14,7 +14,7 @@ Can be installed via the AddonManager in Tools menu -> AddonManager if you have 
 Use this workbench to aid in remodeling imported mesh objects.<br/>
 <br/>
 ## Create Points Object
-<img src="Resources/icons/CreateMeshObject.png" alt="create mesh object"><br/>
+<img src="Resources/icons/CreatePointsObject.png" alt="create points object"><br/>
 Select the mesh object in the tree, then use this command to create a points object containing all the vertices of the selected mesh object.  The points object is a compound consisting of Part Point (vertex) objects, one per vertex in the selected mesh.  The purpose of this object is to provide selectable points in the 3d view.  We can use these selectable points with the other tools in the workbench to create the lines, circles, arcs, and polygons needed to remodel the mesh.<br/>
 <br/>
 ## Create Line
