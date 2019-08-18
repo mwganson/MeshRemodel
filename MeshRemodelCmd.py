@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2019.08.18"
-__version__ = "1.02"
-version = 1.02
+__version__ = "1.03"
+version = 1.03
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -171,6 +171,8 @@ class MeshRemodelCreateLineCommandClass(object):
             Part.show(line,"MR_Line")
             lineName = doc.ActiveObject.Name
             doc.ActiveObject.ViewObject.LineWidth=line_width
+            Gui.Selection.clearSelection()
+            Gui.Selection.addSelection(doc.getObject(lineName))
             FreeCAD.Console.PrintMessage(lineName+": length = "+str(line.Length)+"\n  midpoint at "+str(self.midpoint(self.pts[0],self.pts[1]))+"\n")
         if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             Part.show(Part.Point(self.midpoint(self.pts[0],self.pts[1])).toShape(),lineName+"_Mid")
@@ -239,6 +241,8 @@ class MeshRemodelCreatePolygonCommandClass(object):
             polyName = doc.ActiveObject.Name
             doc.ActiveObject.ViewObject.LineWidth=line_width
             FreeCAD.Console.PrintMessage(polyName+": length = "+str(poly.Length)+"\n  Center of mass: "+str(poly.CenterOfMass)+"\n")
+            Gui.Selection.clearSelection()
+            Gui.Selection.addSelection(doc.getObject(polyName))
         if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.ControlModifier):
             Part.show(Part.Point(poly.CenterOfMass).toShape(),polyName+"_CoM")
             doc.ActiveObject.ViewObject.PointSize = point_size
@@ -355,6 +359,8 @@ class MeshRemodelCreateCircleCommandClass(object):
             circName = doc.ActiveObject.Name
             doc.ActiveObject.ViewObject.LineWidth=line_width
             FreeCAD.Console.PrintMessage(circName+": radius = "+str(radius)+"\n  center at "+str(I)+"\n")
+            Gui.Selection.clearSelection()
+            Gui.Selection.addSelection(doc.getObject(circName))
         if modifiers == QtCore.Qt.ControlModifier or modifiers==QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             Part.show(Part.Point(I).toShape(),circName+"_Ctr") #show the center point on ctrl click or shift+ctrl click
             doc.ActiveObject.ViewObject.PointSize = point_size
@@ -455,6 +461,8 @@ class MeshRemodelCreateArcCommandClass(object):
             arcName = doc.ActiveObject.Name
             doc.ActiveObject.ViewObject.LineWidth=line_width
             FreeCAD.Console.PrintMessage(arcName+": radius = "+str(radius)+"\n  center at "+str(I)+"\n")
+            Gui.Selection.clearSelection()
+            Gui.Selection.addSelection(doc.getObject(arcName))
         if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             Part.show(Part.Point(I).toShape(),arcName+"_Ctr") #show the center point
             doc.ActiveObject.ViewObject.PointSize = point_size
