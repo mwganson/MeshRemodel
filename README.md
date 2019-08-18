@@ -56,6 +56,8 @@ Select 2 or more sketches to enable this command.  This uses Sketcher workbench 
 <br/>
 
 #### Release notes:<br/>
+* 2019.08.18 (version 1.02)<br/>
+** add settings for point size and line width
 * 2019.08.18 (version 1.01)<br/>
 ** Add some simple information for created objects in the report view<br/>
 * 2019.08.16 (version 1.00)<br/>
