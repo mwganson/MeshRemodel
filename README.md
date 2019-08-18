@@ -40,12 +40,16 @@ In the report view you will find some basic information about the arc, including
 <br/>
 ## Create Wire
 <img src="Resources/icons/CreateWire.png" alt = "create wire"><br/>
-Select 2 or more objects to enable this command.  It uses Draft.upgrade() to connect the objects into a single wire.  Note: the selected objects should all be connected together, but need not necessarily form a closed loop.  For example, you might have an arc and 2 lines connected one to each end of the arc.  You should not include circles unless you wish to connect them to other objects (not common).  The idea here to create wires from connected lines, open polygons, and arcs, then use these new wires, along with existing (coplanar) circles and closed polygons to create a sketch with the Create Sketch tool.  This is typically an intermediate step in creating a sketch.<br/>
+Select 2 or more objects to enable this command.  It uses Draft.upgrade() to connect the objects into a single wire.  It is here as a convenience.  Note: the selected objects should all be connected together, but need not necessarily form a closed loop.  For example, you might have an arc and 2 lines connected one to each end of the arc.  You should not include circles unless you wish to connect them to other objects (not common).  The idea here to create wires from connected lines, open polygons, and arcs, then use these new wires, along with existing (coplanar) circles and closed polygons to create a sketch with the Create Sketch tool.  This is typically an intermediate step in creating a sketch.<br/>
 <br/>
 ## Create Sketch
 <img src="Resources/icons/CreateSketch.png" alt = "create sketch"><br/>
-Select one or more wire objects to enable this command.  It uses Draft.makeSketch() to create a sketch from the selected objects.  If the selected objects are all coplanar this should usually result in a single sketch.  If not, you can use the Merge Sketches command to combine them all into a single sketch, if desired.  Note: only coplanar sketches can be merged.  If you have a use case for combining non-coplanar sketches, consider using Part Fusion (union) tool.
-
+Select one or more wire objects to enable this command.  It uses Draft.makeSketch() to create a sketch from the selected objects.  It is here as a convenience.  If the selected objects are all coplanar this should usually result in a single sketch.  Some constraints are applied, but there will always be some constraining necessary.<br/>
+<br/>
+## Merge Sketches
+<img src="Resources/icons/MergeSketches.png" alt = "merge sketches"><br/>
+Select 2 or more sketches to enable this command.  This uses Sketcher workbench merge sketches command.  It is here as a convenience. 
+<br/>
 
 #### Release notes:<br/>
 * 2019.08.18 (version 1.01)<br/>
