@@ -80,7 +80,12 @@ This sets the line width on all lines created with the workbench.  It does not a
 <br/>
 
 #### Release notes:<br/>
-* 2019.18.18 (version 1.10)<br/>
+* 2019.08.19 (version 1.20)<br/>
+** add coplanar points object creation<br/>
+** revert automatic selection of bspline and polygons for easier redo<br/>
+** make polygons compound lines, explodable via undo (Ctrl+Z)<br/>
+** support block select (Ctrl+B) for polygons, bsplines, and circles<br/>
+* 2019.08.18 (version 1.10)<br/>
 ** add bspline creation
 * 2019.08.18 (version 1.02)<br/>
 ** add settings for point size and line width
