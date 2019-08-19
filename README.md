@@ -30,6 +30,10 @@ Select 3 or more points in the 3d view to enable this command.  It creates a pol
 <br/>
 In the report view you will find some basic information about the polygon, including its overall length and coordinates of its center of mass.<br/>
 <br/>
+## Create BSpline
+<img src="Resources/icons/CreateBSpline.png" alt = "create bspline"><br/>
+Select 3 or more points in the 3d view to enable this command.  It creates a BSpline from the selected points.  The order of selection is important.  By default the BSpline will be closed, but you can prevent this with Shift+Click.  The points need not all lie on the same plane, but if they are not all on the same plane you will not be able to create a sketch from this later.<br/>
+<br/>
 ## Create Circle
 <img src="Resources/icons/CreateCircle.png" alt = "create circle"><br/>
 Select 3 points in the 3d view to enable this command.  It creates a circle from those 3 points.  Use Ctrl+Click to add a point at the center of the new circle.  Use Ctrl+Shift+Click if only the center is desired.<br/>
@@ -68,6 +72,8 @@ This sets the line width on all lines created with the workbench.  It does not a
 <br/>
 
 #### Release notes:<br/>
+* 2019.18.18 (version 1.10)<br/>
+** add bspline creation
 * 2019.08.18 (version 1.02)<br/>
 ** add settings for point size and line width
 * 2019.08.18 (version 1.01)<br/>
