@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2019.08.19"
-__version__ = "1.11"
-version = 1.11
+__version__ = "1.20"
+version = 1.20
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -121,8 +121,8 @@ class MeshRemodelCreatePointsObjectCommandClass(object):
         Part.show(Part.makeCompound(pts),"MR_Points")
         doc.ActiveObject.ViewObject.PointSize = point_size
         doc.recompute()
-
         doc.commitTransaction()
+        doc.recompute()
         QtGui.QApplication.restoreOverrideCursor()
         return
    
@@ -139,7 +139,90 @@ class MeshRemodelCreatePointsObjectCommandClass(object):
         return True
 
 # end create points class
+####################################################################################
+# Create a coplanar points object from 3 selected points
 
+class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
+    """Create coplanar points object from 3 selected points"""
+
+    def __init__(self):
+        self.pts = []
+        self.obj = None #original points object
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateCoplanar.png') ,
+            'MenuText': "Create copla&nar points object" ,
+            'ToolTip' : "Create a coplanar points object from 3 selected points \nby selecting only those points that are coplanar with the 3 selected points\n\
+(Makes exploded compound for use with block select (Shift+B) tool)\n(Press Undo (Ctrl+Z) afterwards if you do not want it exploded)"}
+ 
+    def Activated(self):
+        doc = FreeCAD.ActiveDocument
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        line_width = pg.GetFloat("LineWidth",5.0)
+        point_size = pg.GetFloat("PointSize",4.0)
+        #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        doc.openTransaction("Create coplanar")
+        modifiers = QtGui.QApplication.keyboardModifiers()
+        trio = [self.pts[0],self.pts[1],self.pts[2]]
+        candidates = self.obj.Shape.Vertexes
+        coplanar = []
+        for v in candidates:
+            if self.isCoplanar(trio,v):
+                coplanar.append(Part.Point(v.Point).toShape())
+        coplanar.extend([Part.Point(v).toShape() for v in trio])
+        Part.show(Part.makeCompound(coplanar),"MR_Points_Coplanar")
+        doc.ActiveObject.ViewObject.PointSize = point_size
+        self.obj.ViewObject.Visibility = False
+        doc.recompute()
+        doc.commitTransaction()
+        doc.openTransaction("explode coplanar points")
+        import CompoundTools.Explode
+        input_obj = doc.ActiveObject
+        comp = CompoundTools.Explode.explodeCompound(input_obj)
+        input_obj.ViewObject.hide()
+        for obj in comp[1]:
+            obj.ViewObject.PointSize = point_size
+        doc.recompute()
+        doc.commitTransaction()
+        #QtGui.QApplication.restoreOverrideCursor()
+        return
+
+    def isCoplanar(self,trio,pt):
+        """trio is a list of vertices, pt is a vertex, return True if all 4 are coplanar"""
+        epsilon = 1e-7
+        A,B,C = trio[0],trio[1],trio[2]
+        poly = Part.makePolygon([A,B,C,pt.Point])
+        #Part.show(poly)
+        bb = poly.BoundBox
+        vol = bb.XLength*bb.YLength*bb.ZLength #one will be ~zero if coplanar
+        if vol <= epsilon:
+            return True
+        return False
+   
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getSelectionEx()
+        if len(sel) == 0:
+            return False
+        if not hasattr(sel[0],"PickedPoints"):
+            return False
+        count = 0
+        self.pts = []
+        self.obj = sel[0].Object
+        for s in sel:
+            if hasattr(s,"PickedPoints"):
+                p = s.PickedPoints
+                for pt in s.PickedPoints:
+                    self.pts.append(pt)
+                    count += 1
+                    if count > 3:
+                        return False
+        if count == 3:
+            return True
+        return False
+
+# end create coplanar points object
 ####################################################################################
 # Create a line from 2 selected points
 
@@ -198,6 +281,8 @@ class MeshRemodelCreateLineCommandClass(object):
                 for pt in s.PickedPoints:
                     self.pts.append(pt)
                     count += 1
+                    if count > 2: #avoid parsing really long lists
+                        return False
         if count == 2:
             return True
         return False
@@ -222,7 +307,8 @@ class MeshRemodelCreatePolygonCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreatePolygon.png') ,
             'MenuText': "Create &Polygon" ,
-            'ToolTip' : "Create a Polygon from 3 or more selected points\n(Shift+Click to not close polygon)\n(Ctrl+Click to add Center of Mass)\n(Ctrl+Shift+Click for only Center of Mass)"}
+            'ToolTip' : "Create a Polygon from 3 or more selected points\n(Shift+Click to not close polygon)\n(Alt+Click to sort selected points)\n\
+(Makes compound of individiual lines, press Undo (Ctrl+Z) afterwards to get individual lines)"}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
@@ -232,26 +318,78 @@ class MeshRemodelCreatePolygonCommandClass(object):
         #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         doc.openTransaction("Create polygon")
         modifiers = QtGui.QApplication.keyboardModifiers()
-        if not modifiers == QtCore.Qt.ShiftModifier:
+        if modifiers != QtCore.Qt.ShiftModifier and modifiers != QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.AltModifier):
             self.pts.append(self.pts[0]) #don't close polygon on shift+click
-        poly = Part.makePolygon(self.pts)
-        polyName = "MR_Ref"
-        if not modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.ControlModifier):
-            Part.show(poly, "MR_Polygon")
-            polyName = doc.ActiveObject.Name
-            doc.ActiveObject.ViewObject.LineWidth=line_width
-            FreeCAD.Console.PrintMessage(polyName+": length = "+str(poly.Length)+"\n  Center of mass: "+str(poly.CenterOfMass)+"\n")
-            Gui.Selection.clearSelection()
-            Gui.Selection.addSelection(doc.getObject(polyName))
-        if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.ControlModifier):
-            Part.show(Part.Point(poly.CenterOfMass).toShape(),polyName+"_CoM")
-            doc.ActiveObject.ViewObject.PointSize = point_size
+
+        if modifiers == QtCore.Qt.AltModifier.__or__(QtCore.Qt.ShiftModifier) or modifiers == QtCore.Qt.AltModifier:
+            #poly = Part.makePolygon(self.sortPoints(self.pts))
+            lineList = self.makePolygon(self.sortPoints(self.pts))
+        else:
+            #poly = Part.makePolygon(self.pts)
+            lineList = self.makePolygon(self.pts)
+
+        lineObjs = []
+        for line in lineList:
+            Part.show(line,"MR_Line")
+            doc.recompute()
+            lineObjs.append(doc.ActiveObject)
+
+        for l in lineObjs:
+            l.ViewObject.LineWidth = line_width
 
         doc.recompute()
         doc.commitTransaction()
+
+        doc.openTransaction("lines to compound")
+        lineShapes = [s.Shape for s in lineObjs]
+        Part.show(Part.makeCompound(lineShapes),"MR_Polygon")
+        doc.recompute()
+        doc.ActiveObject.ViewObject.LineWidth=line_width
+        for l in lineObjs:
+            doc.removeObject(l.Name)
+
+        doc.commitTransaction()
+
         #QtGui.QApplication.restoreOverrideCursor()
         return
-   
+
+    def makePolygon(self,pts):
+        """make list of lines out of the pts list one line at a time, return the list"""
+        lines=[]
+        for ii in range(1,len(pts)):
+            if pts[ii-1] != pts[ii]:
+                lines.append(Part.makeLine(pts[ii-1],pts[ii]))
+        return lines
+            
+            
+
+    def dist(self, p1, p2):
+        return self.getDistance3d(p1[0],p1[1],p1[2],p2[0],p2[1],p2[2])
+
+    def getDistance3d(self, x1, y1, z1, x2, y2, z2):
+        return math.sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
+
+    def sortPoints(self,pts):
+        """sort pts, a list of points, according to distance from one point to the next"""
+        newList = [pts[0]]
+        for ii in range(0, len(pts)):
+            newList.extend([self.nearestPoint(newList[ii],pts,newList)])
+        return newList    
+
+    def nearestPoint(self, pt, pts, exclude):
+        """return nearest point to pt in pts and not in exclude"""
+        if len(pts) == 0:
+            raise Exception("MeshRemodel Error: nearestPoint(pt, pts) pts length = 0\n")
+        nearest = pts[0]
+        d = 10**100
+        for p in pts:
+            if p in exclude:
+                continue
+            dis = self.dist(pt, p)
+            if dis < d:
+                d = dis
+                nearest = p
+        return nearest
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
@@ -268,6 +406,10 @@ class MeshRemodelCreatePolygonCommandClass(object):
                 for pt in s.PickedPoints:
                     self.pts.append(pt)
                     count += 1
+                if len(p)==0: #might be individual part point objects
+                    if len(s.Object.Shape.Vertexes)==1:
+                        self.pts.append(s.Object.Shape.Vertexes[0].Point)
+                        count += 1
         if count >= 3:
             return True
         return False
@@ -285,7 +427,7 @@ class MeshRemodelCreateBSplineCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateBSpline.png') ,
             'MenuText': "Create &BSpline" ,
-            'ToolTip' : "Create a BSPline from 3 or more selected points\n(Shift+Click to not close bspline)"}
+            'ToolTip' : "Create a BSPline from 3 or more selected points\n(Shift+Click to not close bspline)\n(Alt+Click to sort selected points)"}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
@@ -297,25 +439,56 @@ class MeshRemodelCreateBSplineCommandClass(object):
         doc.openTransaction("Create BSpline")
         modifiers = QtGui.QApplication.keyboardModifiers()
         is_periodic=True
-        if modifiers == QtCore.Qt.ShiftModifier:
+        if modifiers == QtCore.Qt.ShiftModifier or modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.AltModifier):
             is_periodic=False #don't close bspline on shift+click
         bspline = Part.BSplineCurve()
-        bspline.interpolate(self.pts,PeriodicFlag=is_periodic)
+        if modifiers == QtCore.Qt.AltModifier or modifiers == QtCore.Qt.AltModifier.__or__(QtCore.Qt.ShiftModifier) or modifiers == QtCore.Qt.ShiftModifier:
+            sortedPoints = self.sortPoints(self.pts)[:-1]
+            bspline.interpolate(sortedPoints,PeriodicFlag=is_periodic)
+        else:
+            bspline.interpolate(self.pts,PeriodicFlag=is_periodic)
 
-        if not modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.ControlModifier):
-            Part.show(bspline.toShape(), "MR_BSpline")
-            bsplineName = doc.ActiveObject.Name
-            doc.ActiveObject.ViewObject.LineWidth=line_width
-            #FreeCAD.Console.PrintMessage(bsplineName+": length = "+str(bspline.Length)+"\n  Center of mass: "+str(bspline.CenterOfMass)+"\n")
-            #Gui.Selection.clearSelection()
-            #Gui.Selection.addSelection(doc.getObject(bsplineName))
+        Part.show(bspline.toShape(), "MR_BSpline")
+        bsplineName = doc.ActiveObject.Name
+        doc.ActiveObject.ViewObject.LineWidth=line_width
+        #FreeCAD.Console.PrintMessage(bsplineName+": length = "+str(bspline.Length)+"\n  Center of mass: "+str(bspline.CenterOfMass)+"\n")
+        #Gui.Selection.clearSelection()
+        #Gui.Selection.addSelection(doc.getObject(bsplineName))
 
 
         doc.recompute()
         doc.commitTransaction()
         #QtGui.QApplication.restoreOverrideCursor()
         return
-   
+
+    def dist(self, p1, p2):
+        return self.getDistance3d(p1[0],p1[1],p1[2],p2[0],p2[1],p2[2])
+
+    def getDistance3d(self, x1, y1, z1, x2, y2, z2):
+        return math.sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
+
+    def sortPoints(self,pts):
+        """sort pts, a list of points, according to distance from one point to the next"""
+        newList = [pts[0]]
+        for ii in range(0, len(pts)):
+            newList.extend([self.nearestPoint(newList[ii],pts,newList)])
+        return newList    
+
+    def nearestPoint(self, pt, pts, exclude):
+        """return nearest point to pt in pts and not in exclude"""
+        if len(pts) == 0:
+            raise Exception("MeshRemodel Error: nearestPoint(pt, pts) pts length = 0\n")
+        nearest = pts[0]
+        d = 10**100
+        for p in pts:
+            if p in exclude:
+                continue
+            dis = self.dist(pt, p)
+            if dis < d:
+                d = dis
+                nearest = p
+        return nearest
+
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
@@ -332,6 +505,10 @@ class MeshRemodelCreateBSplineCommandClass(object):
                 for pt in s.PickedPoints:
                     self.pts.append(pt)
                     count += 1
+                if len(p)==0: #might be individual part point objects
+                    if len(s.Object.Shape.Vertexes)==1:
+                        self.pts.append(s.Object.Shape.Vertexes[0].Point)
+                        count += 1
         if count >= 3:
             return True
         return False
@@ -340,10 +517,10 @@ class MeshRemodelCreateBSplineCommandClass(object):
 
 ###################################################################
 
-# Create a Circle from 3 selected points
+# Create a Circle from first 3 selected points
 
 class MeshRemodelCreateCircleCommandClass(object):
-    """Create Circle from 3 selected points"""
+    """Create Circle from first 3 selected points"""
 
     def __init__(self):
         self.pts = []
@@ -351,7 +528,7 @@ class MeshRemodelCreateCircleCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateCircle.png') ,
             'MenuText': "Create &circle" ,
-            'ToolTip' : "Create a circle from 3 selected points\n(Ctrl+Click to include Center point)\n(Ctrl+Shift+Click for only center)"}
+            'ToolTip' : "Create a circle from first 3 selected points\n(Ctrl+Click to include Center point)\n(Ctrl+Shift+Click for only center)"}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
@@ -479,20 +656,24 @@ class MeshRemodelCreateCircleCommandClass(object):
                 for pt in s.PickedPoints:
                     self.pts.append(pt)
                     count += 1
-        if count == 3:
+                if len(p)==0: #might be individual part point objects
+                    if len(s.Object.Shape.Vertexes)==1:
+                        self.pts.append(s.Object.Shape.Vertexes[0].Point)
+                        count += 1
+        if count >= 3:
             return True
         return False
 
 # end create circle class
 
 ####################################################################################
-# Create an Arc from 3 selected points
+# Create an Arc from first 3 selected points
 class MeshRemodelCreateArcCommandClass(object):
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateArc.png') ,
             'MenuText': "Create &arc" ,
-            'ToolTip' : "Create an arc from 3 selected points\n(Ctrl+Click to include Center point)\n(Ctrl+Shift+Click for only center)"}
+            'ToolTip' : "Create an arc from first 3 selected points\n(Ctrl+Click to include Center point)\n(Ctrl+Shift+Click for only center)"}
 
     def __init__(self):
         self.pts = []
@@ -580,7 +761,11 @@ class MeshRemodelCreateArcCommandClass(object):
                 for pt in s.PickedPoints:
                     self.pts.append(pt)
                     count += 1
-        if count == 3:
+                if len(p)==0: #might be individual part point objects
+                    if len(s.Object.Shape.Vertexes)==1:
+                        self.pts.append(s.Object.Shape.Vertexes[0].Point)
+                        count += 1
+        if count >= 3:
             return True
         return False
 
@@ -726,6 +911,7 @@ class MeshRemodelMergeSketchesCommandClass(object):
 def initialize():
     if FreeCAD.GuiUp:
         Gui.addCommand("MeshRemodelCreatePointsObject", MeshRemodelCreatePointsObjectCommandClass())
+        Gui.addCommand("MeshRemodelCreateCoplanarPointsObject", MeshRemodelCreateCoplanarPointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateLine", MeshRemodelCreateLineCommandClass())
         Gui.addCommand("MeshRemodelCreatePolygon", MeshRemodelCreatePolygonCommandClass())
         Gui.addCommand("MeshRemodelCreateBSpline", MeshRemodelCreateBSplineCommandClass())
