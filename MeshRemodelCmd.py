@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2019.08.18"
-__version__ = "1.10"
-version = 1.10
+__date__    = "2019.08.19"
+__version__ = "1.11"
+version = 1.11
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -103,7 +103,7 @@ class MeshRemodelCreatePointsObjectCommandClass(object):
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreatePointsObject.png') ,
-            'MenuText': "&Create points object" ,
+            'MenuText': "Create points &object" ,
             'ToolTip' : "Create the points object"}
  
     def Activated(self):
@@ -151,7 +151,7 @@ class MeshRemodelCreateLineCommandClass(object):
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateLine.png') ,
-            'MenuText': "&Create line" ,
+            'MenuText': "Create &line" ,
             'ToolTip' : "Create a line from 2 selected points\n(Ctrl+Click to add midpoint)\n(Ctrl+Shift+Click for only midpoint)"}
  
     def Activated(self):
@@ -221,7 +221,7 @@ class MeshRemodelCreatePolygonCommandClass(object):
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreatePolygon.png') ,
-            'MenuText': "&Create Polygon" ,
+            'MenuText': "Create &Polygon" ,
             'ToolTip' : "Create a Polygon from 3 or more selected points\n(Shift+Click to not close polygon)\n(Ctrl+Click to add Center of Mass)\n(Ctrl+Shift+Click for only Center of Mass)"}
  
     def Activated(self):
@@ -284,7 +284,7 @@ class MeshRemodelCreateBSplineCommandClass(object):
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateBSpline.png') ,
-            'MenuText': "&Create BSpline" ,
+            'MenuText': "Create &BSpline" ,
             'ToolTip' : "Create a BSPline from 3 or more selected points\n(Shift+Click to not close bspline)"}
  
     def Activated(self):
@@ -350,7 +350,7 @@ class MeshRemodelCreateCircleCommandClass(object):
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateCircle.png') ,
-            'MenuText': "&Create circle" ,
+            'MenuText': "Create &circle" ,
             'ToolTip' : "Create a circle from 3 selected points\n(Ctrl+Click to include Center point)\n(Ctrl+Shift+Click for only center)"}
  
     def Activated(self):
@@ -491,7 +491,7 @@ class MeshRemodelCreateArcCommandClass(object):
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateArc.png') ,
-            'MenuText': "&Create arc" ,
+            'MenuText': "Create &arc" ,
             'ToolTip' : "Create an arc from 3 selected points\n(Ctrl+Click to include Center point)\n(Ctrl+Shift+Click for only center)"}
 
     def __init__(self):
@@ -597,7 +597,7 @@ class MeshRemodelCreateSketchCommandClass(object):
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateSketch.png') ,
-            'MenuText': "&Create sketch" ,
+            'MenuText': "Create s&ketch" ,
             'ToolTip' : "Create a sketch from selected objects"}
  
     def Activated(self):
@@ -640,7 +640,7 @@ class MeshRemodelCreateWireCommandClass(object):
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateWire.png') ,
-            'MenuText': "&Create wire" ,
+            'MenuText': "Create &wire" ,
             'ToolTip' : "Create a wire from selected objects\n(All selected objects should be connected.)\n(Runs draft upgrade)"}
  
     def Activated(self):

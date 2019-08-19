@@ -48,7 +48,7 @@ class MeshRemodelWorkbench(Workbench):
 
     global main_meshremodelWB_Icon
 
-    MenuText = "MeshRemodel"
+    MenuText = "Mesh Remodel"
     ToolTip = "MeshRemodel workbench"
     Icon = main_meshremodelWB_Icon
     
@@ -69,7 +69,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelMergeSketches",
                     "MeshRemodelSettings"] # A list of command names created in the line above
         self.appendToolbar("MeshRemodel Commands",self.list[:-1]) # leave settings off toolbar
-        self.appendMenu("&MeshRemodel",self.list) # creates a new menu
+        self.appendMenu("Mesh&Remodel",self.list) # creates a new menu
         #considered putting the menu inside the Edit menu, but decided against it
         #self.appendMenu(["&Edit","MeshRemodel"],self.list) # appends a submenu to an existing menu
 
