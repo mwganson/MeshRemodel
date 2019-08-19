@@ -17,6 +17,10 @@ Use this workbench to aid in remodeling imported mesh objects.  The workflow is 
 <img src="Resources/icons/CreatePointsObject.png" alt="create points object"><br/>
 Select the mesh object in the tree, then use this command to create a points object containing all the vertices of the selected mesh object.  The points object is a compound consisting of Part Point (vertex) objects, one per vertex in the selected mesh.  The purpose of this object is to provide selectable points in the 3d view.  We can use these selectable points with the other tools in the workbench to create the lines, circles, arcs, and polygons needed to remodel the mesh.<br/>
 <br/>
+## Create Coplanar Points Object
+<img src="Resources/icons/CreateCoplanar" alt = "create coplanar"><br/>
+Select 3 points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  These are packed into a compound, which is then exploded in order to support (Shift+B) block selection.  The exploding is done as a separate document transaction, thus enabling you to undo this (Ctrl+Z) if you would prefer it to not be exploded.<br/>
+<br/>
 ## Create Line
 <img src="Resources/icons/CreateLine.png" alt = "create line"><br/>
 Select 2 points in the 3d view to enable this command.  It creates a Part Line object using the 2 selected points as a reference.  Note: any 2 selectable points may be used, even points that are part of an edge (the edge is shown selected in the 3d view, but the point at the mouse position is the one used), sketch, 3d object vertex, circle, etc.  If you can see it in the 3d view and select it, then it most likely can be used with this function.<br/>
@@ -26,17 +30,21 @@ In the report view you will find some basic information about the line, includin
 <br/>
 ## Create Polygon
 <img src="Resources/icons/CreatePolygon.png" alt = "create polygon"><br/>
-Select 3 or more points in the 3d view to enable this command.  It creates a polygon from the selected points.  Note: this is not a regular polygon, meaning the side lengths are not necessarily all equal to each other.  The order of selection is important.  By default the polygon will be closed, but you can prevent this with Shift+Click.  Use Ctrl+Click to include a point at the center of mass of the polygon.  Use Ctrl+Shift+Click of only the center of mass point is desired.  The points need not all lie on the same plane, but if they are not all on the same plane you will not be able to create a sketch from this later.<br/>
+Select 3 or more points in the 3d view to enable this command.  It creates a polygon from the selected points.  Note: this is not a regular polygon, meaning the side lengths are not necessarily all equal to each other.  The order of selection is important.  By default the polygon will be closed, but you can prevent this with Shift+Click.<br/>
 <br/>
-In the report view you will find some basic information about the polygon, including its overall length and coordinates of its center of mass.<br/>
+When selecting using Shift+B, block selection, the points will generally need to be sorted or else you will get a polygon which zig zags all about.  To enable sorting using Alt+Click.  The sorting algorithm takes the first selected point, then finds the nearest point among the other selected points, and puts it 2nd.  Then it uses the 2nd point to find the next nearest point, and puts it 3rd, and so on.<br/>
+<br/>
+The polygon object created is a compound made up of individual Part Lines.  If you do not want the compound, but would instead prefer to have individual line objects, press Undo (Ctrl+Z) after making the polygon.  This will enable you to delete any lines you would prefer not to have, for example if you get a closed polygon, but would prefer it not to be closed or if some lines get crossed, etc.<br/>
 <br/>
 ## Create BSpline
 <img src="Resources/icons/CreateBSpline.png" alt = "create bspline"><br/>
 Select 3 or more points in the 3d view to enable this command.  It creates a BSpline from the selected points.  The order of selection is important.  By default the BSpline will be closed, but you can prevent this with Shift+Click.  The points need not all lie on the same plane, but if they are not all on the same plane you will not be able to create a sketch from this later.<br/>
 <br/>
+This command supports block selections (Shift+B, draw rectangle).  Generally, the points will need to be sorted when using that block selection method.  Use Alt+Click to sort.  See the section on Create polygon for details on the sorting algorithm used.<br/>
+<br/>
 ## Create Circle
 <img src="Resources/icons/CreateCircle.png" alt = "create circle"><br/>
-Select 3 points in the 3d view to enable this command.  It creates a circle from those 3 points.  Use Ctrl+Click to add a point at the center of the new circle.  Use Ctrl+Shift+Click if only the center is desired.<br/>
+Select 3 (or more) points in the 3d view to enable this command.  It creates a circle from those first 3 selected points.  Any points after the first 3 are ignored, but you are allowed to select more.  This is to support easier block selection mode (Shift+B, draw rectangle).  Use Ctrl+Click to add a point at the center of the new circle.  Use Ctrl+Shift+Click if only the center is desired.<br/>
 <br/>
 In the report view you will find some basic information about the circle, including its radius and coordinates of the center.<br/>
 <br/>
