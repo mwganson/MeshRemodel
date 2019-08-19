@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2019.08.18"
-__version__ = "1.03"
-version = 1.03
+__version__ = "1.10"
+version = 1.10
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -273,7 +273,72 @@ class MeshRemodelCreatePolygonCommandClass(object):
         return False
 
 # end create Polygon class
+####################################################################################
+# Create a BSpline from 3 or more selected points
 
+class MeshRemodelCreateBSplineCommandClass(object):
+    """Create BSpline from 3 or more selected points"""
+
+    def __init__(self):
+        self.pts = []
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateBSpline.png') ,
+            'MenuText': "&Create BSpline" ,
+            'ToolTip' : "Create a BSPline from 3 or more selected points\n(Shift+Click to not close bspline)"}
+ 
+    def Activated(self):
+        doc = FreeCAD.ActiveDocument
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        line_width = pg.GetFloat("LineWidth",5.0)
+        point_size = pg.GetFloat("PointSize",4.0)
+
+        #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        doc.openTransaction("Create BSpline")
+        modifiers = QtGui.QApplication.keyboardModifiers()
+        is_periodic=True
+        if modifiers == QtCore.Qt.ShiftModifier:
+            is_periodic=False #don't close bspline on shift+click
+        bspline = Part.BSplineCurve()
+        bspline.interpolate(self.pts,PeriodicFlag=is_periodic)
+
+        if not modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.ControlModifier):
+            Part.show(bspline.toShape(), "MR_BSpline")
+            bsplineName = doc.ActiveObject.Name
+            doc.ActiveObject.ViewObject.LineWidth=line_width
+            #FreeCAD.Console.PrintMessage(bsplineName+": length = "+str(bspline.Length)+"\n  Center of mass: "+str(bspline.CenterOfMass)+"\n")
+            #Gui.Selection.clearSelection()
+            #Gui.Selection.addSelection(doc.getObject(bsplineName))
+
+
+        doc.recompute()
+        doc.commitTransaction()
+        #QtGui.QApplication.restoreOverrideCursor()
+        return
+   
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getSelectionEx()
+        if len(sel) == 0:
+            return False
+        if not hasattr(sel[0],"PickedPoints"):
+            return False
+        count = 0
+        self.pts = []
+        for s in sel:
+            if hasattr(s,"PickedPoints"):
+                p = s.PickedPoints
+                for pt in s.PickedPoints:
+                    self.pts.append(pt)
+                    count += 1
+        if count >= 3:
+            return True
+        return False
+
+# end create BSpline class
+
+###################################################################
 
 # Create a Circle from 3 selected points
 
@@ -414,7 +479,7 @@ class MeshRemodelCreateCircleCommandClass(object):
                 for pt in s.PickedPoints:
                     self.pts.append(pt)
                     count += 1
-        if count >= 3:
+        if count == 3:
             return True
         return False
 
@@ -515,7 +580,7 @@ class MeshRemodelCreateArcCommandClass(object):
                 for pt in s.PickedPoints:
                     self.pts.append(pt)
                     count += 1
-        if count >= 3:
+        if count == 3:
             return True
         return False
 
@@ -663,6 +728,7 @@ def initialize():
         Gui.addCommand("MeshRemodelCreatePointsObject", MeshRemodelCreatePointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateLine", MeshRemodelCreateLineCommandClass())
         Gui.addCommand("MeshRemodelCreatePolygon", MeshRemodelCreatePolygonCommandClass())
+        Gui.addCommand("MeshRemodelCreateBSpline", MeshRemodelCreateBSplineCommandClass())
         Gui.addCommand("MeshRemodelCreateCircle", MeshRemodelCreateCircleCommandClass())
         Gui.addCommand("MeshRemodelCreateArc", MeshRemodelCreateArcCommandClass())
         Gui.addCommand("MeshRemodelCreateWire", MeshRemodelCreateWireCommandClass())

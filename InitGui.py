@@ -61,6 +61,7 @@ class MeshRemodelWorkbench(Workbench):
         self.list = ["MeshRemodelCreatePointsObject",
                     "MeshRemodelCreateLine",
                     "MeshRemodelCreatePolygon",
+                    "MeshRemodelCreateBSpline",
                     "MeshRemodelCreateCircle",
                     "MeshRemodelCreateArc",
                     "MeshRemodelCreateWire",
