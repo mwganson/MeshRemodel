@@ -87,21 +87,21 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 <br/>
 #### Release notes:<br/>
 * 2019.08.20 (version 1.29)<br/>
-** reorganize code internally, consolidating geometry utilities into a single class
-** accessible via python:
-**  from MeshRemodelCmd import MeshRemodelGeomUtils
-**  gu = MeshRemodelGeomUtils()
-**  gu.circumcenter(A,B,C)
-**  gu.circumradius(A,B,C)
-**  gu.inradius(A,B,C) 
-**  gu.incenter(A,B,C)
-**  gu.dist(A,B)
-**  gu.getDistance3d(Ax,Ay,Az,Bx,By,Bz)
-**  gu.isCoplanar(A,B,C)
-**  gu.isColinear(A,B,C)
-**  gu.nearestPoint(pt, pts, exclude)
-**  gu.sortPoints(pts)
-**  gu.midpoint(A,B)
+** reorganize code internally, consolidating geometry utilities into a single class<br/>
+** accessible via python:<br/>
+**  from MeshRemodelCmd import MeshRemodelGeomUtils<br/>
+**  gu = MeshRemodelGeomUtils()<br/>
+**  gu.circumcenter(A,B,C)<br/>
+**  gu.circumradius(A,B,C)<br/>
+**  gu.inradius(A,B,C)<br/>
+**  gu.incenter(A,B,C)<br/>
+**  gu.dist(A,B)<br/>
+**  gu.getDistance3d(Ax,Ay,Az,Bx,By,Bz)<br/>
+**  gu.isCoplanar(A,B,C)<br/>
+**  gu.isColinear(A,B,C)<br/>
+**  gu.nearestPoint(pt, pts, exclude)<br/>
+**  gu.sortPoints(pts)<br/>
+**  gu.midpoint(A,B)<br/>
 * 2019.08.20 (version 1.28)<br/>
 ** add sketch radius precision to settings
 * 2019.08.20 (version 1.27)<br/>
