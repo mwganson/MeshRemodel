@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2019.08.20"
-__version__ = "1.25"
-version = 1.25
+__version__ = "1.26"
+version = 1.26
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -172,8 +172,7 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
             if self.isCoplanar(trio,v):
                 coplanar.append(Part.Point(v.Point).toShape())
         coplanar.extend([Part.Point(v).toShape() for v in trio])
-        if len(coplanar) == 3: #failed, so include all selected points
-            coplanar = ([Part.Point(v).toShape() for v in self.pts])
+
         Part.show(Part.makeCompound(coplanar),"MR_Points_Coplanar")
         doc.ActiveObject.ViewObject.PointSize = point_size
         if self.obj and hasattr(self.obj,"ViewObject"):
@@ -191,15 +190,39 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
         doc.commitTransaction()
         #QtGui.QApplication.restoreOverrideCursor()
         return
+#source for this block of code: https://stackoverflow.com/questions/9866452/calculate-volume-of-any-tetrahedron-given-4-points
+#4 points are coplanar if the tetrahedron defined by them has volume = 0
+##################################################################
+    def determinant_3x3(self,m):
+        return (m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
+                m[1][0] * (m[0][1] * m[2][2] - m[0][2] * m[2][1]) +
+                m[2][0] * (m[0][1] * m[1][2] - m[0][2] * m[1][1]))
+
+
+    def subtract(self, a, b):
+        return (a[0] - b[0],
+                a[1] - b[1],
+                a[2] - b[2])
+
+    def tetrahedron_calc_volume(self, a, b, c, d):
+        return (abs(self.determinant_3x3((self.subtract(a, b),
+                                 self.subtract(b, c),
+                                 self.subtract(c, d),
+                                 ))) / 6.0)
+
+#a = [0.0, 0.0, 0.0]
+#d = [2.0, 0.0, 0.0]
+#c = [0.0, 2.0, 0.0]
+#b = [0.0, 0.0, 2.0]
+
+#print(tetrahedron_calc_volume(a, b, c, d))
 
     def isCoplanar(self,trio,pt):
         """trio is a list of vertices, pt is a vertex, return True if all 4 are coplanar"""
         epsilon = 1e-3
-        A,B,C = trio[0],trio[1],trio[2]
-        poly = Part.makePolygon([A,B,C,pt.Point])
-        #Part.show(poly)
-        bb = poly.BoundBox
-        vol = bb.XLength*bb.YLength*bb.ZLength #one will be ~zero if coplanar
+        A,B,C,D = trio[0],trio[1],trio[2],pt.Point
+        vol = self.tetrahedron_calc_volume(A,B,C,D)
+
         if vol <= epsilon:
             return True
         return False
@@ -225,7 +248,9 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
                     if len(s.Object.Shape.Vertexes)==1:
                         self.pts.append(s.Object.Shape.Vertexes[0].Point)
                         count += 1
-        if count >= 3:
+            if count > 3:
+                return False
+        if count == 3:
             return True
         return False
 
