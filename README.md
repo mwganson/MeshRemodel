@@ -67,6 +67,10 @@ Select one or more wire objects to enable this command.  It uses Draft.makeSketc
 Select 2 or more sketches to enable this command.  This uses Sketcher workbench merge sketches command.  It is here as a convenience. 
 <br/>
 <br/>
+## Validate Sketch
+<img src="Resources/icons/ValidateSketch.png" alt = "validate sketch"><br/>
+Opens Sketch workbench validate sketch tool.  Enabled only if you have 1 sketch selected.  It is here as a convenience.<br/>
+<br/>
 ## Settings
 <img src="Resources/icons/Settings.png" alt="settings"><br/>
 ### Keep toolbar active
@@ -80,6 +84,10 @@ This sets the line width on all lines created with the workbench.  It does not a
 <br/>
 
 #### Release notes:<br/>
+* 2019.08.19 (version 1.22)<br/>
+** convenience link to sketcher validate tool
+* 2019.08.19 (version 1.21)<br/>
+** fix for polygons needing coincidence constraints
 * 2019.08.19 (version 1.20)<br/>
 ** add coplanar points object creation<br/>
 ** revert automatic selection of bspline and polygons for easier redo<br/>

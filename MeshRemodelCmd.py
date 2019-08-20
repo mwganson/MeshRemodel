@@ -905,6 +905,43 @@ class MeshRemodelMergeSketchesCommandClass(object):
 
 # end merge sketches
 
+####################################################################################
+
+# validate sketch
+class MeshRemodelValidateSketchCommandClass(object):
+    """Validate sketch"""
+
+    def __init__(self):
+        self.objs = []
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'ValidateSketch.png') ,
+            'MenuText': "&Validate sketch" ,
+            'ToolTip' : "Validate selected sketch with sketcher validate sketch tool"}
+ 
+    def Activated(self):
+        Gui.runCommand("Sketcher_ValidateSketch")
+        return
+   
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getSelectionEx()
+        if len(sel) == 0:
+            return False
+        count = 0
+        self.objs = []
+        for s in sel:
+            if hasattr(s,"Object"):
+                if "Sketch" in s.Object.Name:
+                    self.objs.append(s.Object)
+                    count += 1
+        if count == 1:
+            return True
+        return False
+
+# end validate sketch
+
 ##################################################################################################
 # initialize
 
@@ -920,6 +957,7 @@ def initialize():
         Gui.addCommand("MeshRemodelCreateWire", MeshRemodelCreateWireCommandClass())
         Gui.addCommand("MeshRemodelCreateSketch", MeshRemodelCreateSketchCommandClass())
         Gui.addCommand("MeshRemodelMergeSketches", MeshRemodelMergeSketchesCommandClass())
+        Gui.addCommand("MeshRemodelValidateSketch", MeshRemodelValidateSketchCommandClass())
         Gui.addCommand("MeshRemodelSettings", MeshRemodelSettingsCommandClass())
 
 

@@ -68,6 +68,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelCreateWire",
                     "MeshRemodelCreateSketch",
                     "MeshRemodelMergeSketches",
+                    "MeshRemodelValidateSketch",
                     "MeshRemodelSettings"] # A list of command names created in the line above
         self.appendToolbar("MeshRemodel Commands",self.list[:-1]) # leave settings off toolbar
         self.appendMenu("Mesh&Remodel",self.list) # creates a new menu
