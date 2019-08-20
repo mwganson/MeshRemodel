@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2019.08.20"
-__version__ = "1.28"
-version = 1.28
+__version__ = "1.29"
+version = 1.29
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -43,7 +43,202 @@ iconPath = os.path.join( __dir__, 'Resources', 'icons' )
 keepToolbar = False
 windowFlags = QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint #no ? in title bar
 
+######################################################################################
+# geometry utilities
 
+class MeshRemodelGeomUtils(object):
+    """Geometry Utilities"""
+
+#source for this block of code: https://stackoverflow.com/questions/9866452/calculate-volume-of-any-tetrahedron-given-4-points
+#4 points are coplanar if the tetrahedron defined by them has volume = 0
+##################################################################
+    def determinant_3x3(self,m):
+        """helper for isCoplanar()"""
+        return (m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
+                m[1][0] * (m[0][1] * m[2][2] - m[0][2] * m[2][1]) +
+                m[2][0] * (m[0][1] * m[1][2] - m[0][2] * m[1][1]))
+
+
+    def subtract(self, a, b):
+        """ helper for isCoplanar()"""
+        return (a[0] - b[0],
+                a[1] - b[1],
+                a[2] - b[2])
+
+    def tetrahedron_calc_volume(self, a, b, c, d):
+        """helper for isCoplanar()"""
+        return (abs(self.determinant_3x3((self.subtract(a, b),
+                                 self.subtract(b, c),
+                                 self.subtract(c, d),
+                                 ))) / 6.0)
+
+#a = [0.0, 0.0, 0.0]
+#d = [2.0, 0.0, 0.0]
+#c = [0.0, 2.0, 0.0]
+#b = [0.0, 0.0, 2.0]
+
+#print(tetrahedron_calc_volume(a, b, c, d))
+    def isCoplanar(self, trio, pt, tol=1e-3):
+        """ isCoplanar(trio, pt, tol=1e-3)
+            trio is a 3-element list of vectors, pt is a vector to test, tol is tolerance, return True if all 4 are coplanar
+            test is done by creating a tetrahedron and testing its volume against tol
+            a tetrahedron from 4 coplanar points should have volume ~= 0
+        """
+        if len(trio) != 3:
+            raise Exception("MeshRemodel GeomUtils Error: isCoplanar() trio parameter must be list of 3 vectors")
+        A,B,C,D = trio[0],trio[1],trio[2],pt
+        vol = self.tetrahedron_calc_volume(A,B,C,D)
+
+        if vol <= tol:
+            return True
+        return False
+
+    def midpoint(self, A, B):
+        """ midpoint(A, B)
+            A,B are vectors, return midpoint"""   
+        mid = FreeCAD.Base.Vector()
+        mid.x = (A.x + B.x)/2.0
+        mid.y = (A.y + B.y)/2.0
+        mid.z = (A.z + B.z)/2.0
+        return mid
+
+    def dist(self, p1, p2):
+        """ dist (p1, p2)
+            3d distance between vectors p1 and p2"""
+        return self.getDistance3d(p1[0],p1[1],p1[2],p2[0],p2[1],p2[2])
+
+    def getDistance3d(self, x1, y1, z1, x2, y2, z2):
+        """ getDistance3d(x1, y1, z1, x2, y2, z2)
+            3d distance between x1,y1,z1 and x2,y2,z2 float parameters"""
+        return math.sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
+
+    def sortPoints(self,pts):
+        """ sortPoints(pts)
+            sort pts, a list of vectors, according to distance from one point to the next
+            pts[0] is taken first, then the nearest point to it is placed at pts[1]
+            then pts[1] is used to find the nearest point to it and placed at pts[2], and so on
+        """
+        newList = [pts[0]]
+        for ii in range(0, len(pts)):
+            newList.extend([self.nearestPoint(newList[ii],pts,newList)])
+        return newList    
+
+    def nearestPoint(self, pt, pts, exclude):
+        """ nearestPoint(pt, pts, exclude)
+            pt is a vector, pts a list of vectors
+            exlude is a list of vectors to exclude from process
+            return nearest point to pt in pts and not in exclude"""
+        if len(pts) == 0: #should never happen
+            raise Exception("MeshRemodel GeomUtils Error: nearestPoint() pts length = 0\n")
+        nearest = pts[0]
+        d = 10**100
+        for p in pts:
+            if p in exclude:
+                continue
+            dis = self.dist(pt, p)
+            if dis < d:
+                d = dis
+                nearest = p
+        return nearest
+
+    def isColinear(self,A,B,C):
+        """ isColinear(A, B, C)
+            determine whether vectors A,B,C are colinear """
+        return DraftVecUtils.isColinear([A,B,C])
+
+    def incenter(A,B,C):
+        """ incenter(A, B, C)
+            return incenter (vector) of triangle at vectors A,B,C 
+            incenter is center of circle fitting inside the triangle
+            tangent to all 3 sides
+            raises exception if A,B,C are colinear
+        """
+
+        if self.isColinear(A,B,C):
+            raise Exception("MeshRemodel Error: incenter() A,B,C are colinear")
+
+        Ax,Ay,Az = A[0],A[1],A[2] 
+        Bx,By,Bz = B[0],B[1],B[2]
+        Cx,Cy,Cz = C[0],C[1],C[2]
+ 
+        a = self.dist(B,C)
+        b = self.dist(C,A)
+        c = self.dist(A,B)
+        s = a+b+c
+        
+        Ix = (a*Ax+b*Bx+c*Cx)/s
+        Iy = (a*Ay+b*By+c*Cy)/s
+        Iz = (a*Az+b*Bz+c*Cz)/s
+        I = FreeCAD.Base.Vector(Ix,Iy,Iz)
+        return I
+
+    def inradius(A,B,C):
+        """ inradius(A, B, C)
+            return inradius of triangle A,B,C 
+            this is radius of incircle, the circle that
+            fits inside the triangle, tangent to all 3 sides
+        """
+        return self.dist(A, self.incenter(A,B,C))
+
+#python code below was adapted from this javascript code
+#from here: https://gamedev.stackexchange.com/questions/60630/how-do-i-find-the-circumcenter-of-a-triangle-in-3d
+#in a question answered by user greenthings
+
+#function circumcenter(A,B,C) {
+#    var z = crossprod(subv(C,B),subv(A,B));
+#    var a=vlen(subv(A,B)),b=vlen(subv(B,C)),c=vlen(subv(C,A));
+#    var r = ((b*b + c*c - a*a)/(2*b*c)) * outeradius(a,b,c);
+#    return addv(midpoint(A,B),multv(normaliz(crossprod(subv(A,B),z)),r));
+#}
+
+#function outeradius(a,b,c) { /// 3 lens
+#    return (a*b*c) / (4*sss_area(a,b,c));
+#}
+
+#function sss_area(a,b,c) {
+#    var sp = (a+b+c)*0.5;
+#    return Math.sqrt(sp*(sp-a)*(sp-b)*(sp-c));
+#    //semi perimeter
+#}
+
+    def circumcenter(self,A,B,C):
+        """ circumcenter(A, B, C)
+            return the circumcenter of triangle A,B,C
+            the circumcenter is the circle that passes through
+            all 3 of the triangle's vertices
+            raises exception if A,B,C are colinear
+        """
+        if self.isColinear(A,B,C):
+            raise Exception("MeshRemodel Error: circumcenter() A,B,C are colinear")
+
+        z = C.sub(B).cross(A.sub(B))
+        a = A.sub(B).Length
+        b = B.sub(C).Length
+        c = C.sub(A).Length
+        r = ((b*b + c*c - a*a)/(2*b*c)) * self.outerradius(a,b,c)
+        return  A.sub(B).cross(z).normalize().multiply(r).add(self.midpoint(A,B))
+
+    def outerradius(self, a, b, c):
+        """ helper for circumcenter()"""
+        return (a*b*c) / (4*self.sss_area(a,b,c))
+
+    def sss_area(self,a,b,c): #semiperimeter
+        """ helper for circumcenter()"""
+        sp = (a+b+c)*0.5;
+        return math.sqrt(sp*(sp-a)*(sp-b)*(sp-c))
+
+    def circumradius(self, A,B,C):
+        """ circumradius(A, B, C)
+            returns the radius of circumcircle of triangle A,B,C
+            A,B,C are vectors
+            the circumcircle is the circle passing through A, B, and C
+
+        """
+        return self.dist(A, self.circumcenter(A,B,C))
+
+
+
+gu = MeshRemodelGeomUtils()
 #######################################################################################
 # Settings
 
@@ -178,8 +373,9 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
         if self.obj and hasattr(self.obj,"Shape"):
             candidates = self.obj.Shape.Vertexes
         coplanar = []
+
         for v in candidates:
-            if self.isCoplanar(trio,v):
+            if gu.isCoplanar(trio,v.Point):
                 coplanar.append(Part.Point(v.Point).toShape())
         coplanar.extend([Part.Point(v).toShape() for v in trio])
 
@@ -201,43 +397,7 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
             doc.commitTransaction()
         #QtGui.QApplication.restoreOverrideCursor()
         return
-#source for this block of code: https://stackoverflow.com/questions/9866452/calculate-volume-of-any-tetrahedron-given-4-points
-#4 points are coplanar if the tetrahedron defined by them has volume = 0
-##################################################################
-    def determinant_3x3(self,m):
-        return (m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
-                m[1][0] * (m[0][1] * m[2][2] - m[0][2] * m[2][1]) +
-                m[2][0] * (m[0][1] * m[1][2] - m[0][2] * m[1][1]))
 
-
-    def subtract(self, a, b):
-        return (a[0] - b[0],
-                a[1] - b[1],
-                a[2] - b[2])
-
-    def tetrahedron_calc_volume(self, a, b, c, d):
-        return (abs(self.determinant_3x3((self.subtract(a, b),
-                                 self.subtract(b, c),
-                                 self.subtract(c, d),
-                                 ))) / 6.0)
-
-#a = [0.0, 0.0, 0.0]
-#d = [2.0, 0.0, 0.0]
-#c = [0.0, 2.0, 0.0]
-#b = [0.0, 0.0, 2.0]
-
-#print(tetrahedron_calc_volume(a, b, c, d))
-
-    def isCoplanar(self,trio,pt):
-        """trio is a list of vertices, pt is a vertex, return True if all 4 are coplanar"""
-        epsilon = 1e-3
-        A,B,C,D = trio[0],trio[1],trio[2],pt.Point
-        vol = self.tetrahedron_calc_volume(A,B,C,D)
-
-        if vol <= epsilon:
-            return True
-        return False
-   
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
@@ -299,9 +459,9 @@ class MeshRemodelCreateLineCommandClass(object):
             doc.ActiveObject.ViewObject.LineWidth=line_width
             Gui.Selection.clearSelection()
             Gui.Selection.addSelection(doc.getObject(lineName))
-            FreeCAD.Console.PrintMessage(lineName+": length = "+str(line.Length)+"\n  midpoint at "+str(self.midpoint(self.pts[0],self.pts[1]))+"\n")
+            FreeCAD.Console.PrintMessage(lineName+": length = "+str(line.Length)+"\n  midpoint at "+str(gu.midpoint(self.pts[0],self.pts[1]))+"\n")
         if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
-            Part.show(Part.Point(self.midpoint(self.pts[0],self.pts[1])).toShape(),lineName+"_Mid")
+            Part.show(Part.Point(gu.midpoint(self.pts[0],self.pts[1])).toShape(),lineName+"_Mid")
             doc.ActiveObject.ViewObject.PointSize = point_size
         doc.recompute()
         doc.commitTransaction()
@@ -330,12 +490,6 @@ class MeshRemodelCreateLineCommandClass(object):
             return True
         return False
 
-    def midpoint(self, A, B):       
-        mid = FreeCAD.Base.Vector()
-        mid.x = (A.x + B.x)/2.0
-        mid.y = (A.y + B.y)/2.0
-        mid.z = (A.z + B.z)/2.0
-        return mid
 # end create line class
 
 ####################################################################################
@@ -365,8 +519,8 @@ class MeshRemodelCreatePolygonCommandClass(object):
             self.pts.append(self.pts[0]) #don't close polygon on shift+click
 
         if modifiers == QtCore.Qt.AltModifier.__or__(QtCore.Qt.ShiftModifier) or modifiers == QtCore.Qt.AltModifier:
-            poly = Part.makePolygon(self.sortPoints(self.pts))
-            lineList = self.makePolygon(self.sortPoints(self.pts))
+            poly = Part.makePolygon(gu.sortPoints(self.pts))
+            lineList = self.makePolygon(gu.sortPoints(self.pts))
         else:
             poly = Part.makePolygon(self.pts)
             lineList = self.makePolygon(self.pts)
@@ -397,42 +551,12 @@ class MeshRemodelCreatePolygonCommandClass(object):
         return
 
     def makePolygon(self,pts):
-        """make list of lines out of the pts list one line at a time, return the list"""
+        """make list of lines out of the pts (vectors) list one line at a time, return the list"""
         lines=[]
         for ii in range(1,len(pts)):
             if pts[ii-1] != pts[ii]:
                 lines.append(Part.makeLine(pts[ii-1],pts[ii]))
         return lines
-            
-            
-
-    def dist(self, p1, p2):
-        return self.getDistance3d(p1[0],p1[1],p1[2],p2[0],p2[1],p2[2])
-
-    def getDistance3d(self, x1, y1, z1, x2, y2, z2):
-        return math.sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
-
-    def sortPoints(self,pts):
-        """sort pts, a list of points, according to distance from one point to the next"""
-        newList = [pts[0]]
-        for ii in range(0, len(pts)):
-            newList.extend([self.nearestPoint(newList[ii],pts,newList)])
-        return newList    
-
-    def nearestPoint(self, pt, pts, exclude):
-        """return nearest point to pt in pts and not in exclude"""
-        if len(pts) == 0:
-            raise Exception("MeshRemodel Error: nearestPoint(pt, pts) pts length = 0\n")
-        nearest = pts[0]
-        d = 10**100
-        for p in pts:
-            if p in exclude:
-                continue
-            dis = self.dist(pt, p)
-            if dis < d:
-                d = dis
-                nearest = p
-        return nearest
 
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
@@ -487,7 +611,7 @@ class MeshRemodelCreateBSplineCommandClass(object):
             is_periodic=False #don't close bspline on shift+click
         bspline = Part.BSplineCurve()
         if modifiers == QtCore.Qt.AltModifier or modifiers == QtCore.Qt.AltModifier.__or__(QtCore.Qt.ShiftModifier) or modifiers == QtCore.Qt.ShiftModifier:
-            sortedPoints = self.sortPoints(self.pts)[:-1]
+            sortedPoints = gu.sortPoints(self.pts)[:-1]
             bspline.interpolate(sortedPoints,PeriodicFlag=is_periodic)
         else:
             bspline.interpolate(self.pts,PeriodicFlag=is_periodic)
@@ -504,34 +628,6 @@ class MeshRemodelCreateBSplineCommandClass(object):
         doc.commitTransaction()
         #QtGui.QApplication.restoreOverrideCursor()
         return
-
-    def dist(self, p1, p2):
-        return self.getDistance3d(p1[0],p1[1],p1[2],p2[0],p2[1],p2[2])
-
-    def getDistance3d(self, x1, y1, z1, x2, y2, z2):
-        return math.sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
-
-    def sortPoints(self,pts):
-        """sort pts, a list of points, according to distance from one point to the next"""
-        newList = [pts[0]]
-        for ii in range(0, len(pts)):
-            newList.extend([self.nearestPoint(newList[ii],pts,newList)])
-        return newList    
-
-    def nearestPoint(self, pt, pts, exclude):
-        """return nearest point to pt in pts and not in exclude"""
-        if len(pts) == 0:
-            raise Exception("MeshRemodel Error: nearestPoint(pt, pts) pts length = 0\n")
-        nearest = pts[0]
-        d = 10**100
-        for p in pts:
-            if p in exclude:
-                continue
-            dis = self.dist(pt, p)
-            if dis < d:
-                d = dis
-                nearest = p
-        return nearest
 
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
@@ -587,26 +683,6 @@ class MeshRemodelCreateCircleCommandClass(object):
         #    "By default pnt=Vector(0,0,0), dir=Vector(0,0,1), angle1=0 and angle2=360"
         #);
 
-#python code below was adapted from this javascript code
-#from here: https://gamedev.stackexchange.com/questions/60630/how-do-i-find-the-circumcenter-of-a-triangle-in-3d
-#in a question answered by user greenthings
-
-#function circumcenter(A,B,C) {
-#    var z = crossprod(subv(C,B),subv(A,B));
-#    var a=vlen(subv(A,B)),b=vlen(subv(B,C)),c=vlen(subv(C,A));
-#    var r = ((b*b + c*c - a*a)/(2*b*c)) * outeradius(a,b,c);
-#    return addv(midpoint(A,B),multv(normaliz(crossprod(subv(A,B),z)),r));
-#}
-
-#function outeradius(a,b,c) { /// 3 lens
-#    return (a*b*c) / (4*sss_area(a,b,c));
-#}
-
-#function sss_area(a,b,c) {
-#    var sp = (a+b+c)*0.5;
-#    return Math.sqrt(sp*(sp-a)*(sp-b)*(sp-c));
-#    //semi perimeter
-#}
         modifiers = QtGui.QApplication.keyboardModifiers()
         poly = Part.makePolygon(self.pts)
         #Part.show(poly)
@@ -616,39 +692,25 @@ class MeshRemodelCreateCircleCommandClass(object):
         B = self.pts[1]
         C = self.pts[2]
 
-        if DraftVecUtils.isColinear([A,B,C]):
+        if gu.isColinear([A,B,C]):
             FreeCAD.Console.PrintError("MeshRemodel Error: Cannot make arc/circle from 3 colinear points\n")
             return
 
-        #Ax,Ay,Az = A[0],A[1],A[2] #this would find the incenter (I), not needed here
-        #Bx,By,Bz = B[0],B[1],B[2]
-        #Cx,Cy,Cz = C[0],C[1],C[2]
- 
-        #a = self.dist(B,C)
-        #b = self.dist(C,A)
-        #c = self.dist(A,B)
-        #s = a+b+c
-        
-        #Ix = (a*Ax+b*Bx+c*Cx)/s
-        #Iy = (a*Ay+b*By+c*Cy)/s
-        #Iz = (a*Az+b*Bz+c*Cz)/s
-        #I = FreeCAD.Base.Vector(Ix,Iy,Iz)
-
-        I = self.circumcenter(A,B,C)
-        radius = self.dist(I,A)
+        center = gu.circumcenter(A,B,C)
+        radius = gu.circumradius(A,B,C)
 
         doc.openTransaction("Create circle")
-        circle = Part.makeCircle(radius, I, normal)
+        circle = Part.makeCircle(radius, center, normal)
         circName="MR_Ref"
         if not modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.ControlModifier):
             Part.show(circle,"MR_Circle")
             circName = doc.ActiveObject.Name
             doc.ActiveObject.ViewObject.LineWidth=line_width
-            FreeCAD.Console.PrintMessage(circName+": radius = "+str(radius)+"\n  center at "+str(I)+"\n")
+            FreeCAD.Console.PrintMessage(circName+": radius = "+str(radius)+"\n  center at "+str(center)+"\n")
             Gui.Selection.clearSelection()
             Gui.Selection.addSelection(doc.getObject(circName))
         if modifiers == QtCore.Qt.ControlModifier or modifiers==QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
-            Part.show(Part.Point(I).toShape(),circName+"_Ctr") #show the center point on ctrl click or shift+ctrl click
+            Part.show(Part.Point(center).toShape(),circName+"_Ctr") #show the center point on ctrl click or shift+ctrl click
             doc.ActiveObject.ViewObject.PointSize = point_size
 
         doc.recompute()
@@ -656,33 +718,7 @@ class MeshRemodelCreateCircleCommandClass(object):
         #QtGui.QApplication.restoreOverrideCursor()
         return
 
-    def circumcenter(self,A,B,C):
-        z = C.sub(B).cross(A.sub(B))
-        a = A.sub(B).Length
-        b = B.sub(C).Length
-        c = C.sub(A).Length
-        r = ((b*b + c*c - a*a)/(2*b*c)) * self.outerradius(a,b,c)
-        return  A.sub(B).cross(z).normalize().multiply(r).add(self.midpoint(A,B))
 
-    def midpoint(self, A, B):       
-        mid = FreeCAD.Base.Vector()
-        mid.x = (A.x + B.x)/2.0
-        mid.y = (A.y + B.y)/2.0
-        mid.z = (A.z + B.z)/2.0
-        return mid
-
-    def outerradius(self, a, b, c):
-        return (a*b*c) / (4*self.sss_area(a,b,c))
-
-    def sss_area(self,a,b,c): #semiperimeter
-        sp = (a+b+c)*0.5;
-        return math.sqrt(sp*(sp-a)*(sp-b)*(sp-c))
-
-    def dist(self, p1, p2):
-        return self.getDistance3d(p1[0],p1[1],p1[2],p2[0],p2[1],p2[2])
-
-    def getDistance3d(self, x1, y1, z1, x2, y2, z2):
-        return math.sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
 
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
@@ -736,11 +772,11 @@ class MeshRemodelCreateArcCommandClass(object):
         B = self.pts[1]
         C = self.pts[2]
 
-        if DraftVecUtils.isColinear([A,B,C]):
+        if gu.isColinear([A,B,C]):
             FreeCAD.Console.PrintError("MeshRemodel Error: Cannot make arc/circle from 3 colinear points\n")
             return
-        I = self.circumcenter(A,B,C)
-        radius = self.dist(I,A)
+        center = gu.circumcenter(A,B,C)
+        radius = gu.circumradius(A,B,C)
 
         doc.openTransaction("Create Arc")
         arc = Part.ArcOfCircle(A,B,C)
@@ -750,44 +786,18 @@ class MeshRemodelCreateArcCommandClass(object):
             Part.show(arc.toShape(),"MR_Arc")
             arcName = doc.ActiveObject.Name
             doc.ActiveObject.ViewObject.LineWidth=line_width
-            FreeCAD.Console.PrintMessage(arcName+": radius = "+str(radius)+"\n  center at "+str(I)+"\n")
+            FreeCAD.Console.PrintMessage(arcName+": radius = "+str(radius)+"\n  center at "+str(center)+"\n")
             Gui.Selection.clearSelection()
             Gui.Selection.addSelection(doc.getObject(arcName))
         if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
-            Part.show(Part.Point(I).toShape(),arcName+"_Ctr") #show the center point
+            Part.show(Part.Point(center).toShape(),arcName+"_Ctr") #show the center point
             doc.ActiveObject.ViewObject.PointSize = point_size
         doc.recompute()
         doc.commitTransaction()
         #QtGui.QApplication.restoreOverrideCursor()
         return
 
-    def circumcenter(self,A,B,C):
-        z = C.sub(B).cross(A.sub(B))
-        a = A.sub(B).Length
-        b = B.sub(C).Length
-        c = C.sub(A).Length
-        r = ((b*b + c*c - a*a)/(2*b*c)) * self.outerradius(a,b,c)
-        return  A.sub(B).cross(z).normalize().multiply(r).add(self.midpoint(A,B))
 
-    def midpoint(self, A, B):       
-        mid = FreeCAD.Base.Vector()
-        mid.x = (A.x + B.x)/2.0
-        mid.y = (A.y + B.y)/2.0
-        mid.z = (A.z + B.z)/2.0
-        return mid
-
-    def outerradius(self, a, b, c):
-        return (a*b*c) / (4*self.sss_area(a,b,c))
-
-    def sss_area(self,a,b,c): #semiperimeter
-        sp = (a+b+c)*0.5;
-        return math.sqrt(sp*(sp-a)*(sp-b)*(sp-c))
-
-    def dist(self, p1, p2):
-        return self.getDistance3d(p1[0],p1[1],p1[2],p2[0],p2[1],p2[2])
-
-    def getDistance3d(self, x1, y1, z1, x2, y2, z2):
-        return math.sqrt((x1 - x2)**2 + (y1 - y2)**2 + (z1 - z2)**2)
 
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
