@@ -82,8 +82,12 @@ This sets the point size on all points created with the workbench.  It does not 
 ### Line width
 This sets the line width on all lines created with the workbench.  It does not affect objects already created after the setting is changed, only those created after the setting is changed.  Does not affect wire objects or sketch objects, only the edges of arcs, circles, lines, and polygons.  Default: 5.0<br/>
 <br/>
-
+### Sketch radius precision
+This sets the precision to use when constraining radii (for circles and arcs) when creating sketches.  These are integer values from -1 to 12.  If -1, then no constraining of any radii occurs.  If 0, then radii are constrained to maximum precision.  If > 0, then radius constraints are rounded to that many digits precision, e.g. 1 results in 1.5, 2 in 1.49, 3 in 1.498, etc.  Additionally, if > 0, then equality constraints are used where possible (where radii round to the same value). Default: 1<br/>
+<br/>
 #### Release notes:<br/>
+* 2019.08.20 (version 1.28)<br/>
+** add sketch radius precision to settings
 * 2019.08.20 (version 1.27)<br/>
 ** add shift+click option in creating coplanar points that are not exploded
 * 2019.08.20 (version 1.26)<br/>
