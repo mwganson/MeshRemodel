@@ -84,6 +84,9 @@ This sets the line width on all lines created with the workbench.  It does not a
 <br/>
 
 #### Release notes:<br/>
+* 2019.08.20 (version 1.25)<br/>
+** make sketch now constrains radii to precision = 0.1 mm
+** try to place sketch even with first selected object center of mass
 * 2019.08.20 (version 1.24)<br/>
 ** remove ? from title bar in settings dialog
 * 2019.08.19 (version 1.23)<br/>
