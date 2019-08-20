@@ -86,6 +86,8 @@ This sets the line width on all lines created with the workbench.  It does not a
 This sets the precision to use when constraining radii (for circles and arcs) when creating sketches.  These are integer values from -1 to 12.  If -1, then no constraining of any radii occurs.  If 0, then radii are constrained to maximum precision.  If > 0, then radius constraints are rounded to that many digits precision, e.g. 1 results in 1.5, 2 in 1.49, 3 in 1.498, etc.  Additionally, if > 0, then equality constraints are used where possible (where radii round to the same value). Default: 1<br/>
 <br/>
 #### Release notes:<br/>
+* 2019.08.20 (version 1.291)<br/>
+** fix bug in calls to gu.isColinear()
 * 2019.08.20 (version 1.29)<br/>
 ** reorganize code internally, consolidating geometry utilities into a single class<br/>
 ** accessible via python:<br/>

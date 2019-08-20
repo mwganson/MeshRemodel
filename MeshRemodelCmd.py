@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2019.08.20"
-__version__ = "1.29"
-version = 1.29
+__version__ = "1.291"
+version = 1.291
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -692,7 +692,7 @@ class MeshRemodelCreateCircleCommandClass(object):
         B = self.pts[1]
         C = self.pts[2]
 
-        if gu.isColinear([A,B,C]):
+        if gu.isColinear(A,B,C):
             FreeCAD.Console.PrintError("MeshRemodel Error: Cannot make arc/circle from 3 colinear points\n")
             return
 
@@ -772,7 +772,7 @@ class MeshRemodelCreateArcCommandClass(object):
         B = self.pts[1]
         C = self.pts[2]
 
-        if gu.isColinear([A,B,C]):
+        if gu.isColinear(A,B,C):
             FreeCAD.Console.PrintError("MeshRemodel Error: Cannot make arc/circle from 3 colinear points\n")
             return
         center = gu.circumcenter(A,B,C)
@@ -858,12 +858,13 @@ class MeshRemodelCreateSketchCommandClass(object):
         if modifiers != QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             if hasattr(self.objs[0],"Shape"):
                 shp = self.objs[0].Shape
-                normal = DraftGeomUtils.getNormal(shp)            
+                normal = DraftGeomUtils.getNormal(shp).normalize()          
                 com = shp.CenterOfMass
                 pl = sketch.Placement
                 pl.Base.x += dir * com.x * normal.x
                 pl.Base.y += dir * com.y * normal.y
                 pl.Base.z += dir * com.z * normal.z
+                
                 sketch.Placement = pl
 
         doc.recompute()
