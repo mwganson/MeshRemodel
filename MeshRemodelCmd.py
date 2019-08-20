@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2019.08.20"
-__version__ = "1.24"
-version = 1.24
+__version__ = "1.25"
+version = 1.25
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -164,15 +164,20 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
         doc.openTransaction("Create coplanar")
         modifiers = QtGui.QApplication.keyboardModifiers()
         trio = [self.pts[0],self.pts[1],self.pts[2]]
-        candidates = self.obj.Shape.Vertexes
+        candidates = []
+        if self.obj and hasattr(self.obj,"Shape"):
+            candidates = self.obj.Shape.Vertexes
         coplanar = []
         for v in candidates:
             if self.isCoplanar(trio,v):
                 coplanar.append(Part.Point(v.Point).toShape())
         coplanar.extend([Part.Point(v).toShape() for v in trio])
+        if len(coplanar) == 3: #failed, so include all selected points
+            coplanar = ([Part.Point(v).toShape() for v in self.pts])
         Part.show(Part.makeCompound(coplanar),"MR_Points_Coplanar")
         doc.ActiveObject.ViewObject.PointSize = point_size
-        self.obj.ViewObject.Visibility = False
+        if self.obj and hasattr(self.obj,"ViewObject"):
+            self.obj.ViewObject.Visibility = False
         doc.recompute()
         doc.commitTransaction()
         doc.openTransaction("explode coplanar points")
@@ -189,7 +194,7 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
 
     def isCoplanar(self,trio,pt):
         """trio is a list of vertices, pt is a vertex, return True if all 4 are coplanar"""
-        epsilon = 1e-7
+        epsilon = 1e-3
         A,B,C = trio[0],trio[1],trio[2]
         poly = Part.makePolygon([A,B,C,pt.Point])
         #Part.show(poly)
@@ -216,9 +221,11 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
                 for pt in s.PickedPoints:
                     self.pts.append(pt)
                     count += 1
-                    if count > 3:
-                        return False
-        if count == 3:
+                if len(p)==0: #might be individual part point objects
+                    if len(s.Object.Shape.Vertexes)==1:
+                        self.pts.append(s.Object.Shape.Vertexes[0].Point)
+                        count += 1
+        if count >= 3:
             return True
         return False
 
@@ -390,6 +397,7 @@ class MeshRemodelCreatePolygonCommandClass(object):
                 d = dis
                 nearest = p
         return nearest
+
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
@@ -783,18 +791,35 @@ class MeshRemodelCreateSketchCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateSketch.png') ,
             'MenuText': "Create s&ketch" ,
-            'ToolTip' : "Create a sketch from selected objects"}
+            'ToolTip' : "Create a sketch from selected objects\n(Attempts to place sketch)\n(If it fails, try again with Shift+Click)\n(Ctrl+Shift+Click to not try to place sketch)"}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
+        modifiers = QtGui.QApplication.keyboardModifiers()
+
         doc.openTransaction("Create sketch")
-        sketch = Draft.makeSketch(self.objs,autoconstraints=True)
+        sketch = Draft.makeSketch(self.objs,autoconstraints=True,radiusPrecision=1)
         doc.recompute()
         for o in self.objs:
             if hasattr(o,"ViewObject"):
                 o.ViewObject.Visibility=False
+        if modifiers == QtCore.Qt.ShiftModifier:
+            dir = -1
+        else:
+            dir = 1
+        if modifiers != QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
+            if hasattr(self.objs[0],"Shape"):
+                shp = self.objs[0].Shape
+                normal = DraftGeomUtils.getNormal(shp)            
+                com = shp.CenterOfMass
+                pl = sketch.Placement
+                pl.Base.x += dir * com.x * normal.x
+                pl.Base.y += dir * com.y * normal.y
+                pl.Base.z += dir * com.z * normal.z
+                sketch.Placement = pl
+
+        doc.recompute()
         doc.commitTransaction()
-        #QtGui.QApplication.restoreOverrideCursor()
         return
    
     def IsActive(self):
