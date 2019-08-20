@@ -84,6 +84,8 @@ This sets the line width on all lines created with the workbench.  It does not a
 <br/>
 
 #### Release notes:<br/>
+* 2019.08.20 (version 1.27)<br/>
+** add shift+click option in creating coplanar points that are not exploded
 * 2019.08.20 (version 1.26)<br/>
 ** fix coplanar point filter when original mesh was rotated
 * 2019.08.20 (version 1.25)<br/>
