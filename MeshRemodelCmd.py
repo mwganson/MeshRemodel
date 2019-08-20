@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2019.08.19"
-__version__ = "1.23"
-version = 1.23
+__date__    = "2019.08.20"
+__version__ = "1.24"
+version = 1.24
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -41,7 +41,7 @@ if FreeCAD.GuiUp:
 __dir__ = os.path.dirname(__file__)
 iconPath = os.path.join( __dir__, 'Resources', 'icons' )
 keepToolbar = False
-
+windowFlags = QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint #no ? in title bar
 
 
 #######################################################################################
@@ -65,7 +65,7 @@ class MeshRemodelSettingsCommandClass(object):
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         keep = pg.GetBool('KeepToolbar',False)
         items=["Keep the toolbar active","Do not keep the toolbar active","Change point size","Change line width","Cancel"]
-        item,ok = QtGui.QInputDialog.getItem(window,'Mesh Remodel','Mesh Remodel v'+__version__+'\nSettings\n\nSelect the settings option\n',items,0,False)
+        item,ok = QtGui.QInputDialog.getItem(window,'Mesh Remodel v'+__version__,'Settings\n\nSelect the settings option\n',items,0,False,windowFlags)
         if ok and item == items[-1]:
             return
         elif ok and item == items[0]:
