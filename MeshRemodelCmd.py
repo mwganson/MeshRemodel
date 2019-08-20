@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2019.08.19"
-__version__ = "1.21"
-version = 1.21
+__version__ = "1.23"
+version = 1.23
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -45,10 +45,10 @@ keepToolbar = False
 
 
 #######################################################################################
-# Keep Toolbar active even after leaving workbench
+# Settings
 
 class MeshRemodelSettingsCommandClass(object):
-    """Settings, currently only whether to keep toolbar after leaving workbench"""
+    """Settings, keep toolbar active, point size, line width"""
 
     def __init__(self):
         pass       
@@ -65,7 +65,7 @@ class MeshRemodelSettingsCommandClass(object):
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         keep = pg.GetBool('KeepToolbar',False)
         items=["Keep the toolbar active","Do not keep the toolbar active","Change point size","Change line width","Cancel"]
-        item,ok = QtGui.QInputDialog.getItem(window,'MeshRemodel','Settings\n\nSelect the settings option\n',items,0,False)
+        item,ok = QtGui.QInputDialog.getItem(window,'Mesh Remodel','Mesh Remodel v'+__version__+'\nSettings\n\nSelect the settings option\n',items,0,False)
         if ok and item == items[-1]:
             return
         elif ok and item == items[0]:
