@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2019.08.20"
-__version__ = "1.26"
-version = 1.26
+__version__ = "1.27"
+version = 1.27
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -153,7 +153,7 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateCoplanar.png') ,
             'MenuText': "Create copla&nar points object" ,
             'ToolTip' : "Create a coplanar points object from 3 selected points \nby selecting only those points that are coplanar with the 3 selected points\n\
-(Makes exploded compound for use with block select (Shift+B) tool)\n(Press Undo (Ctrl+Z) afterwards if you do not want it exploded)"}
+(Makes exploded compound for use with block select (Shift+B) tool)\n(Shift+Click or press Undo (Ctrl+Z) afterwards if you do not want it exploded)"}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
@@ -179,15 +179,16 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
             self.obj.ViewObject.Visibility = False
         doc.recompute()
         doc.commitTransaction()
-        doc.openTransaction("explode coplanar points")
-        import CompoundTools.Explode
-        input_obj = doc.ActiveObject
-        comp = CompoundTools.Explode.explodeCompound(input_obj)
-        input_obj.ViewObject.hide()
-        for obj in comp[1]:
-            obj.ViewObject.PointSize = point_size
-        doc.recompute()
-        doc.commitTransaction()
+        if modifiers != QtCore.Qt.ShiftModifier:
+            doc.openTransaction("explode coplanar points")
+            import CompoundTools.Explode
+            input_obj = doc.ActiveObject
+            comp = CompoundTools.Explode.explodeCompound(input_obj)
+            input_obj.ViewObject.hide()
+            for obj in comp[1]:
+                obj.ViewObject.PointSize = point_size
+            doc.recompute()
+            doc.commitTransaction()
         #QtGui.QApplication.restoreOverrideCursor()
         return
 #source for this block of code: https://stackoverflow.com/questions/9866452/calculate-volume-of-any-tetrahedron-given-4-points
