@@ -19,7 +19,7 @@ Select the mesh object in the tree, then use this command to create a points obj
 <br/>
 ## Create Coplanar Points Object
 <img src="Resources/icons/CreateCoplanar.png" alt = "create coplanar"><br/>
-Select 3 points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  These are packed into a compound, which is then exploded in order to support (Shift+B) block selection.  The exploding is done as a separate document transaction, thus enabling you to undo this (Ctrl+Z) if you would prefer it to not be exploded.<br/>
+Select 3 points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  These are packed into a compound, which is then exploded in order to support (Shift+B) block selection.  The exploding is done as a separate document transaction, thus enabling you to undo this (Ctrl+Z) if you would prefer it to not be exploded.  You can also use Shift+Click to bypass the explode operation.<br/>
 <br/>
 ## Create Line
 <img src="Resources/icons/CreateLine.png" alt = "create line"><br/>
