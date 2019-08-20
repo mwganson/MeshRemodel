@@ -84,6 +84,8 @@ This sets the line width on all lines created with the workbench.  It does not a
 <br/>
 
 #### Release notes:<br/>
+* 2019.08.20 (version 1.26)<br/>
+** fix coplanar point filter when original mesh was rotated
 * 2019.08.20 (version 1.25)<br/>
 ** make sketch now constrains radii to precision = 0.1 mm
 ** try to place sketch even with first selected object center of mass
