@@ -86,6 +86,22 @@ This sets the line width on all lines created with the workbench.  It does not a
 This sets the precision to use when constraining radii (for circles and arcs) when creating sketches.  These are integer values from -1 to 12.  If -1, then no constraining of any radii occurs.  If 0, then radii are constrained to maximum precision.  If > 0, then radius constraints are rounded to that many digits precision, e.g. 1 results in 1.5, 2 in 1.49, 3 in 1.498, etc.  Additionally, if > 0, then equality constraints are used where possible (where radii round to the same value). Default: 1<br/>
 <br/>
 #### Release notes:<br/>
+* 2019.08.20 (version 1.29)<br/>
+** reorganize code internally, consolidating geometry utilities into a single class
+** accessible via python:
+**  from MeshRemodelCmd import MeshRemodelGeomUtils
+**  gu = MeshRemodelGeomUtils()
+**  gu.circumcenter(A,B,C)
+**  gu.circumradius(A,B,C)
+**  gu.inradius(A,B,C) 
+**  gu.incenter(A,B,C)
+**  gu.dist(A,B)
+**  gu.getDistance3d(Ax,Ay,Az,Bx,By,Bz)
+**  gu.isCoplanar(A,B,C)
+**  gu.isColinear(A,B,C)
+**  gu.nearestPoint(pt, pts, exclude)
+**  gu.sortPoints(pts)
+**  gu.midpoint(A,B)
 * 2019.08.20 (version 1.28)<br/>
 ** add sketch radius precision to settings
 * 2019.08.20 (version 1.27)<br/>
