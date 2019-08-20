@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2019.08.20"
-__version__ = "1.27"
-version = 1.27
+__version__ = "1.28"
+version = 1.28
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -48,7 +48,7 @@ windowFlags = QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint #no ? 
 # Settings
 
 class MeshRemodelSettingsCommandClass(object):
-    """Settings, keep toolbar active, point size, line width"""
+    """Settings"""
 
     def __init__(self):
         pass       
@@ -64,7 +64,7 @@ class MeshRemodelSettingsCommandClass(object):
         window = QtGui.QApplication.activeWindow()
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         keep = pg.GetBool('KeepToolbar',False)
-        items=["Keep the toolbar active","Do not keep the toolbar active","Change point size","Change line width","Cancel"]
+        items=["Keep the toolbar active","Do not keep the toolbar active","Change point size","Change line width","Change sketch radius precision","Cancel"]
         item,ok = QtGui.QInputDialog.getItem(window,'Mesh Remodel v'+__version__,'Settings\n\nSelect the settings option\n',items,0,False,windowFlags)
         if ok and item == items[-1]:
             return
@@ -84,6 +84,16 @@ class MeshRemodelSettingsCommandClass(object):
             new_line_width,ok = QtGui.QInputDialog.getDouble(window,"Line width", "Enter line width", line_width,1,50,.25)
             if ok:
                 pg.SetFloat("LineWidth", new_line_width)
+        elif ok and item==items[4]:
+            prec = pg.GetInt("SketchRadiusPrecision", 1)
+            new_prec, ok = QtGui.QInputDialog.getInt(window,"Sketch Radius Precision", "\n\
+-1 = no radius constraints\n\
+0 = radius constraints\n\
+1-12 = decimal points to round to when constraining\n\n\
+(if 1-12, equality constraints will be added to other circles where possible)\n\n\
+Enter new sketch radius precision", prec, -1,12,1,flags=windowFlags)
+            if ok:
+                pg.SetInt("SketchRadiusPrecision", new_prec)
         return
    
     def IsActive(self):
@@ -822,9 +832,11 @@ class MeshRemodelCreateSketchCommandClass(object):
     def Activated(self):
         doc = FreeCAD.ActiveDocument
         modifiers = QtGui.QApplication.keyboardModifiers()
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        prec = pg.GetInt("SketchRadiusPrecision", 1)
 
         doc.openTransaction("Create sketch")
-        sketch = Draft.makeSketch(self.objs,autoconstraints=True,radiusPrecision=1)
+        sketch = Draft.makeSketch(self.objs,autoconstraints=True,radiusPrecision=prec)
         doc.recompute()
         for o in self.objs:
             if hasattr(o,"ViewObject"):
