@@ -18,7 +18,7 @@ Use this workbench to aid in remodeling imported mesh objects.  The workflow is 
 Select the mesh object in the tree, then use this command to create a points object containing all the vertices of the selected mesh object.  The points object is a compound consisting of Part Point (vertex) objects, one per vertex in the selected mesh.  The purpose of this object is to provide selectable points in the 3d view.  We can use these selectable points with the other tools in the workbench to create the lines, circles, arcs, and polygons needed to remodel the mesh.<br/>
 <br/>
 ## Create Coplanar Points Object
-<img src="Resources/icons/CreateCoplanar" alt = "create coplanar"><br/>
+<img src="Resources/icons/CreateCoplanar.png" alt = "create coplanar"><br/>
 Select 3 points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  These are packed into a compound, which is then exploded in order to support (Shift+B) block selection.  The exploding is done as a separate document transaction, thus enabling you to undo this (Ctrl+Z) if you would prefer it to not be exploded.<br/>
 <br/>
 ## Create Line
