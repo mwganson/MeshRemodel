@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2019.08.19"
-__version__ = "1.20"
-version = 1.20
+__version__ = "1.21"
+version = 1.21
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -322,10 +322,10 @@ class MeshRemodelCreatePolygonCommandClass(object):
             self.pts.append(self.pts[0]) #don't close polygon on shift+click
 
         if modifiers == QtCore.Qt.AltModifier.__or__(QtCore.Qt.ShiftModifier) or modifiers == QtCore.Qt.AltModifier:
-            #poly = Part.makePolygon(self.sortPoints(self.pts))
+            poly = Part.makePolygon(self.sortPoints(self.pts))
             lineList = self.makePolygon(self.sortPoints(self.pts))
         else:
-            #poly = Part.makePolygon(self.pts)
+            poly = Part.makePolygon(self.pts)
             lineList = self.makePolygon(self.pts)
 
         lineObjs = []
@@ -342,7 +342,7 @@ class MeshRemodelCreatePolygonCommandClass(object):
 
         doc.openTransaction("lines to compound")
         lineShapes = [s.Shape for s in lineObjs]
-        Part.show(Part.makeCompound(lineShapes),"MR_Polygon")
+        Part.show(poly,"MR_Polygon")
         doc.recompute()
         doc.ActiveObject.ViewObject.LineWidth=line_width
         for l in lineObjs:
