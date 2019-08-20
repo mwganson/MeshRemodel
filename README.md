@@ -84,6 +84,10 @@ This sets the line width on all lines created with the workbench.  It does not a
 <br/>
 
 #### Release notes:<br/>
+* 2019.08.20 (version 1.24)<br/>
+** remove ? from title bar in settings dialog
+* 2019.08.19 (version 1.23)<br/>
+** show version info in settings dialog
 * 2019.08.19 (version 1.22)<br/>
 ** convenience link to sketcher validate tool
 * 2019.08.19 (version 1.21)<br/>
