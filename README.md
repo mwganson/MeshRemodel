@@ -60,7 +60,7 @@ Select 2 or more objects to enable this command.  It uses Draft.upgrade() to con
 <br/>
 ## Create Sketch
 <img src="Resources/icons/CreateSketch.png" alt = "create sketch"><br/>
-Select one or more wire objects to enable this command.  It uses Draft.makeSketch() to create a sketch from the selected objects.  It is here as a convenience.  If the selected objects are all coplanar this should usually result in a single sketch.  Some constraints are applied, but there will always be some constraining necessary.<br/>
+Select one or more wire objects to enable this command.  It uses Draft.makeSketch() to create a sketch from the selected objects.  It is here as a convenience.  If the selected objects are all coplanar this should usually result in a single sketch.  Some constraints are applied, but there will always be some constraining necessary.  (Shift+Click to attach the sketch concentrically to the first selected object, if it is a circle or arc.)<br/>
 <br/>
 ## Merge Sketches
 <img src="Resources/icons/MergeSketches.png" alt = "merge sketches"><br/>
@@ -83,9 +83,12 @@ This sets the point size on all points created with the workbench.  It does not 
 This sets the line width on all lines created with the workbench.  It does not affect objects already created after the setting is changed, only those created after the setting is changed.  Does not affect wire objects or sketch objects, only the edges of arcs, circles, lines, and polygons.  Default: 5.0<br/>
 <br/>
 ### Sketch radius precision
-This sets the precision to use when constraining radii (for circles and arcs) when creating sketches.  These are integer values from -1 to 12.  If -1, then no constraining of any radii occurs.  If 0, then radii are constrained to maximum precision.  If > 0, then radius constraints are rounded to that many digits precision, e.g. 1 results in 1.5, 2 in 1.49, 3 in 1.498, etc.  Additionally, if > 0, then equality constraints are used where possible (where radii round to the same value). Default: 1<br/>
+This sets the precision to use when constraining radii (for circles and arcs) when creating sketches.  These are integer values from -1 to 12.  If -1, then no constraining of any radii occurs.  If 0, then radii are constrained to maximum precision.  If > 0, then radius constraints are rounded to that many digits precision, e.g. 1 results in 1.5, 2 in 1.49, 3 in 1.498, etc. Default: 1<br/>
 <br/>
 #### Release notes:<br/>
+* 2019.08.20 (version 1.292)<br/>
+** option to attach sketch concentrically to first selected object, if that is a circle or arc with Shift+Click.
+** bug fix where sketch is sometimes reported as noncoplanar, but lost ability to place equality constraints on some circles/arcs
 * 2019.08.20 (version 1.291)<br/>
 ** fix bug in calls to gu.isColinear()
 * 2019.08.20 (version 1.29)<br/>
