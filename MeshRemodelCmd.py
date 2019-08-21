@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2019.08.20"
-__version__ = "1.291"
-version = 1.291
+__version__ = "1.292"
+version = 1.292
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -285,7 +285,6 @@ class MeshRemodelSettingsCommandClass(object):
 -1 = no radius constraints\n\
 0 = radius constraints\n\
 1-12 = decimal points to round to when constraining\n\n\
-(if 1-12, equality constraints will be added to other circles where possible)\n\n\
 Enter new sketch radius precision", prec, -1,12,1,flags=windowFlags)
             if ok:
                 pg.SetInt("SketchRadiusPrecision", new_prec)
@@ -837,35 +836,37 @@ class MeshRemodelCreateSketchCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateSketch.png') ,
             'MenuText': "Create s&ketch" ,
-            'ToolTip' : "Create a sketch from selected objects\n(Attempts to place sketch)\n(If it fails, try again with Shift+Click)\n(Ctrl+Shift+Click to not try to place sketch)"}
+            'ToolTip' : "Create a sketch from selected objects\n(Shift+Click to attach sketch concentrically to first selected object, if it is circle or arc.)"}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
         modifiers = QtGui.QApplication.keyboardModifiers()
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         prec = pg.GetInt("SketchRadiusPrecision", 1)
-
+        #sometimes sketch has noncoplanar issues, this seems to fix it:
+        #make sketches individually, then merge them
         doc.openTransaction("Create sketch")
-        sketch = Draft.makeSketch(self.objs,autoconstraints=True,radiusPrecision=prec)
+        sketches=[]
+        for obj in self.objs:
+            sketches.append(Draft.makeSketch(obj,autoconstraints=True,radiusPrecision=prec))
         doc.recompute()
+        FreeCADGui.Selection.clearSelection()
+        for sk in sketches:
+            FreeCADGui.Selection.addSelection(sk)
+        FreeCADGui.runCommand("Sketcher_MergeSketches")
+        sketch = doc.ActiveObject
+        doc.recompute()
+        for sk in sketches:
+            doc.removeObject(sk.Name)
+
         for o in self.objs:
             if hasattr(o,"ViewObject"):
                 o.ViewObject.Visibility=False
+
         if modifiers == QtCore.Qt.ShiftModifier:
-            dir = -1
-        else:
-            dir = 1
-        if modifiers != QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
-            if hasattr(self.objs[0],"Shape"):
-                shp = self.objs[0].Shape
-                normal = DraftGeomUtils.getNormal(shp).normalize()          
-                com = shp.CenterOfMass
-                pl = sketch.Placement
-                pl.Base.x += dir * com.x * normal.x
-                pl.Base.y += dir * com.y * normal.y
-                pl.Base.z += dir * com.z * normal.z
-                
-                sketch.Placement = pl
+            if "MR_Circle" in self.objs[0].Name or "MR_Arc" in self.objs[0].Name:
+                sketch.Support = [(self.objs[0],'Edge1')]
+                sketch.MapMode = 'Concentric'
 
         doc.recompute()
         doc.commitTransaction()
