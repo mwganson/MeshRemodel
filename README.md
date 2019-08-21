@@ -60,7 +60,11 @@ Select 2 or more objects to enable this command.  It uses Draft.upgrade() to con
 <br/>
 ## Create Sketch
 <img src="Resources/icons/CreateSketch.png" alt = "create sketch"><br/>
-Select one or more wire objects to enable this command.  It uses Draft.makeSketch() to create a sketch from the selected objects.  It is here as a convenience.  If the selected objects are all coplanar this should usually result in a single sketch.  Some constraints are applied, but there will always be some constraining necessary.  (Shift+Click to attach the sketch concentrically to the first selected object, if it is a circle or arc.)<br/>
+Select one or more wire objects to enable this command.  It uses Draft.makeSketch() to create a sketch from the selected objects.  It is here as a convenience.  If the selected objects are all coplanar this should usually result in a single sketch.  Some constraints are applied, but there will always be some constraining necessary.<br/>
+<br/>
+Using this here is slightly different from using it in Draft workbench.  Used here there is opportunity to constrain radius of circles and arcs, and to specify the rounding to use (in settings).  Also, with Shift+Click there is option to attach sketch concentrically to first selected object, if it is a circle or arc.  This will usually put the sketch on the correct plane, but the elements are unlikely to be aligned with the origin, so it will need to be adjusted in most cases.<br/>
+<br/>
+Note: there was a bug where some sketches were being reported as non-coplanar by extrude function.  The workaround was to make the sketch, then used draft to sketch to turn it into wires, then make it again.  That fixed the non-coplanar issue, as far as I know, but consequently no longer are equality constraints applied to some circles.  They are instead now constrained separately with the same radii.<br/>
 <br/>
 ## Merge Sketches
 <img src="Resources/icons/MergeSketches.png" alt = "merge sketches"><br/>
@@ -69,7 +73,7 @@ Select 2 or more sketches to enable this command.  This uses Sketcher workbench 
 <br/>
 ## Validate Sketch
 <img src="Resources/icons/ValidateSketch.png" alt = "validate sketch"><br/>
-Opens Sketch workbench validate sketch tool.  Enabled only if you have 1 sketch selected.  It is here as a convenience.<br/>
+Opens Sketch workbench validate sketch tool.  Enabled only if you have 1 sketch selected.  It is here as a convenience.  Occasionally, sketches will have missing coincidence constraints.  That tool is good for fixing that issue.<br/>
 <br/>
 ## Settings
 <img src="Resources/icons/Settings.png" alt="settings"><br/>
