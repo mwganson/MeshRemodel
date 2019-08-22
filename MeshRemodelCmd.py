@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2019.08.20"
-__version__ = "1.292"
-version = 1.292
+__date__    = "2019.08.21"
+__version__ = "1.3"
+version = 1.3
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -259,7 +259,7 @@ class MeshRemodelSettingsCommandClass(object):
         window = QtGui.QApplication.activeWindow()
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         keep = pg.GetBool('KeepToolbar',False)
-        items=["Keep the toolbar active","Do not keep the toolbar active","Change point size","Change line width","Change sketch radius precision","Cancel"]
+        items=["Keep the toolbar active","Do not keep the toolbar active","Change point size","Change line width","Change sketch radius precision","Change coplanar tolerance","Cancel"]
         item,ok = QtGui.QInputDialog.getItem(window,'Mesh Remodel v'+__version__,'Settings\n\nSelect the settings option\n',items,0,False,windowFlags)
         if ok and item == items[-1]:
             return
@@ -271,12 +271,12 @@ class MeshRemodelSettingsCommandClass(object):
             pg.SetBool('KeepToolbar', keep)
         elif ok and item==items[2]:
             point_size = pg.GetFloat("PointSize", 4.0)
-            new_point_size,ok = QtGui.QInputDialog.getDouble(window,"Point size", "Enter point size", point_size,1,50,.25)
+            new_point_size,ok = QtGui.QInputDialog.getDouble(window,"Point size", "Enter point size", point_size,1,50,2)
             if ok:
                 pg.SetFloat("PointSize", new_point_size)
         elif ok and item==items[3]:
             line_width = pg.GetFloat("LineWidth", 5.0)
-            new_line_width,ok = QtGui.QInputDialog.getDouble(window,"Line width", "Enter line width", line_width,1,50,.25)
+            new_line_width,ok = QtGui.QInputDialog.getDouble(window,"Line width", "Enter line width", line_width,1,50,2)
             if ok:
                 pg.SetFloat("LineWidth", new_line_width)
         elif ok and item==items[4]:
@@ -288,6 +288,11 @@ class MeshRemodelSettingsCommandClass(object):
 Enter new sketch radius precision", prec, -1,12,1,flags=windowFlags)
             if ok:
                 pg.SetInt("SketchRadiusPrecision", new_prec)
+        elif ok and item==items[5]:
+            coplanar_tol = pg.GetFloat("CoplanarTolerance",.001)
+            new_coplanar_tol, ok = QtGui.QInputDialog.getDouble(window,"Coplanar tolerance", "Enter coplanar tolerance\n(Only applies to internal coplanar check using Alt+Click to create coplanar points)", coplanar_tol,.0000001,1,8)
+            if ok:
+                pg.SetFloat("CoplanarTolerance", new_coplanar_tol)
         return
    
     def IsActive(self):
@@ -356,14 +361,19 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateCoplanar.png') ,
             'MenuText': "Create copla&nar points object" ,
-            'ToolTip' : "Create a coplanar points object from 3 selected points \nby selecting only those points that are coplanar with the 3 selected points\n\
-(Makes exploded compound for use with block select (Shift+B) tool)\n(Shift+Click or press Undo (Ctrl+Z) afterwards if you do not want it exploded)"}
+            'ToolTip' : "\
+Makes coplanar points object from 3 selected points, used to define the plane\n\
+Creates empty sketch and places links to external geometry to coplanar points\n\
+Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
+(Alt+Click to use more restrictive Draft workbench coplanar check, likely to produce fewer points.)\n\
+(Shift+Click for exploded compound, compatible with Shift+B block select)"}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         line_width = pg.GetFloat("LineWidth",5.0)
         point_size = pg.GetFloat("PointSize",4.0)
+        coplanar_tolerance = pg.GetFloat("CoplanarTolerance", .001)
         #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         doc.openTransaction("Create coplanar")
         modifiers = QtGui.QApplication.keyboardModifiers()
@@ -374,17 +384,40 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
         coplanar = []
 
         for v in candidates:
-            if gu.isCoplanar(trio,v.Point):
+            if modifiers == QtCore.Qt.AltModifier or modifiers == QtCore.Qt.AltModifier.__or__(QtCore.Qt.ShiftModifier):
+                poly = Part.makePolygon([trio[0],trio[1],trio[2],v.Point])
+                if DraftGeomUtils.isPlanar(poly):
+                    planar = True
+                else:
+                    planar = False
+            else: #use our own complanar check
+                if gu.isCoplanar(trio,v.Point,coplanar_tolerance):
+                    planar = True
+                else:
+                    planar = False
+
+            if planar:
                 coplanar.append(Part.Point(v.Point).toShape())
         coplanar.extend([Part.Point(v).toShape() for v in trio])
 
         Part.show(Part.makeCompound(coplanar),"MR_Points_Coplanar")
         doc.ActiveObject.ViewObject.PointSize = point_size
+        mr = doc.ActiveObject
+        Gui.runCommand("Sketcher_NewSketch")
+        sketch=doc.ActiveObject
+        sketch.Label = mr.Name+'_Sketch'
+        for ii in range(0,len(mr.Shape.Vertexes)):
+            vname = 'Vertex'+str(ii+1)
+            sketch.addExternal(mr.Name, vname)
+        
+        doc.recompute()
+
+
         if self.obj and hasattr(self.obj,"ViewObject"):
             self.obj.ViewObject.Visibility = False
         doc.recompute()
         doc.commitTransaction()
-        if modifiers != QtCore.Qt.ShiftModifier:
+        if modifiers == QtCore.Qt.ShiftModifier or modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.AltModifier):
             doc.openTransaction("explode coplanar points")
             import CompoundTools.Explode
             input_obj = doc.ActiveObject
@@ -503,8 +536,13 @@ class MeshRemodelCreatePolygonCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreatePolygon.png') ,
             'MenuText': "Create &Polygon" ,
-            'ToolTip' : "Create a Polygon from 3 or more selected points\n(Shift+Click to not close polygon)\n(Alt+Click to sort selected points)\n\
-(Makes compound of individiual lines, press Undo (Ctrl+Z) afterwards to get individual lines)"}
+            'ToolTip' : "\
+Create a Polygon from 3 or more selected points\n\
+Might not always be coplanar, consider using links to external geometry in a sketch\n\
+(Makes compound, press Undo (Ctrl+Z) afterwards to get individual lines)\n\
+(Shift+Click to not close polygon)\n\
+(Alt+Click to sort selected points)\n\
+"}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
@@ -537,7 +575,7 @@ class MeshRemodelCreatePolygonCommandClass(object):
         doc.commitTransaction()
 
         doc.openTransaction("lines to compound")
-        lineShapes = [s.Shape for s in lineObjs]
+        #lineShapes = [s.Shape for s in lineObjs]
         Part.show(poly,"MR_Polygon")
         doc.recompute()
         doc.ActiveObject.ViewObject.LineWidth=line_width
@@ -836,37 +874,48 @@ class MeshRemodelCreateSketchCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateSketch.png') ,
             'MenuText': "Create s&ketch" ,
-            'ToolTip' : "Create a sketch from selected objects\n(Shift+Click to attach sketch concentrically to first selected object, if it is circle or arc.)"}
+            'ToolTip' : "\
+Create a new empty sketch, optionally attaching to selected objects, e.g. 3 points to define a plane.\n\
+(Ctrl+Click to make a sketch out of selected objects, e.g. circles, polygons, etc.)\n\
+(Alt+Click to make a separate sketch from each selected object, and then merge them together.)\n\
+"}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
         modifiers = QtGui.QApplication.keyboardModifiers()
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         prec = pg.GetInt("SketchRadiusPrecision", 1)
-        #sometimes sketch has noncoplanar issues, this seems to fix it:
-        #make sketches individually, then merge them
+
+        if modifiers == QtCore.Qt.NoModifier:
+            Gui.runCommand("Sketcher_NewSketch")
+            return
+
         doc.openTransaction("Create sketch")
-        sketches=[]
-        for obj in self.objs:
-            sketches.append(Draft.makeSketch(obj,autoconstraints=True,radiusPrecision=prec))
-        doc.recompute()
-        FreeCADGui.Selection.clearSelection()
-        for sk in sketches:
-            FreeCADGui.Selection.addSelection(sk)
-        FreeCADGui.runCommand("Sketcher_MergeSketches")
-        sketch = doc.ActiveObject
-        doc.recompute()
-        for sk in sketches:
-            doc.removeObject(sk.Name)
+        if modifiers == QtCore.Qt.AltModifier:
+            #alternative method: on alt+click make separate sketch from each object, then merge them together
+            sketches=[]
+            for obj in self.objs:
+                sketches.append(Draft.makeSketch(obj,autoconstraints=True,radiusPrecision=prec))
+            doc.recompute()
+            FreeCADGui.Selection.clearSelection()
+            for sk in sketches:
+                if sk:
+                    FreeCADGui.Selection.addSelection(sk)
+            if len(sketches) >= 2:
+                FreeCADGui.runCommand("Sketcher_MergeSketches")
+            sketch = doc.ActiveObject
+            doc.recompute()
+            for sk in sketches:
+                if sk:
+                    doc.removeObject(sk.Name)
+        elif modifiers == QtCore.Qt.ControlModifier:
+            #on ctrl+click make single sketch out of selected objects
+            sketch = Draft.makeSketch(self.objs,autoconstraints=True,radiusPrecision=prec)
+            doc.recompute()
 
         for o in self.objs:
             if hasattr(o,"ViewObject"):
                 o.ViewObject.Visibility=False
-
-        if modifiers == QtCore.Qt.ShiftModifier:
-            if "MR_Circle" in self.objs[0].Name or "MR_Arc" in self.objs[0].Name:
-                sketch.Support = [(self.objs[0],'Edge1')]
-                sketch.MapMode = 'Concentric'
 
         doc.recompute()
         doc.commitTransaction()
