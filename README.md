@@ -11,7 +11,9 @@ Download the <a href = "https://github.com/mwganson/MeshRemodel/blob/master/Reso
 Can be installed via the AddonManager in Tools menu -> AddonManager if you have a very recent build.  In the AddonManger click Configure, then add https://github.com/mwganson/MeshRemodel to the list of custom repositories.  After restarting the AddonManager you should find MeshRemodel in the list of workbenches you can install.
 <br/>
 ## Overview
-Use this workbench to aid in remodeling imported mesh objects.  The workflow is generally to first create a points object, then use those points in creating circles, arcs, lines, and polygons, which are then combined into wires, and then made into sketches.  Select 3 points to create a circle or arc, 2 points to create a line, 3 or more points to create a polygon / polyline.  These tools also work with any selectable points in the 3d view, not just points objects created with the workbench.<br/>
+Use this workbench to aid in remodeling imported mesh objects.  The preferred workflow is to select the mesh, then click create points object.  This creates an object with selectable points at all of the mesh vertices.  The next step is to choose a face you wish to remodel.  Select 3 points on that face, then click the create coplanar points tool.  This creates an empty sketch mapped using 3 points make a plane mode, and into which all of the coplanar points are links to external geometry.  Use the sketcher tools, such as circle from 3 points or arc from 3 points, etc. to remodel the profile as a sketch.  If desired, it is possible to delete all of the links to external geometry later using the sketcher validation tool.  You would then be able to rearrange the elements relative to their rotation and/or to the sketch's origin, if desired.<br/>
+<br/>
+An alternative workflow is to first create a points object, then use those points in creating circles, arcs, lines, and polygons, which are then combined into wires, and then made into sketches.  Select 3 points to create a circle or arc, 2 points to create a line, 3 or more points to create a polygon / polyline.  These tools also work with any selectable points in the 3d view, not just points objects created with the workbench.  The problem with this is sometimes the objects created are no coplanar, and so you end up with problems in future operations, such as extrude or trying to make them into a sketch.<br/>
 <br/>
 ## Create Points Object
 <img src="Resources/icons/CreatePointsObject.png" alt="create points object"><br/>
@@ -19,7 +21,9 @@ Select the mesh object in the tree, then use this command to create a points obj
 <br/>
 ## Create Coplanar Points Object
 <img src="Resources/icons/CreateCoplanar.png" alt = "create coplanar"><br/>
-Select 3 points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  These are packed into a compound, which is then exploded in order to support (Shift+B) block selection.  The exploding is done as a separate document transaction, thus enabling you to undo this (Ctrl+Z) if you would prefer it to not be exploded.  You can also use Shift+Click to bypass the explode operation.<br/>
+Select 3 points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  Then an empty sketch is created, and added to that empty sketch are links to external geometry for all of the points in the new coplanar points object.  It is advised to recreate the profile inside the sketch using those external links and the sketcher tools.<br/>
+<br/>
+In order to filter the original points object into a set of coplanar points aligned on the plane defined by the 3 selected points an internal isCoplanar algorithm is used.  An alternative (Alt+Click) is to use the isPlaner() algorithm from the Draft workbench.  The difference is the Draft workbench algorithm is more restrictive, and so you end up with fewer points than when using the default internal algorithm at its default tolerance level.  There is a settings option for changing the tolerance level.  The smaller the number the fewer points get produced.  The filtering is done by using the 3 selected points and each other point in turn to create a tetrahedron.  If the 4 points are coplanar, then the tetrahedron should have volume ~= zero.  Default tolerance is 0.001 mm^3.
 <br/>
 ## Create Line
 <img src="Resources/icons/CreateLine.png" alt = "create line"><br/>
@@ -30,15 +34,17 @@ In the report view you will find some basic information about the line, includin
 <br/>
 ## Create Polygon
 <img src="Resources/icons/CreatePolygon.png" alt = "create polygon"><br/>
+It is recommended to remodel the object inside the sketcher using the sketcher line tools instead of this, but it is here for those who wish to use it instead.  The reason it is recommened to use the sketcher is some of the polygons created might not be coplanar, and might give problems with future operations.<br/>
+<br/>
 Select 3 or more points in the 3d view to enable this command.  It creates a polygon from the selected points.  Note: this is not a regular polygon, meaning the side lengths are not necessarily all equal to each other.  The order of selection is important.  By default the polygon will be closed, but you can prevent this with Shift+Click.<br/>
 <br/>
 When selecting using Shift+B, block selection, the points will generally need to be sorted or else you will get a polygon which zig zags all about.  To enable sorting using Alt+Click.  The sorting algorithm takes the first selected point, then finds the nearest point among the other selected points, and puts it 2nd.  Then it uses the 2nd point to find the next nearest point, and puts it 3rd, and so on.<br/>
 <br/>
-The polygon object created is a compound made up of individual Part Lines.  If you do not want the compound, but would instead prefer to have individual line objects, press Undo (Ctrl+Z) after making the polygon.  This will enable you to delete any lines you would prefer not to have, for example if you get a closed polygon, but would prefer it not to be closed or if some lines get crossed, etc.<br/>
+The polygon object created is made up of individual Part Lines.  This will enable you to delete any lines you would prefer not to have, for example if you get a closed polygon, but would prefer it not to be closed or if some lines get crossed, etc.  Use the Create wire tool to upgrade the individual lines to a single wire object, if you prefer.<br/>
 <br/>
 ## Create BSpline
 <img src="Resources/icons/CreateBSpline.png" alt = "create bspline"><br/>
-Select 3 or more points in the 3d view to enable this command.  It creates a BSpline from the selected points.  The order of selection is important.  By default the BSpline will be closed, but you can prevent this with Shift+Click.  The points need not all lie on the same plane, but if they are not all on the same plane you will not be able to create a sketch from this later.<br/>
+Select 3 or more points in the 3d view to enable this command.  It creates a BSpline from the selected points.  The order of selection is important.  By default the BSpline will be closed, but you can prevent this with Shift+Click.  The points need not all lie on the same plane, but if they are not all on the same plane you will not be able to create a sketch from this later.  Sometimes points that appear to lie on the same plane are not actually on the same plane.  It is better to create the bspline in the sketcher.<br/>
 <br/>
 This command supports block selections (Shift+B, draw rectangle).  Generally, the points will need to be sorted when using that block selection method.  Use Alt+Click to sort.  See the section on Create polygon for details on the sorting algorithm used.<br/>
 <br/>
@@ -60,11 +66,11 @@ Select 2 or more objects to enable this command.  It uses Draft.upgrade() to con
 <br/>
 ## Create Sketch
 <img src="Resources/icons/CreateSketch.png" alt = "create sketch"><br/>
-Select one or more wire objects to enable this command.  It uses Draft.makeSketch() to create a sketch from the selected objects.  It is here as a convenience.  If the selected objects are all coplanar this should usually result in a single sketch.  Some constraints are applied, but there will always be some constraining necessary.<br/>
+Creates a sketch, optionally attached to 3 points on a plane if 3 points are selected.  This does not create any links to external geometry.  See Create coplanar points command if you want to automatically import all coplanar points that lie on this same plane.<br/>
 <br/>
-Using this here is slightly different from using it in Draft workbench.  Used here there is opportunity to constrain radius of circles and arcs, and to specify the rounding to use (in settings).  Also, with Shift+Click there is option to attach sketch concentrically to first selected object, if it is a circle or arc.  This will usually put the sketch on the correct plane, but the elements are unlikely to be aligned with the origin, so it will need to be adjusted in most cases.<br/>
+Use Ctrl+Click to make a sketch out of selected circles, polygons, etc.  If a circle or arc is the first selected object, it will map the sketch concentrically to that circle or arc.  Note: there is a known issue using this method that sometimes objects that appear to be coplanar might not actually be coplanar.  It is recommended to remodel using the sketcher with links to external geometry to the points objects instead of this method. Uses method of creating a single sketch from all selected objects.<br/>
 <br/>
-Note: there was a bug where some sketches were being reported as non-coplanar by extrude function.  The workaround was to make the sketch, then used draft to sketch to turn it into wires, then make it again.  That fixed the non-coplanar issue, as far as I know, but consequently no longer are equality constraints applied to some circles.  They are instead now constrained separately with the same radii.<br/>
+Use Alt+Click to create multiple sketches, one from each object selected, and then merge them all together into a single sketch, deleting the temporary sketches afterward.  This can sometimes resolve coplanar issues.<br/>
 <br/>
 ## Merge Sketches
 <img src="Resources/icons/MergeSketches.png" alt = "merge sketches"><br/>
@@ -73,7 +79,7 @@ Select 2 or more sketches to enable this command.  This uses Sketcher workbench 
 <br/>
 ## Validate Sketch
 <img src="Resources/icons/ValidateSketch.png" alt = "validate sketch"><br/>
-Opens Sketch workbench validate sketch tool.  Enabled only if you have 1 sketch selected.  It is here as a convenience.  Occasionally, sketches will have missing coincidence constraints.  That tool is good for fixing that issue.<br/>
+Opens Sketch workbench validate sketch tool.  Enabled only if you have 1 sketch selected.  It is here as a convenience.  Occasionally, sketches will have missing coincidence constraints.  That tool is good for fixing that issue.  It can also be used to easily remove all links to external geometry.<br/>
 <br/>
 ## Settings
 <img src="Resources/icons/Settings.png" alt="settings"><br/>
@@ -89,6 +95,8 @@ This sets the line width on all lines created with the workbench.  It does not a
 ### Sketch radius precision
 This sets the precision to use when constraining radii (for circles and arcs) when creating sketches.  These are integer values from -1 to 12.  If -1, then no constraining of any radii occurs.  If 0, then radii are constrained to maximum precision.  If > 0, then radius constraints are rounded to that many digits precision, e.g. 1 results in 1.5, 2 in 1.49, 3 in 1.498, etc. Default: 1<br/>
 <br/>
+### Coplanar tolerance
+This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might be accepted as coplanar in later operations.  This is not an issue when modeling within the sketcher using links to external geometry.  It is recommened to not change the default unless you are missing some points that you think should be included or perhaps you are getting points that should not be included.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  Default: 0.001 mm^3
 #### Release notes:<br/>
 * 2019.08.20 (version 1.292)<br/>
 ** option to attach sketch concentrically to first selected object, if that is a circle or arc with Shift+Click.
