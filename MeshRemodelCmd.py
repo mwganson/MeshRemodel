@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2019.08.21"
-__version__ = "1.3"
-version = 1.3
+__version__ = "1.31"
+version = 1.31
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -403,15 +403,18 @@ Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
         Part.show(Part.makeCompound(coplanar),"MR_Points_Coplanar")
         doc.ActiveObject.ViewObject.PointSize = point_size
         mr = doc.ActiveObject
+        if not "Sketcher_NewSketch" in Gui.listCommands():
+            Gui.activateWorkbench("SketcherWorkbench")
+            Gui.activateWorkbench("MeshRemodelWorkbench")
         Gui.runCommand("Sketcher_NewSketch")
         sketch=doc.ActiveObject
         sketch.Label = mr.Name+'_Sketch'
+        sketch.MapReversed = True
         for ii in range(0,len(mr.Shape.Vertexes)):
             vname = 'Vertex'+str(ii+1)
             sketch.addExternal(mr.Name, vname)
         
         doc.recompute()
-
 
         if self.obj and hasattr(self.obj,"ViewObject"):
             self.obj.ViewObject.Visibility = False
@@ -539,7 +542,7 @@ class MeshRemodelCreatePolygonCommandClass(object):
             'ToolTip' : "\
 Create a Polygon from 3 or more selected points\n\
 Might not always be coplanar, consider using links to external geometry in a sketch\n\
-(Makes compound, press Undo (Ctrl+Z) afterwards to get individual lines)\n\
+(Makes individual lines, use Create wire to connect into a single wire object.)\n\
 (Shift+Click to not close polygon)\n\
 (Alt+Click to sort selected points)\n\
 "}
@@ -570,17 +573,6 @@ Might not always be coplanar, consider using links to external geometry in a ske
 
         for l in lineObjs:
             l.ViewObject.LineWidth = line_width
-
-        doc.recompute()
-        doc.commitTransaction()
-
-        doc.openTransaction("lines to compound")
-        #lineShapes = [s.Shape for s in lineObjs]
-        Part.show(poly,"MR_Polygon")
-        doc.recompute()
-        doc.ActiveObject.ViewObject.LineWidth=line_width
-        for l in lineObjs:
-            doc.removeObject(l.Name)
 
         doc.commitTransaction()
 
@@ -887,6 +879,9 @@ Create a new empty sketch, optionally attaching to selected objects, e.g. 3 poin
         prec = pg.GetInt("SketchRadiusPrecision", 1)
 
         if modifiers == QtCore.Qt.NoModifier:
+            if not "Sketcher_NewSketch" in Gui.listCommands():
+                Gui.activateWorkbench("SketcherWorkbench")
+                Gui.activateWorkbench("MeshRemodelWorkbench")
             Gui.runCommand("Sketcher_NewSketch")
             return
 
@@ -902,7 +897,11 @@ Create a new empty sketch, optionally attaching to selected objects, e.g. 3 poin
                 if sk:
                     FreeCADGui.Selection.addSelection(sk)
             if len(sketches) >= 2:
+                if not "Sketcher_NewSketch" in Gui.listCommands():
+                    Gui.activateWorkbench("SketcherWorkbench")
+                    Gui.activateWorkbench("MeshRemodelWorkbench")
                 FreeCADGui.runCommand("Sketcher_MergeSketches")
+
             sketch = doc.ActiveObject
             doc.recompute()
             for sk in sketches:
@@ -1001,6 +1000,9 @@ class MeshRemodelMergeSketchesCommandClass(object):
     def Activated(self):
         doc = FreeCAD.ActiveDocument
         #doc.openTransaction("Merge sketches")  #not needed since the command does this
+        if not "Sketcher_NewSketch" in Gui.listCommands():
+            Gui.activateWorkbench("SketcherWorkbench")
+            Gui.activateWorkbench("MeshRemodelWorkbench")
         Gui.runCommand("Sketcher_MergeSketches")
         doc.recompute()
         for o in self.objs:
@@ -1008,6 +1010,7 @@ class MeshRemodelMergeSketchesCommandClass(object):
                 o.ViewObject.Visibility=False
         #doc.commitTransaction()
         #QtGui.QApplication.restoreOverrideCursor()
+        Gui.activateWorkbench("MeshRemodelWorkbench")
         return
    
     def IsActive(self):
@@ -1044,6 +1047,9 @@ class MeshRemodelValidateSketchCommandClass(object):
             'ToolTip' : "Validate selected sketch with sketcher validate sketch tool"}
  
     def Activated(self):
+        if not "Sketcher_NewSketch" in Gui.listCommands():
+            Gui.activateWorkbench("SketcherWorkbench")
+            Gui.activateWorkbench("MeshRemodelWorkbench")
         Gui.runCommand("Sketcher_ValidateSketch")
         return
    

@@ -98,7 +98,9 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might be accepted as coplanar in later operations.  This is not an issue when modeling within the sketcher using links to external geometry.  It is recommened to not change the default unless you are missing some points that you think should be included or perhaps you are getting points that should not be included.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  Default: 0.001 mm^3
 #### Release notes:<br/>
-* 2019.18.22 (version 1.30)<br/>
+* 2019.08.28 (version 1.31)<br/>
+** open sketcher workbench when needed to prevent errors
+* 2019.08.22 (version 1.30)<br/>
 ** Lots of changes here.  We've moved from creating objects in the 3d view to be used later for creating a sketch to creating an empty sketch with links to external geometry automatically added.  Elements are then created directly in the sketch using sketcher tools.  This is to avoid some coplanar issues that can arise out of creating elements in the 3d view with the tools in this workbench.<br/>
 * 2019.08.20 (version 1.292)<br/>
 ** option to attach sketch concentrically to first selected object, if that is a circle or arc with Shift+Click.
