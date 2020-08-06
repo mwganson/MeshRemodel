@@ -19,6 +19,10 @@ An alternative workflow is to first create a points object, then use those point
 <img src="Resources/icons/CreatePointsObject.png" alt="create points object"><br/>
 Select the mesh object in the tree, then use this command to create a points object containing all the vertices of the selected mesh object.  The points object is a compound consisting of Part Point (vertex) objects, one per vertex in the selected mesh.  The purpose of this object is to provide selectable points in the 3d view.  We can use these selectable points with the other tools in the workbench to create the lines, circles, arcs, and polygons needed to remodel the mesh.<br/>
 <br/>
+## Create Point Object
+<img src="Resources/icons/CreatePointObject.png" alt="create point object"><br/>
+Select a vertex in the 3d view, then use this command to create a point object containing that vertex.  The point object is a Part::Vertex that we can use in some operations, such as Part::Loft.<br/>
+<br/>
 ## Create Coplanar Points Object
 <img src="Resources/icons/CreateCoplanar.png" alt = "create coplanar"><br/>
 Select 3 points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  Then an empty sketch is created, and added to that empty sketch are links to external geometry for all of the points in the new coplanar points object.  It is advised to recreate the profile inside the sketch using those external links and the sketcher tools.<br/>
@@ -98,6 +102,8 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might be accepted as coplanar in later operations.  This is not an issue when modeling within the sketcher using links to external geometry.  It is recommened to not change the default unless you are missing some points that you think should be included or perhaps you are getting points that should not be included.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  Default: 0.001 mm^3
 #### Release notes:<br/>
+* 2020.08.06 (version 1.43)<br/>
+** added create a point command
 * 2020.08.05 (version 1.42)<br/>
 ** add downgrade option to upgrade (shift+click to downgrade)
 * 2020.08.05 (version 1.41)<br/>
