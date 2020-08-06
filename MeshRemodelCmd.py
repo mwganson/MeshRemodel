@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2019.08.21"
-__version__ = "1.31"
-version = 1.31
+__date__    = "2020.08.05"
+__version__ = "1.4"
+version = 1.4
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -259,7 +259,17 @@ class MeshRemodelSettingsCommandClass(object):
         window = QtGui.QApplication.activeWindow()
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         keep = pg.GetBool('KeepToolbar',False)
-        items=["Keep the toolbar active","Do not keep the toolbar active","Change point size","Change line width","Change sketch radius precision","Change coplanar tolerance","Cancel"]
+        point_size = pg.GetFloat("PointSize", 4.0)
+        line_width = pg.GetFloat("LineWidth", 5.0)
+        prec = pg.GetInt("SketchRadiusPrecision", 1)
+        coplanar_tol = pg.GetFloat("CoplanarTolerance",.001)
+        items=[("","*")[keep]+"Keep the toolbar active",
+            ("","*")[not keep]+"Do not keep the toolbar active",
+            "Change point size ("+str(point_size)+")",
+            "Change line width ("+str(line_width)+")",
+            "Change sketch radius precision ("+str(prec)+")",
+            "Change coplanar tolerance ("+str(coplanar_tol)+")",
+            "Cancel"]
         item,ok = QtGui.QInputDialog.getItem(window,'Mesh Remodel v'+__version__,'Settings\n\nSelect the settings option\n',items,0,False,windowFlags)
         if ok and item == items[-1]:
             return
@@ -270,17 +280,14 @@ class MeshRemodelSettingsCommandClass(object):
             keep = False
             pg.SetBool('KeepToolbar', keep)
         elif ok and item==items[2]:
-            point_size = pg.GetFloat("PointSize", 4.0)
             new_point_size,ok = QtGui.QInputDialog.getDouble(window,"Point size", "Enter point size", point_size,1,50,2)
             if ok:
                 pg.SetFloat("PointSize", new_point_size)
         elif ok and item==items[3]:
-            line_width = pg.GetFloat("LineWidth", 5.0)
             new_line_width,ok = QtGui.QInputDialog.getDouble(window,"Line width", "Enter line width", line_width,1,50,2)
             if ok:
                 pg.SetFloat("LineWidth", new_line_width)
         elif ok and item==items[4]:
-            prec = pg.GetInt("SketchRadiusPrecision", 1)
             new_prec, ok = QtGui.QInputDialog.getInt(window,"Sketch Radius Precision", "\n\
 -1 = no radius constraints\n\
 0 = radius constraints\n\
@@ -289,7 +296,6 @@ Enter new sketch radius precision", prec, -1,12,1,flags=windowFlags)
             if ok:
                 pg.SetInt("SketchRadiusPrecision", new_prec)
         elif ok and item==items[5]:
-            coplanar_tol = pg.GetFloat("CoplanarTolerance",.001)
             new_coplanar_tol, ok = QtGui.QInputDialog.getDouble(window,"Coplanar tolerance", "Enter coplanar tolerance\n(Only applies to internal coplanar check using Alt+Click to create coplanar points)", coplanar_tol,.0000001,1,8)
             if ok:
                 pg.SetFloat("CoplanarTolerance", new_coplanar_tol)
@@ -363,12 +369,14 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
             'MenuText': "Create copla&nar points object" ,
             'ToolTip' : "\
 Makes coplanar points object from 3 selected points, used to define the plane\n\
-Creates empty sketch and places links to external geometry to coplanar points\n\
 Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
-(Alt+Click to use more restrictive Draft workbench coplanar check, likely to produce fewer points.)\n\
+(Alt+Click -- Creates empty sketch and places links to external geometry to coplanar points\n\
 (Shift+Click for exploded compound, compatible with Shift+B block select)"}
  
     def Activated(self):
+        if gu.isColinear(self.pts[0],self.pts[1],self.pts[2]):
+            FreeCAD.Console.PrintError('Please select 3 non-colinear points in the plane\n')
+            return
         doc = FreeCAD.ActiveDocument
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         line_width = pg.GetFloat("LineWidth",5.0)
@@ -382,20 +390,14 @@ Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
         if self.obj and hasattr(self.obj,"Shape"):
             candidates = self.obj.Shape.Vertexes
         coplanar = []
-
+        bMakeSketch = False;
+        if modifiers == QtCore.Qt.AltModifier or modifiers == QtCore.Qt.AltModifier.__or__(QtCore.Qt.ShiftModifier):
+            bMakeSketch = True
         for v in candidates:
-            if modifiers == QtCore.Qt.AltModifier or modifiers == QtCore.Qt.AltModifier.__or__(QtCore.Qt.ShiftModifier):
-                poly = Part.makePolygon([trio[0],trio[1],trio[2],v.Point])
-                if DraftGeomUtils.isPlanar(poly):
-                    planar = True
-                else:
-                    planar = False
-            else: #use our own complanar check
-                if gu.isCoplanar(trio,v.Point,coplanar_tolerance):
-                    planar = True
-                else:
-                    planar = False
-
+            if gu.isCoplanar(trio,v.Point,coplanar_tolerance):
+                planar = True
+            else:
+                planar = False
             if planar:
                 coplanar.append(Part.Point(v.Point).toShape())
         coplanar.extend([Part.Point(v).toShape() for v in trio])
@@ -403,18 +405,19 @@ Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
         Part.show(Part.makeCompound(coplanar),"MR_Points_Coplanar")
         doc.ActiveObject.ViewObject.PointSize = point_size
         mr = doc.ActiveObject
-        if not "Sketcher_NewSketch" in Gui.listCommands():
-            Gui.activateWorkbench("SketcherWorkbench")
-            Gui.activateWorkbench("MeshRemodelWorkbench")
-        Gui.runCommand("Sketcher_NewSketch")
-        sketch=doc.ActiveObject
-        sketch.Label = mr.Name+'_Sketch'
-        sketch.MapReversed = True
-        for ii in range(0,len(mr.Shape.Vertexes)):
-            vname = 'Vertex'+str(ii+1)
-            sketch.addExternal(mr.Name, vname)
+        if bMakeSketch:
+            if not "Sketcher_NewSketch" in Gui.listCommands():
+                Gui.activateWorkbench("SketcherWorkbench")
+                Gui.activateWorkbench("MeshRemodelWorkbench")
+            Gui.runCommand("Sketcher_NewSketch")
+            sketch=doc.ActiveObject
+            sketch.Label = mr.Name+'_Sketch'
+            sketch.MapReversed = False
+            for ii in range(0,len(mr.Shape.Vertexes)):
+                vname = 'Vertex'+str(ii+1)
+                sketch.addExternal(mr.Name, vname)
         
-        doc.recompute()
+            doc.recompute()
 
         if self.obj and hasattr(self.obj,"ViewObject"):
             self.obj.ViewObject.Visibility = False
