@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2020.08.05"
-__version__ = "1.42"
-version = 1.42
+__date__    = "2020.08.06"
+__version__ = "1.43"
+version = 1.43
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -354,6 +354,51 @@ class MeshRemodelCreatePointsObjectCommandClass(object):
         return True
 
 # end create points class
+
+####################################################################################
+# Create the Mesh Remodel Point Object
+
+class MeshRemodelCreatePointObjectCommandClass(object):
+    """Create Point Object command"""
+
+    def __init__(self):
+        self.obj = None
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'CreatePointObject.png') ,
+            'MenuText': "Create poin&t object" ,
+            'ToolTip' : "Create a single point from the selected point"}
+ 
+    def Activated(self):
+        doc = FreeCAD.ActiveDocument
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        point_size = pg.GetFloat("PointSize",4.0)
+        doc.openTransaction("Create point object")
+        pt = doc.addObject("Part::Vertex", "MR_Point")
+        pt.X = self.obj.Point.x
+        pt.Y = self.obj.Point.y
+        pt.Z = self.obj.Point.z
+        
+        doc.ActiveObject.ViewObject.PointSize = point_size
+        doc.recompute()
+        doc.commitTransaction()
+        return
+   
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        selobj = Gui.Selection.getSelectionEx()
+        if selobj:
+            sel = selobj[0].SubObjects
+            if len(sel) != 1:
+                return False;
+            if "Vertex" in str(type(sel[0])):
+                self.obj = sel[0]
+                return True
+        return False
+
+# end create point class
+
 ####################################################################################
 # Create a coplanar points object from 3 selected points
 
@@ -1093,6 +1138,7 @@ class MeshRemodelValidateSketchCommandClass(object):
 def initialize():
     if FreeCAD.GuiUp:
         Gui.addCommand("MeshRemodelCreatePointsObject", MeshRemodelCreatePointsObjectCommandClass())
+        Gui.addCommand("MeshRemodelCreatePointObject", MeshRemodelCreatePointObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateCoplanarPointsObject", MeshRemodelCreateCoplanarPointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateLine", MeshRemodelCreateLineCommandClass())
         Gui.addCommand("MeshRemodelCreatePolygon", MeshRemodelCreatePolygonCommandClass())
