@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2020.08.05"
-__version__ = "1.41"
-version = 1.41
+__version__ = "1.42"
+version = 1.42
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -952,21 +952,31 @@ class MeshRemodelCreateWireCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateWire.png') ,
             'MenuText': "Create &wire" ,
-            'ToolTip' : "Create a wire from selected objects\n(All selected objects should be connected.)\n(Runs draft upgrade)"}
+            'ToolTip' : "Create a wire from selected objects\n(All selected objects should be connected.)\n\
+(Runs draft upgrade)\n\
+Shift+Click to downgrade to edges\n\
+Tip: You can also use this to upgrade a wire to a face, which can be converted to a sketch to avoid some coplanar issues\n"}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
-        selbackup = FreeCAD.Gui.Selection.getSelection()
-        doc.openTransaction("Create wire")
-        Draft.upgrade(self.objs)
-        doc.recompute()
-        for o in self.objs:
-            if hasattr(o,"ViewObject"):
-                o.ViewObject.Visibility=False
+        modifiers = QtGui.QApplication.keyboardModifiers()
+        if (modifiers == QtCore.Qt.ShiftModifier):
+            doc.openTransaction("Downgrade to edges")
+            Draft.downgrade(self.objs)
+            doc.recompute()
+        else:
+            selbackup = FreeCAD.Gui.Selection.getSelection()
+            doc.openTransaction("Create wire (upgrade)")
+            Draft.upgrade(self.objs)
+            doc.recompute()
+            for o in self.objs:
+                if hasattr(o,"ViewObject"):
+                    o.ViewObject.Visibility=False
+            FreeCAD.Gui.Selection.clearSelection()
+            for sel in selbackup:
+                FreeCAD.Gui.Selection.addSelection(sel)
         doc.commitTransaction()
-        FreeCAD.Gui.Selection.clearSelection()
-        for sel in selbackup:
-            FreeCAD.Gui.Selection.addSelection(sel)
+
         #QtGui.QApplication.restoreOverrideCursor()
         return
    
