@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2020.08.05"
-__version__ = "1.4"
-version = 1.4
+__version__ = "1.41"
+version = 1.41
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -503,7 +503,6 @@ class MeshRemodelCreateLineCommandClass(object):
             doc.ActiveObject.ViewObject.PointSize = point_size
         doc.recompute()
         doc.commitTransaction()
-        #QtGui.QApplication.restoreOverrideCursor()
         return
    
     def IsActive(self):
@@ -573,9 +572,10 @@ Might not always be coplanar, consider using links to external geometry in a ske
             Part.show(line,"MR_Line")
             doc.recompute()
             lineObjs.append(doc.ActiveObject)
-
+        FreeCAD.Gui.Selection.clearSelection()
         for l in lineObjs:
             l.ViewObject.LineWidth = line_width
+            FreeCAD.Gui.Selection.addSelection(l)
 
         doc.commitTransaction()
 
@@ -956,15 +956,17 @@ class MeshRemodelCreateWireCommandClass(object):
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
+        selbackup = FreeCAD.Gui.Selection.getSelection()
         doc.openTransaction("Create wire")
-
         Draft.upgrade(self.objs)
-        
         doc.recompute()
         for o in self.objs:
             if hasattr(o,"ViewObject"):
                 o.ViewObject.Visibility=False
         doc.commitTransaction()
+        FreeCAD.Gui.Selection.clearSelection()
+        for sel in selbackup:
+            FreeCAD.Gui.Selection.addSelection(sel)
         #QtGui.QApplication.restoreOverrideCursor()
         return
    
