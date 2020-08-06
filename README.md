@@ -98,6 +98,8 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might be accepted as coplanar in later operations.  This is not an issue when modeling within the sketcher using links to external geometry.  It is recommened to not change the default unless you are missing some points that you think should be included or perhaps you are getting points that should not be included.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  Default: 0.001 mm^3
 #### Release notes:<br/>
+* 2020.08.05 (version 1.42)<br/>
+** add downgrade option to upgrade (shift+click to downgrade)
 * 2020.08.05 (version 1.41)<br/>
 ** select the lines and arcs used to create a wire after wire creation (updgrade) so it is easier to delete them
 ** select the lines after creating a polygon so it is easier to upgrade them to a wire
