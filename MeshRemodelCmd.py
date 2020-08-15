@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2020.08.06"
-__version__ = "1.43"
-version = 1.43
+__date__    = "2020.08.014"
+__version__ = "1.5"
+version = 1.5
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -90,6 +90,20 @@ class MeshRemodelGeomUtils(object):
         vol = self.tetrahedron_calc_volume(A,B,C,D)
 
         if vol <= tol:
+            return True
+        return False
+
+    def hasPoint(self,pt,lis,tol):
+        """hasPoint(pt,lis,tol)"""
+        for l in lis:
+            if self.isSamePoint(pt,l,tol):
+                return True
+        return False
+
+    def isSamePoint(self,A,B,tol):
+        """isSamePoint(A,B,tol)"""
+        dis = self.dist(A,B)
+        if dis < tol:
             return True
         return False
 
@@ -354,6 +368,88 @@ class MeshRemodelCreatePointsObjectCommandClass(object):
         return True
 
 # end create points class
+####################################################################################
+# Create the Mesh Remodel WireFrame Object
+
+class MeshRemodelCreateWireFrameObjectCommandClass(object):
+    """Create WireFrame Object command"""
+
+    def __init__(self):
+        self.mesh = None
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateWireFrameObject.png') ,
+            'MenuText': "Create Wire&Frame object" ,
+            'ToolTip' : "Create the WireFrame object"}
+ 
+    def Activated(self):
+        doc = FreeCAD.ActiveDocument
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        line_width = pg.GetFloat("LineWidth",5.0)
+        point_size = pg.GetFloat("PointSize",4.0)
+        tolerance = pg.GetFloat("CoplanarTolerance",.001)
+        QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        doc.openTransaction("Create WireFrame object")
+        #group = doc.addObject("App::DocumentObjectGroup", "MR_Facets")
+        mids = []
+        lines=[]
+        meshfacets = self.mesh.Mesh.Facets
+        for f in meshfacets:
+            pts = f.Points
+            mid = gu.midpoint(FreeCAD.Base.Vector(pts[0]), FreeCAD.Base.Vector(pts[1]))
+            l1 =Part.makeLine(pts[0],pts[1])
+            if not gu.hasPoint(mid, mids, tolerance):
+                mids.append(mid)
+                lines.append(l1)
+                #Part.show(l1, "MR_Facet_Edge")
+                #doc.ActiveObject.ViewObject.PointSize = point_size
+                #doc.ActiveObject.ViewObject.LineWidth = line_width
+                #doc.ActiveObject.adjustRelativeLinks(group)
+                #group.addObject(doc.ActiveObject)
+
+            mid = gu.midpoint(FreeCAD.Base.Vector(pts[0]), FreeCAD.Base.Vector(pts[2]))
+            l2 =Part.makeLine(pts[0],pts[2])
+            if not gu.hasPoint(mid, mids, tolerance):
+                mids.append(mid)
+                lines.append(l2)
+                #Part.show(l2, "MR_Facet_Edge")
+                #doc.ActiveObject.ViewObject.PointSize = point_size
+                #doc.ActiveObject.ViewObject.LineWidth = line_width
+                #doc.ActiveObject.adjustRelativeLinks(group)
+                #group.addObject(doc.ActiveObject)
+
+            mid = gu.midpoint(FreeCAD.Base.Vector(pts[2]),FreeCAD.Base.Vector(pts[1]))
+            l3 =Part.makeLine(pts[2],pts[1])
+            if not gu.hasPoint(mid, mids, tolerance):
+                mids.append(mid)
+                lines.append(l3)
+                #Part.show(l3, "MR_Facet_Edge")
+                #doc.ActiveObject.ViewObject.PointSize = point_size
+                #doc.ActiveObject.ViewObject.LineWidth = line_width
+                #doc.ActiveObject.adjustRelativeLinks(group)
+                #group.addObject(doc.ActiveObject)
+        Part.show(Part.makeCompound(lines),"MR_WireFrame")
+        doc.ActiveObject.ViewObject.PointSize = point_size
+        doc.ActiveObject.ViewObject.LineWidth = line_width
+        doc.recompute()
+        doc.commitTransaction()
+        doc.recompute()
+        QtGui.QApplication.restoreOverrideCursor()
+        return
+   
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getSelectionEx()
+        if len(sel) == 0:
+            return False
+        elif "Mesh.Feature" not in str(type(sel[0].Object)):
+            return False
+        else:
+            self.mesh = sel[0].Object
+        return True
+
+# end create WireFrame class
 
 ####################################################################################
 # Create the Mesh Remodel Point Object
@@ -560,8 +656,16 @@ class MeshRemodelCreateLineCommandClass(object):
             return False
         count = 0
         self.pts = []
+        hasEdges = False
         for s in sel:
-            if hasattr(s,"PickedPoints"):
+            if s.HasSubObjects and "Edge" in s.SubElementNames[0]:
+                for sub in s.SubObjects:
+                    if "Edge" in str(type(sub)):
+                        self.pts.append(sub.firstVertex().Point)
+                        self.pts.append(sub.lastVertex().Point)
+                        count += 2
+                        hasEdges = True
+            if not hasEdges and hasattr(s,"PickedPoints"):
                 p = s.PickedPoints
                 for pt in s.PickedPoints:
                     self.pts.append(pt)
@@ -582,15 +686,18 @@ class MeshRemodelCreatePolygonCommandClass(object):
 
     def __init__(self):
         self.pts = []
+        self.edges = []
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreatePolygon.png') ,
             'MenuText': "Create &Polygon" ,
             'ToolTip' : "\
-Create a Polygon from 3 or more selected points\n\
+Create a Polygon from 3 or more selected points or 2 or more selected edges\n\
 Might not always be coplanar, consider using links to external geometry in a sketch\n\
+Do **not** attempt to mix selected edges and selected points, should be all edges\n\
+or all points, but not a combination of the 2 object types\n\
 (Makes individual lines, use Create wire to connect into a single wire object.)\n\
-(Shift+Click to not close polygon)\n\
+(Shift+Click to not close polygon) -- but selected edges never close unless connected\n\
 (Alt+Click to sort selected points)\n\
 "}
  
@@ -603,13 +710,12 @@ Might not always be coplanar, consider using links to external geometry in a ske
         doc.openTransaction("Create polygon")
         modifiers = QtGui.QApplication.keyboardModifiers()
         if modifiers != QtCore.Qt.ShiftModifier and modifiers != QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.AltModifier):
-            self.pts.append(self.pts[0]) #don't close polygon on shift+click
+            if len(self.pts) > 0:
+                self.pts.append(self.pts[0]) #don't close polygon on shift+click
 
         if modifiers == QtCore.Qt.AltModifier.__or__(QtCore.Qt.ShiftModifier) or modifiers == QtCore.Qt.AltModifier:
-            poly = Part.makePolygon(gu.sortPoints(self.pts))
             lineList = self.makePolygon(gu.sortPoints(self.pts))
         else:
-            poly = Part.makePolygon(self.pts)
             lineList = self.makePolygon(self.pts)
 
         lineObjs = []
@@ -628,11 +734,17 @@ Might not always be coplanar, consider using links to external geometry in a ske
         return
 
     def makePolygon(self,pts):
-        """make list of lines out of the pts (vectors) list one line at a time, return the list"""
+        """make list of lines out of the pts (vectors) list one line at a time, return the list
+           or ignore pts if self.edges is not empty and make the list of lines out of those edges
+        """
         lines=[]
-        for ii in range(1,len(pts)):
-            if pts[ii-1] != pts[ii]:
-                lines.append(Part.makeLine(pts[ii-1],pts[ii]))
+        if len(self.edges) == 0:
+            for ii in range(1,len(pts)):
+                if pts[ii-1] != pts[ii]:
+                    lines.append(Part.makeLine(pts[ii-1],pts[ii]))
+        else:
+            for edge in self.edges:
+                lines.append(Part.makeLine(edge.firstVertex().Point, edge.lastVertex().Point))
         return lines
 
     def IsActive(self):
@@ -645,7 +757,14 @@ Might not always be coplanar, consider using links to external geometry in a ske
             return False
         count = 0
         self.pts = []
+        self.edges = []
         for s in sel:
+            if s.HasSubObjects and "Edge" in s.SubElementNames[0]:
+                for sub in s.SubObjects:
+                    if "Edge" in str(type(sub)):
+                        self.edges.append(sub)
+                count = len(self.edges)+1 #2 edges will work as well as 3 points
+                continue
             if hasattr(s,"PickedPoints"):
                 p = s.PickedPoints
                 for pt in s.PickedPoints:
@@ -999,13 +1118,13 @@ class MeshRemodelCreateWireCommandClass(object):
             'MenuText': "Create &wire" ,
             'ToolTip' : "Create a wire from selected objects\n(All selected objects should be connected.)\n\
 (Runs draft upgrade)\n\
-Shift+Click to downgrade to edges\n\
+Ctrl+Click to downgrade to edges\n\
 Tip: You can also use this to upgrade a wire to a face, which can be converted to a sketch to avoid some coplanar issues\n"}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
         modifiers = QtGui.QApplication.keyboardModifiers()
-        if (modifiers == QtCore.Qt.ShiftModifier):
+        if (modifiers == QtCore.Qt.ControlModifier):
             doc.openTransaction("Downgrade to edges")
             Draft.downgrade(self.objs)
             doc.recompute()
@@ -1138,6 +1257,7 @@ class MeshRemodelValidateSketchCommandClass(object):
 def initialize():
     if FreeCAD.GuiUp:
         Gui.addCommand("MeshRemodelCreatePointsObject", MeshRemodelCreatePointsObjectCommandClass())
+        Gui.addCommand("MeshRemodelCreateWireFrameObject",MeshRemodelCreateWireFrameObjectCommandClass())
         Gui.addCommand("MeshRemodelCreatePointObject", MeshRemodelCreatePointObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateCoplanarPointsObject", MeshRemodelCreateCoplanarPointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateLine", MeshRemodelCreateLineCommandClass())

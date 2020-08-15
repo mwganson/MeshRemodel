@@ -19,32 +19,36 @@ An alternative workflow is to first create a points object, then use those point
 <img src="Resources/icons/CreatePointsObject.png" alt="create points object"><br/>
 Select the mesh object in the tree, then use this command to create a points object containing all the vertices of the selected mesh object.  The points object is a compound consisting of Part Point (vertex) objects, one per vertex in the selected mesh.  The purpose of this object is to provide selectable points in the 3d view.  We can use these selectable points with the other tools in the workbench to create the lines, circles, arcs, and polygons needed to remodel the mesh.<br/>
 <br/>
+## Create WireFrame Object
+<img src="Resources/icons/CreateWireFrameObject.png" alt="create wireframe object"><br/>
+Select the mesh object in the tree, then use this command to create a wireframe object containing all the edges of the selected mesh object.  The wireframe object is a compound consisting of Part Line objects, one per edge in the selected mesh.  The purpose of this object is to provide selectable edges in the 3d view.  We can use these selectable points with the other tools in the workbench to create the lines and polygons needed to remodel the mesh.<br/>
+<br/>
 ## Create Point Object
 <img src="Resources/icons/CreatePointObject.png" alt="create point object"><br/>
 Select a vertex in the 3d view, then use this command to create a point object containing that vertex.  The point object is a Part::Vertex that we can use in some operations, such as Part::Loft.<br/>
 <br/>
 ## Create Coplanar Points Object
 <img src="Resources/icons/CreateCoplanar.png" alt = "create coplanar"><br/>
-Select 3 points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  Then an empty sketch is created, and added to that empty sketch are links to external geometry for all of the points in the new coplanar points object.  It is advised to recreate the profile inside the sketch using those external links and the sketcher tools.<br/>
+Select 3 points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  Then an empty sketch is created, and added to that empty sketch are links to external geometry for all of the points in the new coplanar points object.  You can recreate the profile inside the sketch using those external links and the sketcher tools or directly in the 3d view using the MeshRemodel tools.<br/>
 <br/>
-In order to filter the original points object into a set of coplanar points aligned on the plane defined by the 3 selected points an internal isCoplanar algorithm is used.  An alternative (Alt+Click) is to use the isPlaner() algorithm from the Draft workbench.  The difference is the Draft workbench algorithm is more restrictive, and so you end up with fewer points than when using the default internal algorithm at its default tolerance level.  There is a settings option for changing the tolerance level.  The smaller the number the fewer points get produced.  The filtering is done by using the 3 selected points and each other point in turn to create a tetrahedron.  If the 4 points are coplanar, then the tetrahedron should have volume ~= zero.  Default tolerance is 0.001 mm^3.
+In order to filter the original points object into a set of coplanar points aligned on the plane defined by the 3 selected points an internal isCoplanar algorithm is used.  There is a settings option for changing the tolerance level.  The smaller the number the fewer points get produced.  The filtering is done by using the 3 selected points and each other point in turn to create a tetrahedron.  If the 4 points are coplanar, then the tetrahedron should have volume ~= zero.  Default tolerance is 0.001 mm^3.
 <br/>
 ## Create Line
 <img src="Resources/icons/CreateLine.png" alt = "create line"><br/>
-Select 2 points in the 3d view to enable this command.  It creates a Part Line object using the 2 selected points as a reference.  Note: any 2 selectable points may be used, even points that are part of an edge (the edge is shown selected in the 3d view, but the point at the mouse position is the one used), sketch, 3d object vertex, circle, etc.  If you can see it in the 3d view and select it, then it most likely can be used with this function.<br/>
+Select 2 points or 1 edge in the 3d view to enable this command.  It creates a Part Line object using the 2 selected points or the selected edge as a reference.  Note: any 2 selectable points may be used, even points that are part of an edge (the edge is shown selected in the 3d view, but the point at the mouse position is the one used), sketch, 3d object vertex, circle, etc.  If you can see it in the 3d view and select it, then it most likely can be used with this function.  If you select an edge the first point and the last point of the edge are the points used, so curved edges will likely produce unexpected results.<br/>
 <br/>
 Use Ctrl+Click to include a point at the midpoint of the line.  Use Ctrl+Shift+Click if only the midpoint is desired.<br/>
 In the report view you will find some basic information about the line, including its length and coordinates of its midpoint.<br/>
 <br/>
 ## Create Polygon
 <img src="Resources/icons/CreatePolygon.png" alt = "create polygon"><br/>
-It is recommended to remodel the object inside the sketcher using the sketcher line tools instead of this, but it is here for those who wish to use it instead.  The reason it is recommened to use the sketcher is some of the polygons created might not be coplanar, and might give problems with future operations.<br/>
+You may elect to remodel the object inside the sketcher using the sketcher line tools instead of this, but it is here for those who wish to use it instead.  The reason it was previously recommended to use the sketcher is some of the polygons created with this tool might not be coplanar, and might give problems with future operations.  But I have found that when you have a coplanar issue you can usually (usually) click upgrade (Create a wire tool) twice (first to make a wire, second to create a face), then use the face successfully where the wire might have failed.<br/>
 <br/>
-Select 3 or more points in the 3d view to enable this command.  It creates a polygon from the selected points.  Note: this is not a regular polygon, meaning the side lengths are not necessarily all equal to each other.  The order of selection is important.  By default the polygon will be closed, but you can prevent this with Shift+Click.<br/>
+Select 3 or more points or 2 or more edges in the 3d view to enable this command.  It creates a polygon from the selected points or edges.  You should **not** mix points and edges in the same polygon.  Choose either one object type or the other, but not both.  Note: this is not a regular polygon, meaning the side lengths are not necessarily all equal to each other.  The order of selection is important.  By default the polygon will be closed, but you can prevent this with Shift+Click when selecting points.  When selecting edges the polygon will only be closed if the last edge connects back to the first edge.<br/>
 <br/>
 When selecting using Shift+B, block selection, the points will generally need to be sorted or else you will get a polygon which zig zags all about.  To enable sorting using Alt+Click.  The sorting algorithm takes the first selected point, then finds the nearest point among the other selected points, and puts it 2nd.  Then it uses the 2nd point to find the next nearest point, and puts it 3rd, and so on.<br/>
 <br/>
-The polygon object created is made up of individual Part Lines.  This will enable you to delete any lines you would prefer not to have, for example if you get a closed polygon, but would prefer it not to be closed or if some lines get crossed, etc.  Use the Create wire tool to upgrade the individual lines to a single wire object, if you prefer.<br/>
+The polygon object created is made up of individual Part Lines.  This will enable you to delete any lines you would prefer not to have, for example if you get a closed polygon, but would prefer it not to be closed or if some lines get crossed, etc.  Use the Create wire tool to upgrade the individual lines to a single wire object, and then click it again to create a face from the wire.  My experience is faces created in this manner are much less likely to fail in a future sweep or extrude due to being non-coplanar.<br/>
 <br/>
 ## Create BSpline
 <img src="Resources/icons/CreateBSpline.png" alt = "create bspline"><br/>
@@ -66,7 +70,7 @@ In the report view you will find some basic information about the arc, including
 <br/>
 ## Create Wire
 <img src="Resources/icons/CreateWire.png" alt = "create wire"><br/>
-Select 2 or more objects to enable this command.  It uses Draft.upgrade() to connect the objects into a single wire.  It is here as a convenience.  Note: the selected objects should all be connected together, but need not necessarily form a closed loop.  For example, you might have an arc and 2 lines connected one to each end of the arc.  You should not include circles unless you wish to connect them to other objects (not common).  The idea here to create wires from connected lines, open polygons, and arcs, then use these new wires, along with existing (coplanar) circles and closed polygons to create a sketch with the Create Sketch tool.  This is typically an intermediate step in creating a sketch.<br/>
+Select 2 or more objects to enable this command.  It uses Draft.upgrade() to connect the objects into a single wire.  It is here as a convenience.  Note: the selected objects should all be connected together, but need not necessarily form a closed loop.  For example, you might have an arc and 2 lines connected one to each end of the arc.  You should not include circles unless you wish to connect them to other objects (not common).  The idea here to create wires from connected lines, open polygons, and arcs, then use these new wires, along with existing (coplanar) circles and closed polygons to create a sketch with the Create Sketch tool or you can also use the wires directly with Part workbench tools like, extrude or sweep.  As noted in other sections of this document, it is often useful to use this again on the created wire to form it into a face. Faces tend to work better with other tools rather than wires, particularly in cases where the tool complains the wire is not coplanar.  If you get that error message run this tool again on the wire and upgrade it to a face.  Then try the tool that complained the wire was not coplanar again.<br/>
 <br/>
 ## Create Sketch
 <img src="Resources/icons/CreateSketch.png" alt = "create sketch"><br/>
@@ -88,7 +92,7 @@ Opens Sketch workbench validate sketch tool.  Enabled only if you have 1 sketch 
 ## Settings
 <img src="Resources/icons/Settings.png" alt="settings"><br/>
 ### Keep toolbar active
-This setting will keep the toolbar active after leaving the workbench, but you have to open the workbench at least once each session.  After that, if this is enabled, when you leave the workbench the toolbar will appear in the new workbench after a couple seconds.<br/>
+This setting will keep the toolbar active after leaving the workbench, but you have to open the workbench at least once each session.  After that, if this is enabled, when you leave the workbench the toolbar will appear in the new workbench after a couple seconds.  This can be a great time saver as you would often use this tool in conjunction with Part workbench in remodeling a mesh.  This would prevent the need to switch back and forth between workbenches.<br/>
 <br/>
 ### Point size
 This sets the point size on all points created with the workbench.  It does not affect objects already created after the setting is changed, only those created after the setting is changed.  Does not affect wire objects or sketch objects, only the centers of arcs, circles, and polygons, and the midpoints of lines.  Default 4.0<br/>
@@ -100,8 +104,12 @@ This sets the line width on all lines created with the workbench.  It does not a
 This sets the precision to use when constraining radii (for circles and arcs) when creating sketches.  These are integer values from -1 to 12.  If -1, then no constraining of any radii occurs.  If 0, then radii are constrained to maximum precision.  If > 0, then radius constraints are rounded to that many digits precision, e.g. 1 results in 1.5, 2 in 1.49, 3 in 1.498, etc. Default: 1<br/>
 <br/>
 ### Coplanar tolerance
-This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might be accepted as coplanar in later operations.  This is not an issue when modeling within the sketcher using links to external geometry.  It is recommened to not change the default unless you are missing some points that you think should be included or perhaps you are getting points that should not be included.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  Default: 0.001 mm^3
+This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might be accepted as coplanar in later operations.  This is not an issue when modeling within the sketcher using links to external geometry.  It is recommened to not change the default unless you are missing some points that you think should be included or perhaps you are getting points that should not be included.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
 #### Release notes:<br/>
+* 2020.08.14 (version 1.5)<br/>
+** added WireFrame object -- works like creating a Points object, but creates the edges instead of the vertices
+** Make Polygon tool can now work with selected edges as well as selected points (but not both at the same time)
+** Make Line tool can now make a line from 2 selected points or from a selected edge.
 * 2020.08.06 (version 1.43)<br/>
 ** added create a point command
 * 2020.08.05 (version 1.42)<br/>
