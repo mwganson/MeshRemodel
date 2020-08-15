@@ -59,6 +59,7 @@ class MeshRemodelWorkbench(Workbench):
         "This function is executed when FreeCAD starts"
         import MeshRemodelCmd #needed files for FreeCAD commands
         self.list = ["MeshRemodelCreatePointsObject",
+                    "MeshRemodelCreateWireFrameObject",
                     "MeshRemodelCreatePointObject",
                     "MeshRemodelCreateCoplanarPointsObject",
                     "MeshRemodelCreateLine",
