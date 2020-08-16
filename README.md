@@ -113,9 +113,6 @@ This sets the tolerance to use when determining which points lie on the same pla
 ** added WireFrame object -- works like creating a Points object, but creates the edges instead of the vertices
 ** Make Polygon tool can now work with selected edges as well as selected points (but not both at the same time)
 ** Make Line tool can now make a line from 2 selected points or from a selected edge.
-** additional commands via the python API:
-** gu.isSamePoint(A,B,tolerance)
-** gu.hasPoint(pt,ptsList,tolerance)
 * 2020.08.06 (version 1.43)<br/>
 ** added create a point command
 * 2020.08.05 (version 1.42)<br/>
@@ -153,6 +150,9 @@ This sets the tolerance to use when determining which points lie on the same pla
 **  gu.nearestPoint(pt, pts, exclude)<br/>
 **  gu.sortPoints(pts)<br/>
 **  gu.midpoint(A,B)<br/>
+**  additional commands via the python API (since v1.5):<br/>
+**  gu.isSamePoint(A,B,tolerance)<br/>
+**  gu.hasPoint(pt,ptsList,tolerance)<br/>
 * 2019.08.20 (version 1.28)<br/>
 ** add sketch radius precision to settings
 * 2019.08.20 (version 1.27)<br/>
