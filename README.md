@@ -108,6 +108,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 #### Release notes:<br/>
 * 2020.08.15 (version 1.51)<br/>
 ** move to using parametric Draft lines, arcs, and circles for more parametric possibilities.
+** add option to create all variants of arcs by 3 points (alt+click)
 * 2020.08.14 (version 1.5)<br/>
 ** added WireFrame object -- works like creating a Points object, but creates the edges instead of the vertices
 ** Make Polygon tool can now work with selected edges as well as selected points (but not both at the same time)
