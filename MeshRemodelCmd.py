@@ -609,7 +609,7 @@ Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
 # Create a line from 2 selected points
 
 class MeshRemodelCreateLineCommandClass(object):
-    """Create Line from 2 selected points"""
+    """Create Line from 2 selected points or from selected edge"""
 
     def __init__(self):
         self.pts = []
@@ -726,11 +726,11 @@ or all points, but not a combination of the 2 object types\n\
             l = Draft.makeLine(line.Vertexes[0].Point, line.Vertexes[1].Point)
             l.Label="MR_"+l.Label
             doc.recompute()
-            lineObjs.append(doc.ActiveObject)
+            lineObjs.append(l)
         FreeCAD.Gui.Selection.clearSelection()
-        for l in lineObjs:
-            l.ViewObject.LineWidth = line_width
-            FreeCAD.Gui.Selection.addSelection(l)
+        for ll in lineObjs:
+            ll.ViewObject.LineWidth = line_width
+            FreeCAD.Gui.Selection.addSelection(ll)
 
         doc.commitTransaction()
 
