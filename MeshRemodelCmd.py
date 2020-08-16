@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2020.08.014"
-__version__ = "1.5"
-version = 1.5
+__version__ = "1.51"
+version = 1.51
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -633,7 +633,9 @@ class MeshRemodelCreateLineCommandClass(object):
         line = Part.makeLine(self.pts[0],self.pts[1])
         lineName = "MR_Ref"
         if not modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
-            Part.show(line,"MR_Line")
+            #Part.show(line,"MR_Line")
+            l = Draft.makeLine(line.Vertexes[0].Point, line.Vertexes[1].Point)
+            l.Label="MR_"+l.Label
             lineName = doc.ActiveObject.Name
             doc.ActiveObject.ViewObject.LineWidth=line_width
             Gui.Selection.clearSelection()
@@ -720,7 +722,9 @@ or all points, but not a combination of the 2 object types\n\
 
         lineObjs = []
         for line in lineList:
-            Part.show(line,"MR_Line")
+            #Part.show(line,"MR_Line")
+            l = Draft.makeLine(line.Vertexes[0].Point, line.Vertexes[1].Point)
+            l.Label="MR_"+l.Label
             doc.recompute()
             lineObjs.append(doc.ActiveObject)
         FreeCAD.Gui.Selection.clearSelection()
@@ -899,7 +903,9 @@ class MeshRemodelCreateCircleCommandClass(object):
         circle = Part.makeCircle(radius, center, normal)
         circName="MR_Ref"
         if not modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.ControlModifier):
-            Part.show(circle,"MR_Circle")
+            #Part.show(circle,"MR_Circle")
+            c = Draft.makeCircle(circle)
+            c.Label="MR_"+c.Label
             circName = doc.ActiveObject.Name
             doc.ActiveObject.ViewObject.LineWidth=line_width
             FreeCAD.Console.PrintMessage(circName+": radius = "+str(radius)+"\n  center at "+str(center)+"\n")
@@ -949,7 +955,10 @@ class MeshRemodelCreateArcCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateArc.png') ,
             'MenuText': "Create &arc" ,
-            'ToolTip' : "Create an arc from first 3 selected points\n(Ctrl+Click to include Center point)\n(Ctrl+Shift+Click for only center)"}
+            'ToolTip' : "Create an arc from first 3 selected points\n(Ctrl+Click to include Center point)\n\
+(Ctrl+Shift+Click for only center)\n\
+(Alt+Click for all permutations possible with the 3 selected points -- 6 arcs -- useful where you\n\
+are not getting the arc orientation you were expecting -- will need to delete unwanted extra arcs)"}
 
     def __init__(self):
         self.pts = []
@@ -975,16 +984,29 @@ class MeshRemodelCreateArcCommandClass(object):
         radius = gu.circumradius(A,B,C)
 
         doc.openTransaction("Create Arc")
-        arc = Part.ArcOfCircle(A,B,C)
+        #arc = Part.ArcOfCircle(A,B,C)
         #on ctrl+shift click we only show center
         arcName="MR_Ref"
-        if not modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
-            Part.show(arc.toShape(),"MR_Arc")
-            arcName = doc.ActiveObject.Name
+        if not modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier) or modifiers == QtCore.Qt.AltModifier:
+            #Part.show(arc.toShape(),"MR_Arc")
+            a = Draft.make_arc_3points([A,B,C])
+            a.Label = "MR_"+a.Label
+            if modifiers == QtCore.Qt.AltModifier:
+                a = Draft.make_arc_3points([A,C,B])
+                a.Label = "MR_"+a.Label
+                a = Draft.make_arc_3points([B,C,A])
+                a.Label = "MR_"+a.Label
+                a = Draft.make_arc_3points([B,A,C])
+                a.Label = "MR_"+a.Label
+                a = Draft.make_arc_3points([C,B,A])
+                a.Label = "MR_"+a.Label
+                a = Draft.make_arc_3points([C,A,B])
+                a.Label = "MR_"+a.Label
+            arcName = a.Label
             doc.ActiveObject.ViewObject.LineWidth=line_width
             FreeCAD.Console.PrintMessage(arcName+": radius = "+str(radius)+"\n  center at "+str(center)+"\n")
             Gui.Selection.clearSelection()
-            Gui.Selection.addSelection(doc.getObject(arcName))
+            Gui.Selection.addSelection(a)
         if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
             Part.show(Part.Point(center).toShape(),arcName+"_Ctr") #show the center point
             doc.ActiveObject.ViewObject.PointSize = point_size

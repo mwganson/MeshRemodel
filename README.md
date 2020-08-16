@@ -106,6 +106,8 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might be accepted as coplanar in later operations.  This is not an issue when modeling within the sketcher using links to external geometry.  It is recommened to not change the default unless you are missing some points that you think should be included or perhaps you are getting points that should not be included.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
 #### Release notes:<br/>
+* 2020.08.15 (version 1.51)<br/>
+** move to using parametric Draft lines, arcs, and circles for more parametric possibilities.
 * 2020.08.14 (version 1.5)<br/>
 ** added WireFrame object -- works like creating a Points object, but creates the edges instead of the vertices
 ** Make Polygon tool can now work with selected edges as well as selected points (but not both at the same time)
