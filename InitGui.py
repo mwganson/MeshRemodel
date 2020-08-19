@@ -60,6 +60,7 @@ class MeshRemodelWorkbench(Workbench):
         import MeshRemodelCmd #needed files for FreeCAD commands
         self.list = ["MeshRemodelCreatePointsObject",
                     "MeshRemodelCreateWireFrameObject",
+                    "MeshRemodelCreateCrossSectionsObject",
                     "MeshRemodelCreatePointObject",
                     "MeshRemodelCreateCoplanarPointsObject",
                     "MeshRemodelCreateLine",

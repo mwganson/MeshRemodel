@@ -23,9 +23,13 @@ Select the mesh object in the tree, then use this command to create a points obj
 <img src="Resources/icons/CreateWireFrameObject.png" alt="create wireframe object"><br/>
 Select the mesh object in the tree, then use this command to create a wireframe object containing all the edges of the selected mesh object.  The wireframe object is a compound consisting of Part Line objects, one per edge in the selected mesh.  The purpose of this object is to provide selectable edges in the 3d view.  We can use these selectable points with the other tools in the workbench to create the lines and polygons needed to remodel the mesh.<br/>
 <br/>
+## Create Cross-Sections Object
+<img src="Resources/icons/CreateCrossSections.png" alt="create cross-sections object"><br/>
+Select the mesh object in the tree, then use this command to create one or more cross-section objects.  This is just a convenience link to the Cross-sections tool in the Mesh Design workbench.  These cross-sections should no be directly used as wires, but rather as references for creating the wires within the MeshRemodel workbench.  This is because these cross-section objects will have extra points and multiple line segments where only one segment is desired.<br/>
+<br/>
 ## Create Point Object
 <img src="Resources/icons/CreatePointObject.png" alt="create point object"><br/>
-Select a vertex in the 3d view, then use this command to create a point object containing that vertex.  The point object is a Part::Vertex that we can use in some operations, such as Part::Loft.<br/>
+Select a vertex in the 3d view, then use this command to create a point object containing that vertex.  The point object is a Part::Vertex that we can use in some operations, such as Part::Loft.  As of version 1.6 the point object can also be any arbitrary point selected along an edge, as well as a selected vertex.<br/>
 <br/>
 ## Create Coplanar Points Object
 <img src="Resources/icons/CreateCoplanar.png" alt = "create coplanar"><br/>
@@ -106,6 +110,9 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might be accepted as coplanar in later operations.  This is not an issue when modeling within the sketcher using links to external geometry.  It is recommened to not change the default unless you are missing some points that you think should be included or perhaps you are getting points that should not be included.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
 #### Release notes:<br/>
+* 2020.08.19 (version 1.6)<br/>
+** Add convenience link to Mesh Design workbench Cross-sections tool
+** Allow to create a point object at an arbitrary picked point along an edge in addition to a vertex
 * 2020.08.15 (version 1.51)<br/>
 ** move to using parametric Draft lines, arcs, and circles for more parametric possibilities.
 ** add option to create all variants of arcs by 3 points (alt+click)

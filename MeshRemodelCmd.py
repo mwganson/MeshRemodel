@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2020.08.014"
-__version__ = "1.51"
-version = 1.51
+__date__    = "2020.08.19"
+__version__ = "1.6"
+version = 1.6
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -450,7 +450,42 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         return True
 
 # end create WireFrame class
+####################################################################################
+# Create the Mesh Cross Sections Object
 
+class MeshRemodelCreateCrossSectionsCommandClass(object):
+    """Use Mesh Design workbench Cross-Sections command"""
+
+    def __init__(self):
+        self.mesh = None
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateCrossSections.png') ,
+            'MenuText': "Create cross-sections ob&ject..." ,
+            'ToolTip' : "Create the cross-sections object\n\
+Convenience link to the Mesh Design workbench cross-sections tool\n\
+(These objects should not be directly used as wires, but rather as references for\n\
+creating wires using the Mesh Remodel workbench as with the Points and WireFrame objects)\n\
+"}
+ 
+    def Activated(self):
+        import MeshPartGui, FreeCADGui
+        FreeCADGui.runCommand('MeshPart_CrossSections')
+        return
+   
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getSelectionEx()
+        if len(sel) == 0:
+            return False
+        elif "Mesh.Feature" not in str(type(sel[0].Object)):
+            return False
+        else:
+            self.mesh = sel[0].Object
+        return True
+
+# end open mesh section class
 ####################################################################################
 # Create the Mesh Remodel Point Object
 
@@ -459,7 +494,6 @@ class MeshRemodelCreatePointObjectCommandClass(object):
 
     def __init__(self):
         self.obj = None
-
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreatePointObject.png') ,
             'MenuText': "Create poin&t object" ,
@@ -471,9 +505,14 @@ class MeshRemodelCreatePointObjectCommandClass(object):
         point_size = pg.GetFloat("PointSize",4.0)
         doc.openTransaction("Create point object")
         pt = doc.addObject("Part::Vertex", "MR_Point")
-        pt.X = self.obj.Point.x
-        pt.Y = self.obj.Point.y
-        pt.Z = self.obj.Point.z
+        if hasattr(self.obj,"Point"):
+            pt.X = self.obj.Point.x
+            pt.Y = self.obj.Point.y
+            pt.Z = self.obj.Point.z
+        elif hasattr(self.obj,"x"): #was a picked point along an edge rather than a vertex
+            pt.X = self.obj.x
+            pt.Y = self.obj.y
+            pt.Z = self.obj.z
         
         doc.ActiveObject.ViewObject.PointSize = point_size
         doc.recompute()
@@ -491,6 +530,10 @@ class MeshRemodelCreatePointObjectCommandClass(object):
             if "Vertex" in str(type(sel[0])):
                 self.obj = sel[0]
                 return True
+            if "Edge" in str(type(sel[0])):
+                if len (selobj[0].PickedPoints) == 1:
+                    self.obj = selobj[0].PickedPoints[0]
+                    return True
         return False
 
 # end create point class
@@ -1280,6 +1323,7 @@ def initialize():
     if FreeCAD.GuiUp:
         Gui.addCommand("MeshRemodelCreatePointsObject", MeshRemodelCreatePointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateWireFrameObject",MeshRemodelCreateWireFrameObjectCommandClass())
+        Gui.addCommand("MeshRemodelCreateCrossSectionsObject",MeshRemodelCreateCrossSectionsCommandClass())
         Gui.addCommand("MeshRemodelCreatePointObject", MeshRemodelCreatePointObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateCoplanarPointsObject", MeshRemodelCreateCoplanarPointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateLine", MeshRemodelCreateLineCommandClass())
