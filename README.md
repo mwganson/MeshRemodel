@@ -29,7 +29,7 @@ Select the mesh object in the tree, then use this command to create one or more 
 <br/>
 ## Create Point Object
 <img src="Resources/icons/CreatePointObject.png" alt="create point object"><br/>
-Select a vertex in the 3d view, then use this command to create a point object containing that vertex.  The point object is a Part::Vertex that we can use in some operations, such as Part::Loft.  As of version 1.6 the point object can also be any arbitrary point selected along an edge, as well as a selected vertex.<br/>
+Select a vertex (or any arbitrary point along any edge as of version 1.6) in the 3d view, then use this command to create a point object at that location.  The point object is a Part::Vertex that we can use in some operations, such as Part::Loft.<br/>
 <br/>
 ## Create Coplanar Points Object
 <img src="Resources/icons/CreateCoplanar.png" alt = "create coplanar"><br/>
