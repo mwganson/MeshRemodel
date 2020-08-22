@@ -25,11 +25,11 @@ Select the mesh object in the tree, then use this command to create a wireframe 
 <br/>
 ## Create Cross-Sections Object
 <img src="Resources/icons/CreateCrossSections.png" alt="create cross-sections object"><br/>
-Select the mesh object in the tree, then use this command to create one or more cross-section objects.  This is just a convenience link to the Cross-sections tool in the Mesh Design workbench.  These cross-sections should no be directly used as wires, but rather as references for creating the wires within the MeshRemodel workbench.  This is because these cross-section objects will have extra points and multiple line segments where only one segment is desired.<br/>
+Select the mesh object in the tree, then use this command to create one or more cross-section objects.  This is just a convenience link to the Cross-sections tool in the Mesh Design workbench.  These cross-sections should not be directly used as wires, but rather as references for creating the wires within the MeshRemodel workbench.  This is because these cross-section objects will have extra points and multiple line segments where only one segment is desired.<br/>
 <br/>
 ## Create Point Object
 <img src="Resources/icons/CreatePointObject.png" alt="create point object"><br/>
-Select a vertex in the 3d view, then use this command to create a point object containing that vertex.  The point object is a Part::Vertex that we can use in some operations, such as Part::Loft.  As of version 1.61 the point object can also be any arbitrary point selected along an edge or face, as well as a selected vertex.<br/>
+Select a vertex (or any arbitrary point along any edge or face as of version 1.61) in the 3d view, then use this command to create a point object at that location.  The point object is a Part::Vertex that we can use in some operations, such as Part::Loft.<br/>
 <br/>
 ## Create Coplanar Points Object
 <img src="Resources/icons/CreateCoplanar.png" alt = "create coplanar"><br/>
