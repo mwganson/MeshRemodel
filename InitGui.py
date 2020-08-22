@@ -73,7 +73,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelMergeSketches",
                     "MeshRemodelValidateSketch",
                     "MeshRemodelSettings"] # A list of command names created in the line above
-        self.appendToolbar("MeshRemodel Commands",self.list[:-2]) # leave settings off toolbar
+        self.appendToolbar("MeshRemodel Commands",self.list[:-3]) # leave settings, validate sketch and merge sketch off toolbar
         self.appendMenu("Mesh&Remodel",self.list) # creates a new menu
         #considered putting the menu inside the Edit menu, but decided against it
         #self.appendMenu(["&Edit","MeshRemodel"],self.list) # appends a submenu to an existing menu

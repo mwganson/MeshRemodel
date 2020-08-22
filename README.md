@@ -110,8 +110,10 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might be accepted as coplanar in later operations.  This is not an issue when modeling within the sketcher using links to external geometry.  It is recommened to not change the default unless you are missing some points that you think should be included or perhaps you are getting points that should not be included.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
 #### Release notes:<br/>
+* 2020.08.22 (version 1.63)<br/>
+** Remove merge sketch from toolbar, but keep as menu item
 * 2020.08.22 (version 1.62)<br/>
-** Remove sketch validation from toolbar, but keep as menu item.
+** Remove sketch validation from toolbar, but keep as menu item
 * 2020.08.22 (version 1.61)<br/>
 ** Allow to use point on a face as picked point for creating point object, in addition to vertex and edge
 * 2020.08.19 (version 1.6)<br/>
