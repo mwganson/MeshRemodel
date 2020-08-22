@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2020.08.19"
-__version__ = "1.6"
-version = 1.6
+__version__ = "1.61"
+version = 1.61
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -530,7 +530,7 @@ class MeshRemodelCreatePointObjectCommandClass(object):
             if "Vertex" in str(type(sel[0])):
                 self.obj = sel[0]
                 return True
-            if "Edge" in str(type(sel[0])):
+            if "Edge" in str(type(sel[0])) or "Face" in str(type(sel[0])):
                 if len (selobj[0].PickedPoints) == 1:
                     self.obj = selobj[0].PickedPoints[0]
                     return True
