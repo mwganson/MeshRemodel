@@ -852,21 +852,11 @@ class MeshRemodelCreateBSplineCommandClass(object):
         is_periodic=True
         if modifiers == QtCore.Qt.ShiftModifier or modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.AltModifier):
             is_periodic=False #don't close bspline on shift+click
-        bspline = Part.BSplineCurve()
         if modifiers == QtCore.Qt.AltModifier or modifiers == QtCore.Qt.AltModifier.__or__(QtCore.Qt.ShiftModifier) or modifiers == QtCore.Qt.ShiftModifier:
-            sortedPoints = gu.sortPoints(self.pts)[:-1]
-            bspline.interpolate(sortedPoints,PeriodicFlag=is_periodic)
-        else:
-            bspline.interpolate(self.pts,PeriodicFlag=is_periodic)
-
-        Part.show(bspline.toShape(), "MR_BSpline")
-        bsplineName = doc.ActiveObject.Name
-        doc.ActiveObject.ViewObject.LineWidth=line_width
-        #FreeCAD.Console.PrintMessage(bsplineName+": length = "+str(bspline.Length)+"\n  Center of mass: "+str(bspline.CenterOfMass)+"\n")
-        #Gui.Selection.clearSelection()
-        #Gui.Selection.addSelection(doc.getObject(bsplineName))
-
-
+            self.pts = gu.sortPoints(self.pts)[:-1]
+        bs = Draft.makeBSpline(self.pts, is_periodic)
+        bs.Label = "MR_BSpline"
+        bs.ViewObject.LineWidth=line_width
         doc.recompute()
         doc.commitTransaction()
         #QtGui.QApplication.restoreOverrideCursor()
