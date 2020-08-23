@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2020.08.22"
-__version__ = "1.65"
-version = 1.65
+__date__    = "2020.08.23"
+__version__ = "1.66"
+version = 1.66
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -376,6 +376,10 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
 
     def __init__(self):
         self.mesh = None
+        self.pb = None
+        self.btn = None
+        self.bar = None
+        self.bCanceled = False
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateWireFrameObject.png') ,
@@ -389,11 +393,22 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         point_size = pg.GetFloat("PointSize",4.0)
         tolerance = pg.GetFloat("CoplanarTolerance",.001)
         QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
-        doc.openTransaction("Create WireFrame object")
-        #group = doc.addObject("App::DocumentObjectGroup", "MR_Facets")
         mids = []
         lines=[]
         meshfacets = self.mesh.Mesh.Facets
+        total = len(meshfacets)
+        ii = 0
+        self.btn = QtGui.QPushButton("Cancel")
+        self.btn.clicked.connect(self.on_clicked)
+        self.pb = QtGui.QProgressBar()
+        self.bar = Gui.getMainWindow().statusBar()
+        self.bar.addWidget(self.pb)
+        self.bar.addWidget(self.btn)
+        self.btn.show()
+        self.pb.show()
+        self.pb.reset()
+        self.pb.setMinimum(0)
+        self.pb.setMaximum(total);
         for f in meshfacets:
             pts = f.Points
             mid = gu.midpoint(FreeCAD.Base.Vector(pts[0]), FreeCAD.Base.Vector(pts[1]))
@@ -401,33 +416,29 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
             if not gu.hasPoint(mid, mids, tolerance):
                 mids.append(mid)
                 lines.append(l1)
-                #Part.show(l1, "MR_Facet_Edge")
-                #doc.ActiveObject.ViewObject.PointSize = point_size
-                #doc.ActiveObject.ViewObject.LineWidth = line_width
-                #doc.ActiveObject.adjustRelativeLinks(group)
-                #group.addObject(doc.ActiveObject)
-
             mid = gu.midpoint(FreeCAD.Base.Vector(pts[0]), FreeCAD.Base.Vector(pts[2]))
             l2 =Part.makeLine(pts[0],pts[2])
             if not gu.hasPoint(mid, mids, tolerance):
                 mids.append(mid)
                 lines.append(l2)
-                #Part.show(l2, "MR_Facet_Edge")
-                #doc.ActiveObject.ViewObject.PointSize = point_size
-                #doc.ActiveObject.ViewObject.LineWidth = line_width
-                #doc.ActiveObject.adjustRelativeLinks(group)
-                #group.addObject(doc.ActiveObject)
-
             mid = gu.midpoint(FreeCAD.Base.Vector(pts[2]),FreeCAD.Base.Vector(pts[1]))
             l3 =Part.makeLine(pts[2],pts[1])
             if not gu.hasPoint(mid, mids, tolerance):
                 mids.append(mid)
                 lines.append(l3)
-                #Part.show(l3, "MR_Facet_Edge")
-                #doc.ActiveObject.ViewObject.PointSize = point_size
-                #doc.ActiveObject.ViewObject.LineWidth = line_width
-                #doc.ActiveObject.adjustRelativeLinks(group)
-                #group.addObject(doc.ActiveObject)
+            ii += 1
+            self.pb.setValue(ii)
+            QtGui.QApplication.processEvents()
+            if self.bCanceled:
+                self.bCanceled = False #for the next go around
+                self.bar.removeWidget(self.pb)
+                self.bar.removeWidget(self.btn)
+                QtGui.QApplication.restoreOverrideCursor()
+                FreeCAD.Console.PrintMessage("MeshRemodel: WireFrame creation canceled\n")
+                return
+        self.bar.removeWidget(self.pb)
+        self.bar.removeWidget(self.btn)
+        doc.openTransaction("Create WireFrame object")
         Part.show(Part.makeCompound(lines),"MR_WireFrame")
         doc.ActiveObject.ViewObject.PointSize = point_size
         doc.ActiveObject.ViewObject.LineWidth = line_width
@@ -436,7 +447,9 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         doc.recompute()
         QtGui.QApplication.restoreOverrideCursor()
         return
-   
+    def on_clicked(self):
+        self.bCanceled = True
+        return
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
