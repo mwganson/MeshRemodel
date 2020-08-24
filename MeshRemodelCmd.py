@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2020.08.23"
-__version__ = "1.66"
-version = 1.66
+__version__ = "1.661"
+version = 1.661
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -109,7 +109,7 @@ class MeshRemodelGeomUtils(object):
 
     def midpoint(self, A, B):
         """ midpoint(A, B)
-            A,B are vectors, return midpoint"""   
+            A,B are vectors, return midpoint"""
         mid = FreeCAD.Base.Vector()
         mid.x = (A.x + B.x)/2.0
         mid.y = (A.y + B.y)/2.0
@@ -135,7 +135,7 @@ class MeshRemodelGeomUtils(object):
         newList = [pts[0]]
         for ii in range(0, len(pts)):
             newList.extend([self.nearestPoint(newList[ii],pts,newList)])
-        return newList    
+        return newList
 
     def nearestPoint(self, pt, pts, exclude):
         """ nearestPoint(pt, pts, exclude)
@@ -174,12 +174,12 @@ class MeshRemodelGeomUtils(object):
         Ax,Ay,Az = A[0],A[1],A[2] 
         Bx,By,Bz = B[0],B[1],B[2]
         Cx,Cy,Cz = C[0],C[1],C[2]
- 
+
         a = self.dist(B,C)
         b = self.dist(C,A)
         c = self.dist(A,B)
         s = a+b+c
-        
+
         Ix = (a*Ax+b*Bx+c*Cx)/s
         Iy = (a*Ay+b*By+c*Cy)/s
         Iz = (a*Az+b*Bz+c*Cz)/s
@@ -246,7 +246,6 @@ class MeshRemodelGeomUtils(object):
             returns the radius of circumcircle of triangle A,B,C
             A,B,C are vectors
             the circumcircle is the circle passing through A, B, and C
-
         """
         return self.dist(A, self.circumcenter(A,B,C))
 
@@ -260,7 +259,7 @@ class MeshRemodelSettingsCommandClass(object):
     """Settings"""
 
     def __init__(self):
-        pass       
+        pass
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'Settings.png') , # the name of an icon file available in the resources
@@ -314,7 +313,7 @@ Enter new sketch radius precision", prec, -1,12,1,flags=windowFlags)
             if ok:
                 pg.SetFloat("CoplanarTolerance", new_coplanar_tol)
         return
-   
+
     def IsActive(self):
         return True
 
@@ -354,7 +353,7 @@ class MeshRemodelCreatePointsObjectCommandClass(object):
         doc.recompute()
         QtGui.QApplication.restoreOverrideCursor()
         return
-   
+
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
@@ -399,6 +398,7 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         total = len(meshfacets)
         ii = 0
         self.btn = QtGui.QPushButton("Cancel")
+        self.btn.setToolTip("Cancel Create WireFrame Object command")
         self.btn.clicked.connect(self.on_clicked)
         self.pb = QtGui.QProgressBar()
         self.bar = Gui.getMainWindow().statusBar()
@@ -409,6 +409,7 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         self.pb.reset()
         self.pb.setMinimum(0)
         self.pb.setMaximum(total);
+        self.pb.setFormat("%v/%m")
         for f in meshfacets:
             pts = f.Points
             mid = gu.midpoint(FreeCAD.Base.Vector(pts[0]), FreeCAD.Base.Vector(pts[1]))
@@ -429,7 +430,7 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
             ii += 1
             self.pb.setValue(ii)
             QtGui.QApplication.processEvents()
-            if self.bCanceled:
+            if self.bCanceled or Gui.getMainWindow().isVisible == False: #user exited with this still going, so quit
                 self.bCanceled = False #for the next go around
                 self.bar.removeWidget(self.pb)
                 self.bar.removeWidget(self.btn)
@@ -447,9 +448,11 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         doc.recompute()
         #QtGui.QApplication.restoreOverrideCursor()
         return
+
     def on_clicked(self):
         self.bCanceled = True
         return
+
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
