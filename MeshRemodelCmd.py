@@ -392,7 +392,7 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         line_width = pg.GetFloat("LineWidth",5.0)
         point_size = pg.GetFloat("PointSize",4.0)
         tolerance = pg.GetFloat("CoplanarTolerance",.001)
-        QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         mids = []
         lines=[]
         meshfacets = self.mesh.Mesh.Facets
@@ -433,7 +433,7 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
                 self.bCanceled = False #for the next go around
                 self.bar.removeWidget(self.pb)
                 self.bar.removeWidget(self.btn)
-                QtGui.QApplication.restoreOverrideCursor()
+                #QtGui.QApplication.restoreOverrideCursor()
                 FreeCAD.Console.PrintMessage("MeshRemodel: WireFrame creation canceled\n")
                 return
         self.bar.removeWidget(self.pb)
@@ -445,7 +445,7 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         doc.recompute()
         doc.commitTransaction()
         doc.recompute()
-        QtGui.QApplication.restoreOverrideCursor()
+        #QtGui.QApplication.restoreOverrideCursor()
         return
     def on_clicked(self):
         self.bCanceled = True
