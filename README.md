@@ -11,6 +11,10 @@ Can be installed via the AddonManager in Tools menu -> AddonManager.  After rest
 ## Overview
 Use this workbench to aid in remodeling imported mesh objects.  The preferred workflow is to select the mesh, then click either create points object or create wireframe object.  This creates an object with selectable points or edges at all of the mesh vertices or edges.  Use the selectable points or edges to create Mesh Remodel elements, such as points, line segments, arcs, circles, or bsplines.  You can then select those created elements and form a wire using the create a wire (Draft upgrade) tool, which wire can then be also upgraded to a face.  The face can be used with Part Extrude, Part Sweep, Part Revolve, and Part Loft tools to create solids.<br/>
 <br/>
+<figure class="video_container">
+  <iframe src="https://youtu.be/i6AU0TY6WYs" frameborder="0" allowfullscreen="true"> </iframe>
+</figure>
+<br/>
 ## Create Points Object
 <img src="Resources/icons/CreatePointsObject.png" alt="create points object"><br/>
 Select the mesh object in the tree, then use this command to create a points object containing all the vertices of the selected mesh object.  The points object is a compound consisting of Part Point (vertex) objects, one per vertex in the selected mesh.  The purpose of this object is to provide selectable points in the 3d view.  We can use these selectable points with the other tools in the workbench to create the lines, circles, arcs, and polygons needed to remodel the mesh.<br/>
