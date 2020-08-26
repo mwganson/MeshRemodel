@@ -1,14 +1,12 @@
 # MeshRemodel Workbench
 <img src="Resources/icons/MeshRemodelLogo.png" alt="icon">
 <br/>
-This workbench is currently under construction<br/>
-<br/>
 
 ## Toolbar Icon
 Download the <a href = "https://github.com/mwganson/MeshRemodel/blob/master/Resources/icons/MeshRemodelSVGLogo.svg">SVG Toolbar Icon</a><br/>
 
 ## Installation
-Can be installed via the AddonManager in Tools menu -> AddonManager if you have a very recent build.  In the AddonManger click Configure, then add https://github.com/mwganson/MeshRemodel to the list of custom repositories.  After restarting the AddonManager you should find MeshRemodel in the list of workbenches you can install.
+Can be installed via the AddonManager in Tools menu -> AddonManager.  After restarting the AddonManager you should find MeshRemodel in the list of workbenches you can install.
 <br/>
 ## Overview
 Use this workbench to aid in remodeling imported mesh objects.  The preferred workflow is to select the mesh, then click create points object.  This creates an object with selectable points at all of the mesh vertices.  The next step is to choose a face you wish to remodel.  Select 3 points on that face, then click the create coplanar points tool.  This creates an empty sketch mapped using 3 points make a plane mode, and into which all of the coplanar points are links to external geometry.  Use the sketcher tools, such as circle from 3 points or arc from 3 points, etc. to remodel the profile as a sketch.  If desired, it is possible to delete all of the links to external geometry later using the sketcher validation tool.  You would then be able to rearrange the elements relative to their rotation and/or to the sketch's origin, if desired.<br/>
