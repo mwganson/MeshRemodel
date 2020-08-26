@@ -11,7 +11,9 @@ Can be installed via the AddonManager in Tools menu -> AddonManager.  After rest
 ## Overview
 Use this workbench to aid in remodeling imported mesh objects.  The preferred workflow is to select the mesh, then click either create points object or create wireframe object.  This creates an object with selectable points or edges at all of the mesh vertices or edges.  Use the selectable points or edges to create Mesh Remodel elements, such as points, line segments, arcs, circles, or bsplines.  You can then select those created elements and form a wire using the create a wire (Draft upgrade) tool, which wire can then be also upgraded to a face.  The face can be used with Part Extrude, Part Sweep, Part Revolve, and Part Loft tools to create solids.<br/>
 <br/>
-[![IMAGE ALT TEXT](http://img.youtube.com/vi/i6AU0TY6WYs/0.jpg)](http://www.youtube.com/watch?v=i6AU0TY6WYs "MeshRemodel introductory video part 1")
+[![IMAGE ALT TEXT](http://img.youtube.com/vi/i6AU0TY6WYs/0.jpg)](http://www.youtube.com/watch?v=i6AU0TY6WYs "MeshRemodel introductory video part 1")<br/>
+[![IMAGE ALT TEXT](http://img.youtube.com/vi/YlpG_DSk36Q/0.jpg)](http://www.youtube.com/watch?v=YlpG_DSk36Q "MeshRemodel introductory video part 2")<br/>
+[![IMAGE ALT TEXT](http://img.youtube.com/vi/a1opdfll5OE/0.jpg)](http://www.youtube.com/watch?v=a1opdfll5OE "MeshRemodel introductory video part 3")<br/>
 <br/>
 ## Create Points Object
 <img src="Resources/icons/CreatePointsObject.png" alt="create points object"><br/>
