@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2020.08.23"
-__version__ = "1.661"
-version = 1.661
+__date__    = "2020.08.26"
+__version__ = "1.67"
+version = 1.67
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -384,7 +384,17 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateWireFrameObject.png') ,
             'MenuText': "Create Wire&Frame object" ,
             'ToolTip' : "Create the WireFrame object"}
- 
+
+    def makeId(self,a,b):
+        """makeId(a,b)
+           make a unique id from 2 integers using the Cantor Pairing Function
+           see https://en.wikipedia.org/wiki/Pairing_function#Cantor_pairing_function
+        """
+        if a >= b:
+            return (a + b) * (a + b + 1) / 2 + a
+        else:
+            return (a + b) * (a + b + 1) / 2 + b
+
     def Activated(self):
         doc = FreeCAD.ActiveDocument
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
@@ -410,26 +420,29 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         self.pb.setMinimum(0)
         self.pb.setMaximum(total);
         self.pb.setFormat("%v/%m")
+        idMap = {}
         for f in meshfacets:
             pts = f.Points
-            mid = gu.midpoint(FreeCAD.Base.Vector(pts[0]), FreeCAD.Base.Vector(pts[1]))
-            l1 =Part.makeLine(pts[0],pts[1])
-            if not gu.hasPoint(mid, mids, tolerance):
-                mids.append(mid)
-                lines.append(l1)
-            mid = gu.midpoint(FreeCAD.Base.Vector(pts[0]), FreeCAD.Base.Vector(pts[2]))
-            l2 =Part.makeLine(pts[0],pts[2])
-            if not gu.hasPoint(mid, mids, tolerance):
-                mids.append(mid)
-                lines.append(l2)
-            mid = gu.midpoint(FreeCAD.Base.Vector(pts[2]),FreeCAD.Base.Vector(pts[1]))
-            l3 =Part.makeLine(pts[2],pts[1])
-            if not gu.hasPoint(mid, mids, tolerance):
-                mids.append(mid)
-                lines.append(l3)
+            (id0,id1,id2) = f.PointIndices
+            id = self.makeId(id0,id1)
+            if not idMap.get(id):
+                l = Part.makeLine(pts[0],pts[1])
+                lines.append(l)
+                idMap[id] = id
+            id = self.makeId(id0,id2)
+            if not idMap.get(id):
+                l = Part.makeLine(pts[0],pts[2])
+                lines.append(l)
+                idMap[id] = id
+            id = self.makeId(id2,id1)
+            if not idMap.get(id):
+                l = Part.makeLine(pts[2],pts[1])
+                lines.append(l)
+                idMap[id] = id
             ii += 1
             self.pb.setValue(ii)
-            QtGui.QApplication.processEvents()
+            if ii % 10 == 0:
+                QtGui.QApplication.processEvents()
             if self.bCanceled or Gui.getMainWindow().isVisible == False: #user exited with this still going, so quit
                 self.bCanceled = False #for the next go around
                 self.bar.removeWidget(self.pb)
