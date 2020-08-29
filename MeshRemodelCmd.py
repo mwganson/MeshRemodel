@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2020.08.26"
-__version__ = "1.67"
-version = 1.67
+__date__    = "2020.08.29"
+__version__ = "1.7"
+version = 1.7
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -42,6 +42,7 @@ __dir__ = os.path.dirname(__file__)
 iconPath = os.path.join( __dir__, 'Resources', 'icons' )
 keepToolbar = False
 windowFlags = QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint #no ? in title bar
+global_picked = [] #picked points list for use with selection by preselection observer
 
 ######################################################################################
 # geometry utilities
@@ -523,6 +524,7 @@ class MeshRemodelCreatePointObjectCommandClass(object):
 
     def __init__(self):
         self.obj = None
+        self.pts = None
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreatePointObject.png') ,
             'MenuText': "Create poin&t object" ,
@@ -532,9 +534,15 @@ class MeshRemodelCreatePointObjectCommandClass(object):
         doc = FreeCAD.ActiveDocument
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         point_size = pg.GetFloat("PointSize",4.0)
+        if len(global_picked) == 1:
+            self.pts = global_picked #use preselect-picked points
         doc.openTransaction("Create point object")
         pt = doc.addObject("Part::Vertex", "MR_Point")
-        if hasattr(self.obj,"Point"):
+        if self.pts:
+            pt.X = self.pts[0].x
+            pt.Y = self.pts[0].y
+            pt.Z = self.pts[0].z
+        elif hasattr(self.obj,"Point"):
             pt.X = self.obj.Point.x
             pt.Y = self.obj.Point.y
             pt.Z = self.obj.Point.z
@@ -587,6 +595,8 @@ Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
 (Shift+Click for exploded compound, compatible with Shift+B block select)"}
  
     def Activated(self):
+        if len(global_picked) == 3:
+            self.pts = global_picked #use preselect-picked points
         if gu.isColinear(self.pts[0],self.pts[1],self.pts[2]):
             FreeCAD.Console.PrintError('Please select 3 non-colinear points in the plane\n')
             return
@@ -701,7 +711,8 @@ class MeshRemodelCreateLineCommandClass(object):
         #ctrl + shift + click to include only the midpoint
         #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         doc.openTransaction("Create line")
-
+        if len(global_picked) == 2:
+            self.pts = global_picked #use preselect-picked points
         line = Part.makeLine(self.pts[0],self.pts[1])
         lineName = "MR_Ref"
         if not modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
@@ -712,9 +723,9 @@ class MeshRemodelCreateLineCommandClass(object):
             doc.ActiveObject.ViewObject.LineWidth=line_width
             Gui.Selection.clearSelection()
             Gui.Selection.addSelection(doc.getObject(lineName))
-            FreeCAD.Console.PrintMessage(lineName+": length = "+str(line.Length)+"\n  midpoint at "+str(gu.midpoint(self.pts[0],self.pts[1]))+"\n")
+            FreeCAD.Console.PrintMessage(lineName+": length = "+str(line.Length)+"\n  midpoint at "+str(gu.midpoint(line.firstVertex().Point,line.lastVertex().Point))+"\n")
         if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
-            Part.show(Part.Point(gu.midpoint(self.pts[0],self.pts[1])).toShape(),lineName+"_Mid")
+            Part.show(Part.Point(gu.midpoint(line.firstVertex().Point,line.lastVertex().Point)).toShape(),lineName+"_Mid")
             doc.ActiveObject.ViewObject.PointSize = point_size
         doc.recompute()
         doc.commitTransaction()
@@ -781,6 +792,8 @@ or all points, but not a combination of the 2 object types\n\
         line_width = pg.GetFloat("LineWidth",5.0)
         point_size = pg.GetFloat("PointSize",4.0)
         #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        if len(global_picked) > 2:
+            self.pts = global_picked #use preselect-picked points
         doc.openTransaction("Create polygon")
         modifiers = QtGui.QApplication.keyboardModifiers()
         if modifiers != QtCore.Qt.ShiftModifier and modifiers != QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.AltModifier):
@@ -874,7 +887,8 @@ class MeshRemodelCreateBSplineCommandClass(object):
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         line_width = pg.GetFloat("LineWidth",5.0)
         point_size = pg.GetFloat("PointSize",4.0)
-
+        if len(global_picked) > 2:
+            self.pts = global_picked #use preselect-picked points
         #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         doc.openTransaction("Create BSpline")
         modifiers = QtGui.QApplication.keyboardModifiers()
@@ -946,10 +960,11 @@ class MeshRemodelCreateCircleCommandClass(object):
         #);
 
         modifiers = QtGui.QApplication.keyboardModifiers()
+        if len(global_picked) > 2:
+            self.pts = global_picked
         poly = Part.makePolygon(self.pts)
         #Part.show(poly)
         normal = DraftGeomUtils.getNormal(poly)
-       
         A = self.pts[0]
         B = self.pts[1]
         C = self.pts[2]
@@ -1031,10 +1046,11 @@ are not getting the arc orientation you were expecting -- will need to delete un
         line_width = pg.GetFloat("LineWidth",5.0)
         point_size = pg.GetFloat("PointSize",4.0)
         modifiers = QtGui.QApplication.keyboardModifiers()
+        if len(global_picked) > 2:
+            self.pts = global_picked
         poly = Part.makePolygon(self.pts)
 #        Part.show(poly)
         normal = DraftGeomUtils.getNormal(poly)
-       
         A = self.pts[0]
         B = self.pts[1]
         C = self.pts[2]
@@ -1247,6 +1263,138 @@ Tip: You can also use this to upgrade a wire to a face, which can be converted t
 # end create wire class
 
 ####################################################################################
+class MeshRemodelSelectionObserver():
+    """Selection Observer to select preselected vertices"""
+
+    def __init__(self):
+        self.mode = ["Vertex"] #can also be ["Edge","Vertex"] or ["Edge"]
+        pass
+
+    def setMode(self,mode):
+        self.mode = mode
+
+    def getMode(self):
+        return self.mode
+
+    def isEdgeMode(self):
+        return "Edge" in self.mode
+
+    def setEdgeMode(self):
+        if not "Edge" in self.mode:
+            self.mode.append(["Edge"])
+
+    def setVertexMode(self):
+        if not "Vertex" in self.mode:
+            self.mode.append(["Vertex"])
+
+    def isVertexMode(self):
+        return "Vertex" in self.mode
+
+    def setPreselection(self,doc,obj,sub):                # Preselection object
+        modifiers = QtGui.QApplication.keyboardModifiers()
+        if not modifiers == QtCore.Qt.ControlModifier:
+            return
+        if self.isVertexMode() and "Vertex" in str(sub):
+            Gui.Selection.addSelection(doc,obj,str(sub))
+            idx = int(sub[6:])
+            thisobj = FreeCAD.ActiveDocument.getObject(obj)
+            p = thisobj.Shape.Vertexes[idx-1].Point
+            if not gu.hasPoint(p,global_picked,.0001):
+                global_picked.append(p)
+
+        elif self.isEdgeMode() and "Edge" in str(sub):
+            Gui.Selection.addSelection(doc,obj,str(sub))
+
+    def addSelection(self,doc,obj,sub,pnt):               # Selection object
+        pass
+        #App.Console.PrintMessage("addSelection"+ "\n")
+        #App.Console.PrintMessage(str(doc)+ "\n")          # Name of the document
+        #App.Console.PrintMessage(str(obj)+ "\n")          # Name of the object
+        #App.Console.PrintMessage(str(sub)+ "\n")          # The part of the object name
+        #App.Console.PrintMessage(str(pnt)+ "\n")          # Coordinates of the object
+        #App.Console.PrintMessage("______"+ "\n")
+
+    def removeSelection(self,doc,obj,sub):                # Delete the selected object
+        #FreeCAD.Console.PrintMessage("removeSelection"+ "\n")
+        if self.isVertexMode() and "Vertex" in str(sub):
+            idx = int(sub[6:])
+            thisobj = FreeCAD.ActiveDocument.getObject(obj)
+            p = thisobj.Shape.Vertexes[idx-1].Point
+            if gu.hasPoint(p, global_picked, .0001):
+                for ii in range(0,len(global_picked)):
+                    if gu.isSamePoint(global_picked[ii],p,.0001):
+                        global_picked.remove(global_picked[ii])
+        pass
+
+    def setSelection(self,doc):                           # Selection in ComboView
+        #App.Console.PrintMessage("setSelection"+ "\n")
+        pass
+
+    def clearSelection(self,doc):                         # If click on the screen, clear the selection
+        #FreeCAD.Console.PrintMessage("clearSelection"+ "\n")  # If click on another object, clear the previous object
+        global_picked.clear()
+        pass
+
+
+#end MeshRemodelSelectionObserver class
+
+#####################################################################
+
+# add a selection observer
+class MeshRemodelAddSelectionObserverCommandClass(object):
+    """Add a selection observer to enable automatic selection of edges or vertices on preselection"""
+
+    def __init__(self):
+        self.sel = None
+        self.btn = None
+        self.bar = None
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'AddSelectionObserver.png') ,
+            'MenuText': "Add Selection &Observer" ,
+            'ToolTip' : "Allows to select vertices by Ctrl + preselection\n\
+This is intended for use with BSpline selection of points, but\n\
+can be used with all MeshRemodel tools that use selected points.  DOES NOT work if you \n\
+mix points selected in this mode with normal selection mode in the same operation\n"}
+
+    def on_clicked(self):
+        self.bar.removeWidget(self.btn)
+        FreeCADGui.Selection.removeObserver(self.sel)
+        self.bar = None
+        self.btn = None
+        self.sel = None
+        global_picked.clear()
+
+    def Activated(self):
+        doc = FreeCAD.ActiveDocument
+        if not self.sel:
+            self.sel = MeshRemodelSelectionObserver()
+            FreeCADGui.Selection.addObserver(self.sel)
+            self.btn = QtGui.QPushButton("Cancel Preselect Mode")
+            self.btn.setToolTip("Cancel Preselect selection mode and remove observer")
+            self.btn.clicked.connect(self.on_clicked)
+            self.bar = Gui.getMainWindow().statusBar()
+            self.bar.addWidget(self.btn)
+            self.btn.show()
+            global_picked.clear()
+        else:
+            FreeCADGui.Selection.removeObserver(self.sel)
+            self.sel = None
+            self.bar.removeWidget(self.btn)
+            FreeCADGui.Selection.removeObserver(self.sel)
+            self.bar = None
+            self.btn = None
+            global_picked.clear()
+        return
+   
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        return True
+
+# end MeshRemodelAddSelectionObserverCommandClass(object)
+####################################################################################
+
 
 # Merge selected sketches
 class MeshRemodelMergeSketchesCommandClass(object):
@@ -1343,6 +1491,7 @@ def initialize():
         Gui.addCommand("MeshRemodelCreatePointsObject", MeshRemodelCreatePointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateWireFrameObject",MeshRemodelCreateWireFrameObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateCrossSectionsObject",MeshRemodelCreateCrossSectionsCommandClass())
+        Gui.addCommand("MeshRemodelAddSelectionObserver",MeshRemodelAddSelectionObserverCommandClass())
         Gui.addCommand("MeshRemodelCreatePointObject", MeshRemodelCreatePointObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateCoplanarPointsObject", MeshRemodelCreateCoplanarPointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateLine", MeshRemodelCreateLineCommandClass())
