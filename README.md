@@ -34,6 +34,12 @@ Select 3 points from the points object in the 3d view to enable this command.  I
 <br/>
 In order to filter the original points object into a set of coplanar points aligned on the plane defined by the 3 selected points an internal isCoplanar algorithm is used.  There is a settings option for changing the tolerance level.  The smaller the number the fewer points get produced.  The filtering is done by using the 3 selected points and each other point in turn to create a tetrahedron.  If the 4 points are coplanar, then the tetrahedron should have volume ~= zero.  Default tolerance is 0.001 mm^3.
 <br/>
+## Add Selection Observer
+<img src="Resources/icons/AddSelectionObserver.png" alt="add selection observer"><br/>
+This enables preselection mode where points get automatically selected by holding Ctrl key down while hovering over the point in the 3d view.  This is intended to make it easier to select all the points needed for making bsplines since there are usually very many points needing selection, but will work with all MeshRemodel tools that create objects from selected points.  DO NOT mix selection modes in the same operation.  For example, if you select any of the points using Ctrl+preselect mode, then do not click on any points to select them in the usual way for the same operation or else it is likely to fail.<br/>
+Click the icon to enable or to disable Auto Preselection Mode.  There is also a button that will appear in the status bar when this mode is active to indicate you are in Auto Preselection Mode.  You can also click that button to remove the selection observer and return to normal selection mode.<br/>
+The way the selection observer works is it monitors the preselection of points (only Vertex type objects).  If you are holding down the Ctrl key when the point is first preselected (hovered over with the mouse) that point gets added to a list variable internally called global_picked.  When you use one of the object creation tools that uses selected points, e.g. the bspline or line tool, the tool code will check to see if global_picked contains points, and if so, will use those points.  These global_picked points are not updated if a point is normally selected (by clicking on it).  (But if you deselect a point by clicking on it, then the point will be removed from the global_picked list.)
+<br/>
 ## Create Point Object
 <img src="Resources/icons/CreatePointObject.png" alt="create point object"><br/>
 Select a vertex (or any arbitrary point along any edge or face as of version 1.61) in the 3d view, then use this command to create a point object at that location.  The point object is a Part::Vertex that we can use in some operations, such as Part::Loft or in subsequent Mesh Remodel operations, such as creating a line segment or arc.<br/>
@@ -111,6 +117,8 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might be accepted as coplanar in later operations.  This is not an issue when modeling within the sketcher using links to external geometry.  It is recommened to not change the default unless you are missing some points that you think should be included or perhaps you are getting points that should not be included.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
 #### Release notes:<br/>
+* 2020.08.29 (version 1.7)<br/>
+** add auto selection mode (hold Ctrl+preselect to select points)
 * 2020.08.26 (version 1.67)<br/>
 ** optimize creation of wireframe objects
 * 2020.08.23 (version 1.661)<br/>
