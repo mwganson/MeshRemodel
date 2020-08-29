@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2020.08.29"
-__version__ = "1.7"
-version = 1.7
+__version__ = "1.71"
+version = 1.71
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -1322,8 +1322,11 @@ class MeshRemodelSelectionObserver():
             p = thisobj.Shape.Vertexes[idx-1].Point
             if gu.hasPoint(p, global_picked, .0001):
                 for ii in range(0,len(global_picked)):
-                    if gu.isSamePoint(global_picked[ii],p,.0001):
-                        global_picked.remove(global_picked[ii])
+                    try:
+                        if gu.isSamePoint(global_picked[ii],p,.0001):
+                            global_picked.remove(global_picked[ii])
+                    except:
+                        pass
         pass
 
     def setSelection(self,doc):                           # Selection in ComboView
