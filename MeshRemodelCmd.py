@@ -1321,7 +1321,7 @@ class MeshRemodelSelectionObserver():
             thisobj = FreeCAD.ActiveDocument.getObject(obj)
             p = thisobj.Shape.Vertexes[idx-1].Point
             if gu.hasPoint(p, global_picked, .0001):
-                for ii in range(0,len(global_picked)-1):
+                for ii in range(0,len(global_picked)):
                     if gu.isSamePoint(global_picked[ii],p,.0001):
                         global_picked.remove(global_picked[ii])
         pass
