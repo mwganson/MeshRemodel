@@ -93,6 +93,8 @@ Use Ctrl+Click to make a sketch out of selected circles, polygons, etc.  If a ci
 <br/>
 Use Alt+Click to create multiple sketches, one from each object selected, and then merge them all together into a single sketch, deleting the temporary sketches afterward.  This can sometimes resolve coplanar issues.<br/>
 <br/>
+Use Shift+Click to create a sketch based on picked points.  A new picked points object is created containing all the picked points.  The first 3 selected points will define the plane to map the sketch to.  All the picked points get added to the sketch as links to external geometry.<br/>
+<br/>
 ## Merge Sketches
 <img src="Resources/icons/MergeSketches.png" alt = "merge sketches"><br/>
 Select 2 or more sketches to enable this command.  This uses Sketcher workbench merge sketches command.  It is here as a convenience. 
@@ -119,6 +121,8 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might be accepted as coplanar in later operations.  This is not an issue when modeling within the sketcher using links to external geometry.  It is recommened to not change the default unless you are missing some points that you think should be included or perhaps you are getting points that should not be included.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
 #### Release notes:<br/>
+* 2020.08.30 (version 1.73)<br/>
+** Add option to make a sketch from picked points, mapping to first 3 and adding all as external geometry
 * 2020.08.30 (version 1.72)<br/>
 ** in wireframe creation skip facets where 2 or more points are equal
 * 2020.08.29 (version 1.71)<br/>
