@@ -1099,8 +1099,6 @@ are not getting the arc orientation you were expecting -- will need to delete un
         #QtGui.QApplication.restoreOverrideCursor()
         return
 
-
-
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
@@ -1143,6 +1141,8 @@ class MeshRemodelCreateSketchCommandClass(object):
 Create a new empty sketch, optionally attaching to selected objects, e.g. 3 points to define a plane.\n\
 (Ctrl+Click to make a sketch out of selected objects, e.g. circles, polygons, etc.)\n\
 (Alt+Click to make a separate sketch from each selected object, and then merge them together.)\n\
+(Shift+Click to make a new points object from all picked points, attach a new sketch to first 3 points, add all\n\
+picked points as links to external geometry -- useful to produce a coplanar wire)\n\
 "}
  
     def Activated(self):
@@ -1157,8 +1157,6 @@ Create a new empty sketch, optionally attaching to selected objects, e.g. 3 poin
                 Gui.activateWorkbench("MeshRemodelWorkbench")
             Gui.runCommand("Sketcher_NewSketch")
             return
-
-        doc.openTransaction("Create sketch")
         if modifiers == QtCore.Qt.AltModifier:
             #alternative method: on alt+click make separate sketch from each object, then merge them together
             sketches=[]
@@ -1184,15 +1182,47 @@ Create a new empty sketch, optionally attaching to selected objects, e.g. 3 poin
             #on ctrl+click make single sketch out of selected objects
             sketch = Draft.makeSketch(self.objs,autoconstraints=True,radiusPrecision=prec)
             doc.recompute()
+        elif modifiers == QtCore.Qt.ShiftModifier:
+            #on shift+click map sketch to first 3 picked points as a plane, add all picked points as links to external geometry
+            sel = FreeCADGui.Selection.getSelectionEx()
+            picked = []
+            if global_picked:
+                picked = global_picked
+            else:
+                for s in sel:
+                    picked.extend(list(s.PickedPoints))
+            if len(picked) < 3:
+                FreeCAD.Console.PrintMessage("MeshRemodel: Not enough picked points, need at least 3.\n")
+                return
+            #make a compound of the picked points
+            part_pts = []
+            for m in picked:
+                p = Part.Point(m)
+                part_pts.append(p.toShape())
+            Part.show(Part.makeCompound(part_pts),"MR_Picked_Points")
+            sk_pts = doc.ActiveObject
+            doc.recompute()
+            FreeCADGui.Selection.clearSelection()
+            FreeCADGui.Selection.addSelection(sk_pts, ["Vertex1", "Vertex2", "Vertex3"])
+            if not "Sketcher_NewSketch" in Gui.listCommands():
+                Gui.activateWorkbench("SketcherWorkbench")
+                Gui.activateWorkbench("MeshRemodelWorkbench")
+            Gui.runCommand("Sketcher_NewSketch")
+            sketch=doc.ActiveObject
+            sketch.Label = 'MR_Picked_Sketch'
+            sketch.MapReversed = False
+            for ii in range(0,len(sk_pts.Shape.Vertexes)):
+                vname = 'Vertex'+str(ii+1)
+                sketch.addExternal(sk_pts.Name, vname)
+            doc.recompute()
 
         for o in self.objs:
             if hasattr(o,"ViewObject"):
                 o.ViewObject.Visibility=False
 
         doc.recompute()
-        doc.commitTransaction()
         return
-   
+
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
