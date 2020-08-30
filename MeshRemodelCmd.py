@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2020.08.29"
-__version__ = "1.71"
-version = 1.71
+__date__    = "2020.08.30"
+__version__ = "1.72"
+version = 1.72
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -423,23 +423,29 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         self.pb.setFormat("%v/%m")
         idMap = {}
         for f in meshfacets:
-            pts = f.Points
-            (id0,id1,id2) = f.PointIndices
-            id = self.makeId(id0,id1)
-            if not idMap.get(id):
-                l = Part.makeLine(pts[0],pts[1])
-                lines.append(l)
-                idMap[id] = id
-            id = self.makeId(id0,id2)
-            if not idMap.get(id):
-                l = Part.makeLine(pts[0],pts[2])
-                lines.append(l)
-                idMap[id] = id
-            id = self.makeId(id2,id1)
-            if not idMap.get(id):
-                l = Part.makeLine(pts[2],pts[1])
-                lines.append(l)
-                idMap[id] = id
+            try:
+                pts = f.Points
+                (id0,id1,id2) = f.PointIndices
+                if gu.isSamePoint(pts[0], pts[1], tolerance) or gu.isSamePoint(pts[0],pts[2],tolerance) or gu.isSamePoint(pts[1],pts[2],tolerance):
+                    continue #otherwise we get an exception, so skip this line
+                id = self.makeId(id0,id1)
+                if not idMap.get(id):
+                    l = Part.makeLine(pts[0],pts[1])
+                    lines.append(l)
+                    idMap[id] = id
+                id = self.makeId(id0,id2)
+                if not idMap.get(id):
+                    l = Part.makeLine(pts[0],pts[2])
+                    lines.append(l)
+                    idMap[id] = id
+                id = self.makeId(id2,id1)
+                if not idMap.get(id):
+                    l = Part.makeLine(pts[2],pts[1])
+                    lines.append(l)
+                    idMap[id] = id
+            except:
+                FreeCAD.Console.PrintError("Exception creating wireframe.  Typically this is caused by defective mesh object.\n")
+                self.bCanceled = True
             ii += 1
             self.pb.setValue(ii)
             if ii % 10 == 0:
