@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2020.08.30"
-__version__ = "1.72"
-version = 1.72
+__date__    = "2021.08.14"
+__version__ = "1.80"
+version = 1.80
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -137,6 +137,22 @@ class MeshRemodelGeomUtils(object):
         for ii in range(0, len(pts)):
             newList.extend([self.nearestPoint(newList[ii],pts,newList)])
         return newList
+
+    def flattenPoints(self, pts, align_plane):
+        """project points to align_plane."""
+        import WorkingPlane
+        n = align_plane.Shape.Faces[0].normalAt(0,0)
+
+        o = pts[0].Point
+        plane = WorkingPlane.plane()
+        plane.alignToPointAndAxis(o, n, 0)
+        verts = [Part.Vertex(o)]
+
+        for v in pts[1:]:
+            verts.append(Part.Vertex(plane.projectPoint(v.Point)))
+
+        return verts
+
 
     def nearestPoint(self, pt, pts, exclude):
         """ nearestPoint(pt, pts, exclude)
@@ -276,7 +292,7 @@ class MeshRemodelSettingsCommandClass(object):
         point_size = pg.GetFloat("PointSize", 4.0)
         line_width = pg.GetFloat("LineWidth", 5.0)
         prec = pg.GetInt("SketchRadiusPrecision", 1)
-        coplanar_tol = pg.GetFloat("CoplanarTolerance",.001)
+        coplanar_tol = pg.GetFloat("CoplanarTolerance",.01)
         items=[("","*")[keep]+"Keep the toolbar active",
             ("","*")[not keep]+"Do not keep the toolbar active",
             "Change point size ("+str(point_size)+")",
@@ -310,7 +326,7 @@ Enter new sketch radius precision", prec, -1,12,1,flags=windowFlags)
             if ok:
                 pg.SetInt("SketchRadiusPrecision", new_prec)
         elif ok and item==items[5]:
-            new_coplanar_tol, ok = QtGui.QInputDialog.getDouble(window,"Coplanar tolerance", "Enter coplanar tolerance\n(Only applies to internal coplanar check using Alt+Click to create coplanar points)", coplanar_tol,.0000001,1,8)
+            new_coplanar_tol, ok = QtGui.QInputDialog.getDouble(window,"Coplanar tolerance", "Enter coplanar tolerance\n(Used when creating coplanar points.  Increase if some points are missing.)", coplanar_tol,.0000001,1,8)
             if ok:
                 pg.SetFloat("CoplanarTolerance", new_coplanar_tol)
         return
@@ -333,9 +349,13 @@ class MeshRemodelCreatePointsObjectCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreatePointsObject.png') ,
             'MenuText': "Create points &object" ,
-            'ToolTip' : "Create the points object"}
+            'ToolTip' : "Create the points object\n\
+(Ctrl + Click to make mesh partially transparent and non-selectable.\n\
+Non-selectability can be reversed in the mesh object's view tab in the property view.)\n\
+"}
  
     def Activated(self):
+        modifiers = QtGui.QApplication.keyboardModifiers()
         doc = FreeCAD.ActiveDocument
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         point_size = pg.GetFloat("PointSize",4.0)
@@ -350,6 +370,9 @@ class MeshRemodelCreatePointsObjectCommandClass(object):
         Part.show(Part.makeCompound(pts),"MR_Points")
         doc.ActiveObject.ViewObject.PointSize = point_size
         doc.recompute()
+        if modifiers == QtCore.Qt.ControlModifier:
+            self.mesh.ViewObject.Transparency = 75
+            self.mesh.ViewObject.Selectable = False
         doc.commitTransaction()
         doc.recompute()
         QtGui.QApplication.restoreOverrideCursor()
@@ -384,7 +407,10 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateWireFrameObject.png') ,
             'MenuText': "Create Wire&Frame object" ,
-            'ToolTip' : "Create the WireFrame object"}
+            'ToolTip' : "Create the WireFrame object\n\
+(Ctrl + Click to make mesh partially transparent and non-selectable.\n\
+Non-selectability can be reversed in the mesh object's view tab in the property view.)\n\
+"}
 
     def makeId(self,a,b):
         """makeId(a,b)
@@ -397,11 +423,12 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
             return (a + b) * (a + b + 1) / 2 + b
 
     def Activated(self):
+        modifiers = QtGui.QApplication.keyboardModifiers()
         doc = FreeCAD.ActiveDocument
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         line_width = pg.GetFloat("LineWidth",5.0)
         point_size = pg.GetFloat("PointSize",4.0)
-        tolerance = pg.GetFloat("CoplanarTolerance",.001)
+        tolerance = pg.GetFloat("CoplanarTolerance",.01)
         #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         mids = []
         lines=[]
@@ -463,6 +490,9 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         Part.show(Part.makeCompound(lines),"MR_WireFrame")
         doc.ActiveObject.ViewObject.PointSize = point_size
         doc.ActiveObject.ViewObject.LineWidth = line_width
+        if modifiers == QtCore.Qt.ControlModifier:
+            self.mesh.ViewObject.Transparency = 75
+            self.mesh.ViewObject.Selectable = False
         doc.recompute()
         doc.commitTransaction()
         doc.recompute()
@@ -590,6 +620,7 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
     def __init__(self):
         self.pts = []
         self.obj = None #original points object
+        self.vertexNames = [] #for attaching a part::plane
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateCoplanar.png') ,
@@ -598,7 +629,8 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
 Makes coplanar points object from 3 selected points, used to define the plane\n\
 Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
 (Alt+Click -- Creates empty sketch and places links to external geometry to coplanar points\n\
-(Shift+Click for exploded compound, compatible with Shift+B block select)"}
+(Shift+Click for exploded compound, compatible with Shift+B block select)\n\
+(Ctrl+Click to add Part:Plane and project nearby points to it)\n"}
  
     def Activated(self):
         if len(global_picked) == 3:
@@ -630,10 +662,26 @@ Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
             if planar:
                 coplanar.append(Part.Point(v.Point).toShape())
         coplanar.extend([Part.Point(v).toShape() for v in trio])
-
+        if modifiers == QtCore.Qt.ControlModifier:
+            if len(self.vertexNames) != 3:
+                FreeCAD.Console.PrintError("MeshRemodel: Cannot attach plane without 3 named subobjects.  Cannot simply use picked points.")
+            else:
+                #add a part::plane and project all the points to it
+                plane = doc.addObject("Part::Plane","MR_Alignment_Plane")
+                plane.ViewObject.Transparency = 80
+                plane.Width = 10
+                plane.Length = 10
+                plane.Support = [(self.obj,self.vertexNames[0]),(self.obj,self.vertexNames[1]),(self.obj,self.vertexNames[2])]
+                plane.MapMode = 'ThreePointsPlane'
+                plane.ViewObject.Visibility = False
+                coplanar = gu.flattenPoints(coplanar,plane)
+                FreeCAD.Console.PrintMessage("MeshRemodel: coplanar points object flattened to plane.  You may delete alignment plane if desired.\n")
         Part.show(Part.makeCompound(coplanar),"MR_Points_Coplanar")
         doc.ActiveObject.ViewObject.PointSize = point_size
         mr = doc.ActiveObject
+
+
+
         if bMakeSketch:
             if not "Sketcher_NewSketch" in Gui.listCommands():
                 Gui.activateWorkbench("SketcherWorkbench")
@@ -689,6 +737,7 @@ Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
             if count > 3:
                 return False
         if count == 3:
+            self.vertexNames = sel[0].SubElementNames
             return True
         return False
 
