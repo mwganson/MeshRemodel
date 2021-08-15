@@ -20,9 +20,13 @@ Use this workbench to aid in remodeling imported mesh objects.  The preferred wo
 <img src="Resources/icons/CreatePointsObject.png" alt="create points object"><br/>
 Select the mesh object in the tree, then use this command to create a points object containing all the vertices of the selected mesh object.  The points object is a compound consisting of Part Point (vertex) objects, one per vertex in the selected mesh.  The purpose of this object is to provide selectable points in the 3d view.  We can use these selectable points with the other tools in the workbench to create the lines, circles, arcs, and polygons needed to remodel the mesh.<br/>
 <br/>
+If you hold Ctrl key down while invoking this command the mesh object will be made partially transparent and non-selectable in the 3d view.  You can still select it in the tree view, but it will not appear to be selected in the 3d view and on mouse over you will not see it change to pre-select color.  This will make it easier to see the MR_Points object.  These settings can be changed in the mesh object's view tab in the property view.
+<br/>
 ## Create WireFrame Object
 <img src="Resources/icons/CreateWireFrameObject.png" alt="create wireframe object"><br/>
 Select the mesh object in the tree, then use this command to create a wireframe object containing all the edges of the selected mesh object.  The wireframe object is a compound consisting of Part Line objects, one per edge in the selected mesh.  The purpose of this object is to provide selectable edges in the 3d view.  We can use these selectable points with the other tools in the workbench to create the lines and polygons needed to remodel the mesh.<br/>
+<br/>
+If you hold Ctrl key down while invoking this command the mesh object will be made partially transparent and non-selectable in the 3d view.  You can still select it in the tree view, but it will not appear to be selected in the 3d view and on mouse over you will not see it change to pre-select color.  This will make it easier to see the MR_WireFrame object.  These settings can be changed in the mesh object's view tab in the property view.
 <br/>
 ## Create Cross-Sections Object
 <img src="Resources/icons/CreateCrossSections.png" alt="create cross-sections object"><br/>
@@ -30,9 +34,9 @@ Select the mesh object in the tree, then use this command to create one or more 
 <br/>
 ## Create Coplanar Points Object
 <img src="Resources/icons/CreateCoplanar.png" alt = "create coplanar"><br/>
-Select 3 points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  Then an empty sketch is created, and added to that empty sketch are links to external geometry for all of the points in the new coplanar points object.  You can recreate the profile inside the sketch using those external links and the sketcher tools or directly in the 3d view using the MeshRemodel tools.<br/>
+Select 3 (non-colinear) points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  If you use Alt+Click an empty sketch is created, and added to that empty sketch are links to external geometry for all of the points in the new coplanar points object.  You can recreate the profile inside the sketch using those external links and the sketcher tools or directly in the 3d view using the MeshRemodel tools.  If Ctrl+Click is used a Part::Plane object, called MR_Alignment_Plane is created and attached to the 3 vertices selected to define the plane.  This plane is used in an algorithm to flatten (or project) the coplanar points to that plane, ensuring (hopefully) that they are all truly coplanar.  Think of this as though the points that are not perfectly coplanar are being moved onto the plane defined by the Plane object.  Note: the Plane object's size in terms of width and length is irrelevant to the algorithm.  It is infinite for our purposes even though it's only 10mm x 10mm in actual size.  Note #2: Alt and Ctrl cannot be used together.  Alt (creating a sketch and links to external geometry should have the same effect as using Ctrl to flatten to the Part::Plane, since the externally linked points are being flattened / projected to the sketch plane.  Note #3: The Part::Plane object can be deleted if you like.  I decided not to delete it automatically so the user can use it to visualize the plane used in creation of the Coplanar Points object.<br/>
 <br/>
-In order to filter the original points object into a set of coplanar points aligned on the plane defined by the 3 selected points an internal isCoplanar algorithm is used.  There is a settings option for changing the tolerance level.  The smaller the number the fewer points get produced.  The filtering is done by using the 3 selected points and each other point in turn to create a tetrahedron.  If the 4 points are coplanar, then the tetrahedron should have volume ~= zero.  Default tolerance is 0.001 mm^3.
+In order to filter the original points object into a set of coplanar points aligned on the plane defined by the 3 selected points an internal isCoplanar algorithm is used.  There is a settings option for changing the tolerance level.  The smaller the number the fewer points get produced.  The filtering is done by using the 3 selected points and each other point in turn to create a tetrahedron.  If the 4 points are coplanar, then the tetrahedron should have volume ~= zero.  Default tolerance is 0.01 mm^3.
 <br/>
 ## Add Selection Observer
 <img src="Resources/icons/AddSelectionObserver.png" alt="add selection observer"><br/>
@@ -44,7 +48,7 @@ The way the selection observer works is it monitors the preselection of points (
 <br/>
 ## Create Point Object
 <img src="Resources/icons/CreatePointObject.png" alt="create point object"><br/>
-Select a vertex (or any arbitrary point along any edge or face as of version 1.61) in the 3d view, then use this command to create a point object at that location.  The point object is a Part::Vertex that we can use in some operations, such as Part::Loft or in subsequent Mesh Remodel operations, such as creating a line segment or arc.<br/>
+Select a vertex (or any arbitrary point along any edge or face as of version 1.61) in the 3d view, then use this command to create a point object at that location.  The point object is a Part::Vertex that we can use in some operations, such as Part::Loft or in subsequent Mesh Remodel operations, such as creating a line segment or arc.  You must select some object first.  A point cannot be created in any arbitrary empty location, but you can create a point on an edge, for example, and then move it to the desired location.<br/>
 <br/>
 ## Create Line
 <img src="Resources/icons/CreateLine.png" alt = "create line"><br/>
@@ -121,6 +125,10 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might be accepted as coplanar in later operations.  This is not an issue when modeling within the sketcher using links to external geometry.  It is recommened to not change the default unless you are missing some points that you think should be included or perhaps you are getting points that should not be included.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
 #### Release notes:<br/>
+* 2021.08.14 (version 1.80)<br/>
+** Add option to add part::plane when creating coplanar points object and flatten points to that plane, ensuring (hopefully) they are truly coplanar.
+** Add option when creating points / wireframe objects to make mesh object non-selectable and semi-transparent. This prevents the mesh object from pre-selecting, making it easier to see what you are doing.
+** Changed default coplanar tolerance to 0.01.  The larger this value the more points are picked as being coplanar to the 3 selected points when creating the coplanar points object.  If you are missing some points, then make this number larger.  If you are getting too many points and some are not on the plane, make it smaller.
 * 2020.08.30 (version 1.73)<br/>
 ** Add option to make a sketch from picked points, mapping to first 3 and adding all as external geometry
 * 2020.08.30 (version 1.72)<br/>
