@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2021.08.14"
-__version__ = "1.80"
-version = 1.80
+__date__    = "2021.08.24"
+__version__ = "1.81"
+version = 1.81
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -139,20 +139,72 @@ class MeshRemodelGeomUtils(object):
         return newList
 
     def flattenPoints(self, pts, align_plane):
-        """project points to align_plane."""
-        import WorkingPlane
-        n = align_plane.Shape.Faces[0].normalAt(0,0)
+        """ project points to align_plane.
+            pts is list of Part.Vertex objects
+            align_plane is part::plane object or 
+            can be any object with a face (face1 will be used)
+            returns: new list of Part.Vertex objects on the plane"""
 
-        o = pts[0].Point
-        plane = WorkingPlane.plane()
-        plane.alignToPointAndAxis(o, n, 0)
-        verts = [Part.Vertex(o)]
+        #import WorkingPlane
+        ###n = align_plane.Shape.Faces[0].normalAt(0,0)
 
-        for v in pts[1:]:
-            verts.append(Part.Vertex(plane.projectPoint(v.Point)))
+        ###o = pts[0].Point
+        ###o = align_plane.Shape.Vertexes[0].Point
+        #plane = WorkingPlane.plane()
+        ###plane.alignToPointAndAxis(o, n, 0)
+        #plane.alignToFace(align_plane.Shape.Faces[0])
+        #verts = []
+
+        #for v in pts:
+        #    verts.append(Part.Vertex(plane.projectPoint(v.Point)))
+
+        #return verts
+
+        #above cleaner workingplane method should work in theory, but in reality does not
+        #so this messy way to ensure all points are coplanar
+        #make a compound of the points and display as document object
+        # make a temporary sketch, attach it to the plane and add links to external geometry to the points
+        #add points to the sketch constraining to the externally linked points
+        #extract these constrained points now guaranteed to be coplanar and return as list of vertexes
+
+        import Sketcher, Part, Draft
+        doc = FreeCAD.ActiveDocument
+        sketch = doc.addObject("Sketcher::SketchObject","MR_Align_Sketch")
+        sketch.Support = [align_plane,"Face1"]
+        sketch.MapMode = "FlatFace"
+        points = [Part.Vertex(p) for p in pts]
+        comp = Part.makeCompound(points)
+        Part.show(comp,"MR_Sketch_Pts")
+        skpts = doc.ActiveObject
+        for ii in range(0,len(pts)):
+            sketch.addExternal(skpts.Name,"Vertex"+str(ii+1))
+            sketch.addGeometry(Part.Point(FreeCAD.Vector(0,0,0)))
+            sketch.addConstraint(Sketcher.Constraint('Coincident',ii,1,-3-ii,1))
+
+        #this bit borrowed and modified from draft point array code get_point_list
+        #so we don't need to create a point array and then delete it
+        #but rather can instead extract the geometry directly from the sketch
+        #this is needed because all the points have z=0 in sketch local coordinates
+        verts = []
+
+        place = sketch.Placement
+        points = []
+        for geo in sketch.Geometry:
+            # It must contain at least one Part::GeomPoint.
+            if (hasattr(geo, 'X')
+                    and hasattr(geo, 'Y') and hasattr(geo, 'Z')):
+                point = geo.copy()
+                point.translate(place.Base)
+                point.rotate(place)
+                pt = FreeCAD.Vector(point.X,point.Y,point.Z)
+                if not self.hasPoint(pt,points,1e-7): #avoid duplicate points
+                    points.append(pt)
+        for p in points:
+            verts.append(Part.Vertex(p))
+        doc.removeObject(sketch.Name)
+        doc.removeObject(skpts.Name)
 
         return verts
-
 
     def nearestPoint(self, pt, pts, exclude):
         """ nearestPoint(pt, pts, exclude)
@@ -630,7 +682,7 @@ Makes coplanar points object from 3 selected points, used to define the plane\n\
 Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
 (Alt+Click -- Creates empty sketch and places links to external geometry to coplanar points\n\
 (Shift+Click for exploded compound, compatible with Shift+B block select)\n\
-(Ctrl+Click to add Part:Plane and project nearby points to it)\n"}
+"}
  
     def Activated(self):
         if len(global_picked) == 3:
@@ -662,25 +714,23 @@ Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
             if planar:
                 coplanar.append(Part.Point(v.Point).toShape())
         coplanar.extend([Part.Point(v).toShape() for v in trio])
-        if modifiers == QtCore.Qt.ControlModifier:
-            if len(self.vertexNames) != 3:
-                FreeCAD.Console.PrintError("MeshRemodel: Cannot attach plane without 3 named subobjects.  Cannot simply use picked points.")
-            else:
-                #add a part::plane and project all the points to it
-                plane = doc.addObject("Part::Plane","MR_Alignment_Plane")
-                plane.ViewObject.Transparency = 80
-                plane.Width = 10
-                plane.Length = 10
-                plane.Support = [(self.obj,self.vertexNames[0]),(self.obj,self.vertexNames[1]),(self.obj,self.vertexNames[2])]
-                plane.MapMode = 'ThreePointsPlane'
-                plane.ViewObject.Visibility = False
-                coplanar = gu.flattenPoints(coplanar,plane)
-                FreeCAD.Console.PrintMessage("MeshRemodel: coplanar points object flattened to plane.  You may delete alignment plane if desired.\n")
-        Part.show(Part.makeCompound(coplanar),"MR_Points_Coplanar")
+        if len(self.vertexNames) != 3:
+            FreeCAD.Console.PrintError("MeshRemodel: Cannot attach plane without 3 named subobjects.  Cannot simply use picked points.")
+        else:
+            #add a part::plane and project all the points to it
+            plane = doc.addObject("Part::Plane","MR_Alignment_Plane")
+            plane.ViewObject.Transparency = 80
+            plane.Width = 10
+            plane.Length = 10
+            plane.Support = [(self.obj,self.vertexNames[0]),(self.obj,self.vertexNames[1]),(self.obj,self.vertexNames[2])]
+            plane.MapMode = 'ThreePointsPlane'
+            plane.ViewObject.Visibility = False
+            doc.recompute()
+            coplanar2 = gu.flattenPoints(coplanar,plane)
+            doc.removeObject(plane.Name)
+        Part.show(Part.makeCompound(coplanar2),"MR_Points_Coplanar")
         doc.ActiveObject.ViewObject.PointSize = point_size
         mr = doc.ActiveObject
-
-
 
         if bMakeSketch:
             if not "Sketcher_NewSketch" in Gui.listCommands():
