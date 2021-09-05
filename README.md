@@ -22,6 +22,8 @@ Select the mesh object in the tree, then use this command to create a points obj
 <br/>
 If you hold Ctrl key down while invoking this command the mesh object will be made partially transparent and non-selectable in the 3d view.  You can still select it in the tree view, but it will not appear to be selected in the 3d view and on mouse over you will not see it change to pre-select color.  This will make it easier to see the MR_Points object.  These settings can be changed in the mesh object's view tab in the property view.
 <br/>
+Update: As of v1.82 you can now also create a points object from a Points cloud object created in Points workbench, which are non-selectable.  So, if you need to be able to select the individual points in a points cloud use this tool to create the selected points object.<br/>
+<br/>
 ## Create WireFrame Object
 <img src="Resources/icons/CreateWireFrameObject.png" alt="create wireframe object"><br/>
 Select the mesh object in the tree, then use this command to create a wireframe object containing all the edges of the selected mesh object.  The wireframe object is a compound consisting of Part Line objects, one per edge in the selected mesh.  The purpose of this object is to provide selectable edges in the 3d view.  We can use these selectable points with the other tools in the workbench to create the lines and polygons needed to remodel the mesh.<br/>
@@ -38,6 +40,8 @@ Select 3 (non-colinear) points from the points object in the 3d view to enable t
 <br/>
 In order to filter the original points object into a set of coplanar points aligned on the plane defined by the 3 selected points an internal isCoplanar algorithm is used.  There is a settings option for changing the tolerance level.  The smaller the number the fewer points get produced.  The filtering is done by using the 3 selected points and each other point in turn to create a tetrahedron.  If the 4 points are coplanar, then the tetrahedron should have volume ~= zero.  Default tolerance is 0.01 mm^3. If too high a tolerance value is used you will get points that are not truly coplanar, but they will forced into coplanarity by projecting them onto the plane.
 <br/>
+## Flatten Points object
+<img src="Resources/icons/FlattenPoints.png" alt - "flatten points"><br/>
 ## Add Selection Observer
 <img src="Resources/icons/AddSelectionObserver.png" alt="add selection observer"><br/>
 This enables preselection mode where points get automatically selected by holding Ctrl key down while hovering over the point in the 3d view.  This is intended to make it easier to select all the points needed for making bsplines since there are usually very many points needing selection, but will work with all MeshRemodel tools that create objects from selected points.  DO NOT mix selection modes in the same operation.  For example, if you select any of the points using Ctrl+preselect mode, then do not click on any points to select them in the usual way for the same operation or else it is likely to fail.<br/>
