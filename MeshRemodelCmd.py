@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2021.08.24"
-__version__ = "1.81"
-version = 1.81
+__date__    = "2021.09.05"
+__version__ = "1.82"
+version = 1.82
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -401,7 +401,7 @@ class MeshRemodelCreatePointsObjectCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreatePointsObject.png') ,
             'MenuText': "Create points &object" ,
-            'ToolTip' : "Create the points object\n\
+            'ToolTip' : "Create the points object from selected Mesh or Points cloud object\n\
 (Ctrl + Click to make mesh partially transparent and non-selectable.\n\
 Non-selectability can be reversed in the mesh object's view tab in the property view.)\n\
 "}
@@ -415,10 +415,17 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
         doc.openTransaction("Create points object")
 
         pts=[]
-        meshpts = self.mesh.Mesh.Points
-        for m in meshpts:
-            p = Part.Point(m.Vector)
-            pts.append(p.toShape())
+        if hasattr(self.mesh,"Mesh"):
+            meshpts = self.mesh.Mesh.Points
+            for m in meshpts:
+                p = Part.Point(m.Vector)
+                pts.append(p.toShape())
+        elif hasattr(self.mesh,"Points") and hasattr(self.mesh.Points,"Points"): #points cloud
+            meshpts = self.mesh.Points.Points
+            for m in meshpts:
+                p = Part.Point(m)
+                pts.append(p.toShape())
+
         Part.show(Part.makeCompound(pts),"MR_Points")
         doc.ActiveObject.ViewObject.PointSize = point_size
         doc.recompute()
@@ -436,7 +443,7 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
         sel = Gui.Selection.getSelectionEx()
         if len(sel) == 0:
             return False
-        elif "Mesh.Feature" not in str(type(sel[0].Object)):
+        elif "Mesh.Feature" not in str(type(sel[0].Object)) and not hasattr(sel[0].Object,"Points") and not hasattr(sel[0].Object.Points,"Points"):
             return False
         else:
             self.mesh = sel[0].Object
@@ -760,6 +767,108 @@ Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
                 obj.ViewObject.PointSize = point_size
             doc.recompute()
             doc.commitTransaction()
+        #QtGui.QApplication.restoreOverrideCursor()
+        return
+
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getSelectionEx()
+        if len(sel) == 0:
+            return False
+        if not hasattr(sel[0],"PickedPoints"):
+            return False
+        count = 0
+        self.pts = []
+        self.obj = sel[0].Object
+        for s in sel:
+            if hasattr(s,"PickedPoints"):
+                p = s.PickedPoints
+                for pt in s.PickedPoints:
+                    self.pts.append(pt)
+                    count += 1
+                if len(p)==0: #might be individual part point objects
+                    if len(s.Object.Shape.Vertexes)==1:
+                        self.pts.append(s.Object.Shape.Vertexes[0].Point)
+                        count += 1
+            if count > 3:
+                return False
+        if count == 3:
+            self.vertexNames = sel[0].SubElementNames
+            return True
+        return False
+
+# end create coplanar points object
+####################################################################################
+
+# Flatten points object from 3 selected points or from first 3 vertices if it is a non-selectable points cloud object
+
+class MeshRemodelFlattenPointsObjectCommandClass(object):
+    """Flatten points object to 3 selected points
+       Difference between this an create coplanar points object is this
+       flattens all the points in the object regardless of whether they
+       are already somewhat coplanar or not
+"""
+
+    def __init__(self):
+        self.pts = []
+        self.obj = None #original points object
+        self.vertexNames = [] #for attaching a part::plane
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'FlattenPoints.png') ,
+            'MenuText': "%Flatten a points object" ,
+            'ToolTip' : "\
+Flattens a points object from 3 selected points on that object.\
+\n\
+"}
+ 
+    def Activated(self):
+        if len(global_picked) == 3:
+            self.pts = global_picked #use preselect-picked points
+        if gu.isColinear(self.pts[0],self.pts[1],self.pts[2]):
+            FreeCAD.Console.PrintError('Please select 3 non-colinear points in the plane\n')
+            return
+        doc = FreeCAD.ActiveDocument
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        line_width = pg.GetFloat("LineWidth",5.0)
+        point_size = pg.GetFloat("PointSize",4.0)
+        #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        doc.openTransaction("Flatten points")
+        modifiers = QtGui.QApplication.keyboardModifiers()
+        trio = [self.pts[0],self.pts[1],self.pts[2]]
+        candidates = []
+        if self.obj and hasattr(self.obj,"Shape"):
+            candidates = self.obj.Shape.Vertexes
+        coplanar = []
+
+        for v in candidates:
+            coplanar.append(Part.Point(v.Point).toShape())
+        coplanar.extend([Part.Point(v).toShape() for v in trio])
+        if len(self.vertexNames) != 3:
+            FreeCAD.Console.PrintError("MeshRemodel: Cannot attach plane without 3 named subobjects.  Cannot simply use picked points.")
+        else:
+            #add a part::plane and project all the points to it
+            plane = doc.addObject("Part::Plane","MR_Alignment_Plane")
+            plane.ViewObject.Transparency = 80
+            plane.Width = 10
+            plane.Length = 10
+            plane.Support = [(self.obj,self.vertexNames[0]),(self.obj,self.vertexNames[1]),(self.obj,self.vertexNames[2])]
+            plane.MapMode = 'ThreePointsPlane'
+            plane.ViewObject.Visibility = False
+            doc.recompute()
+            coplanar2 = gu.flattenPoints(coplanar,plane)
+            doc.removeObject(plane.Name)
+        doc.recompute()
+        Part.show(Part.makeCompound(coplanar2),"MR_Flattened")
+        doc.ActiveObject.ViewObject.PointSize = point_size
+        mr = doc.ActiveObject
+        doc.recompute()
+
+        if self.obj and hasattr(self.obj,"ViewObject"):
+            self.obj.ViewObject.Visibility = False
+        doc.recompute()
+        doc.commitTransaction()
         #QtGui.QApplication.restoreOverrideCursor()
         return
 
@@ -1632,6 +1741,7 @@ def initialize():
         Gui.addCommand("MeshRemodelAddSelectionObserver",MeshRemodelAddSelectionObserverCommandClass())
         Gui.addCommand("MeshRemodelCreatePointObject", MeshRemodelCreatePointObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateCoplanarPointsObject", MeshRemodelCreateCoplanarPointsObjectCommandClass())
+        Gui.addCommand("MeshRemodelFlattenPointsObject", MeshRemodelFlattenPointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateLine", MeshRemodelCreateLineCommandClass())
         Gui.addCommand("MeshRemodelCreatePolygon", MeshRemodelCreatePolygonCommandClass())
         Gui.addCommand("MeshRemodelCreateBSpline", MeshRemodelCreateBSplineCommandClass())
