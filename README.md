@@ -41,7 +41,7 @@ Select 3 (non-colinear) points from the points object in the 3d view to enable t
 In order to filter the original points object into a set of coplanar points aligned on the plane defined by the 3 selected points an internal isCoplanar algorithm is used.  There is a settings option for changing the tolerance level.  The smaller the number the fewer points get produced.  The filtering is done by using the 3 selected points and each other point in turn to create a tetrahedron.  If the 4 points are coplanar, then the tetrahedron should have volume ~= zero.  Default tolerance is 0.01 mm^3. If too high a tolerance value is used you will get points that are not truly coplanar, but they will forced into coplanarity by projecting them onto the plane.
 <br/>
 ## Flatten Points object
-<img src="Resources/icons/FlattenPoints.png" alt - "flatten points"><br/>
+<img src="Resources/icons/FlattenPointsCoplanar.png" alt = "flatten points"><br/>
 ## Add Selection Observer
 <img src="Resources/icons/AddSelectionObserver.png" alt="add selection observer"><br/>
 This enables preselection mode where points get automatically selected by holding Ctrl key down while hovering over the point in the 3d view.  This is intended to make it easier to select all the points needed for making bsplines since there are usually very many points needing selection, but will work with all MeshRemodel tools that create objects from selected points.  DO NOT mix selection modes in the same operation.  For example, if you select any of the points using Ctrl+preselect mode, then do not click on any points to select them in the usual way for the same operation or else it is likely to fail.<br/>
