@@ -22,7 +22,7 @@ Select the mesh object in the tree, then use this command to create a points obj
 <br/>
 If you hold Ctrl key down while invoking this command the mesh object will be made partially transparent and non-selectable in the 3d view.  You can still select it in the tree view, but it will not appear to be selected in the 3d view and on mouse over you will not see it change to pre-select color.  This will make it easier to see the MR_Points object.  These settings can be changed in the mesh object's view tab in the property view.
 <br/>
-Update: As of v1.82 you can now also create a points object from a Points cloud object created in Points workbench, which are non-selectable.  So, if you need to be able to select the individual points in a points cloud use this tool to create the selected points object.<br/>
+Update: As of v1.82 you can now also create a points object from a Points cloud object created in Points workbench, which are non-selectable.  So, if you need to be able to select the individual points in a points cloud use this tool to create the selected points object.  Because the Points cloud object points are non-selectable the algorithm uses the first 3 points in the object to define the plane.  If those 3 points are colinear then it won't work.<br/>
 <br/>
 ## Create WireFrame Object
 <img src="Resources/icons/CreateWireFrameObject.png" alt="create wireframe object"><br/>
@@ -41,7 +41,9 @@ Select 3 (non-colinear) points from the points object in the 3d view to enable t
 In order to filter the original points object into a set of coplanar points aligned on the plane defined by the 3 selected points an internal isCoplanar algorithm is used.  There is a settings option for changing the tolerance level.  The smaller the number the fewer points get produced.  The filtering is done by using the 3 selected points and each other point in turn to create a tetrahedron.  If the 4 points are coplanar, then the tetrahedron should have volume ~= zero.  Default tolerance is 0.01 mm^3. If too high a tolerance value is used you will get points that are not truly coplanar, but they will forced into coplanarity by projecting them onto the plane.
 <br/>
 ## Flatten Points object
-<img src="Resources/icons/FlattenPointsCoplanar.png" alt = "flatten points"><br/>
+<img src="Resources/icons/FlattenPoints.png" alt = "flatten points"><br/>
+This is similar to the Create Coplanar Points Object command except it flattens all the points in the object without testing for proximity.  This can be used with a discretized edge created in Curves workbench if the edge that was initially discretized wasn't coplanar.  Discretize, flatten, then interpolate/approximate back into a bspline.<br/>
+<br/?
 ## Add Selection Observer
 <img src="Resources/icons/AddSelectionObserver.png" alt="add selection observer"><br/>
 This enables preselection mode where points get automatically selected by holding Ctrl key down while hovering over the point in the 3d view.  This is intended to make it easier to select all the points needed for making bsplines since there are usually very many points needing selection, but will work with all MeshRemodel tools that create objects from selected points.  DO NOT mix selection modes in the same operation.  For example, if you select any of the points using Ctrl+preselect mode, then do not click on any points to select them in the usual way for the same operation or else it is likely to fail.<br/>
@@ -129,6 +131,9 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might actually be coplanar.  But even if they're not coplanar they'll be forced into coplanarity starting with v1.81.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
 #### Release notes:<br/>
+* 2021.09/05 (version 1.82)<br/>
+** Add new command Flatten Points.  This command flattens all points in an object to the plane defined by the first 3 selected points, similar to  Create Coplanar Points Object command except it flattens all the points / vertices in the object.  This command also works with solids.<br/>
+** Create Points Object command now supports Point cloud objects created in Points workbench.
 * 2021.08.24 (version 1.81)<br/>
 ** Improvements to create coplanar points object, now points should be really coplanar (I hope).
 ** added new function gu.flattenPoints(pts,align_plane) -- pts is list of Part.Vertex objects.
