@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2021.09.05"
-__version__ = "1.82"
-version = 1.82
+__date__    = "2021.09.08"
+__version__ = "1.83"
+version = 1.83
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -611,6 +611,159 @@ creating wires using the Mesh Remodel workbench as with the Points and WireFrame
         return True
 
 # end open mesh section class
+
+####################################################################################
+# Convenience links to some oft-used Part Solid commands: Extrude, Sweep, and Loft
+
+class MeshRemodelPartSolidCommandClass(object):
+    """Convenience links to Part Solid commands Extrude, Loft, Sweep"""
+
+    def __init__(self):
+        pass
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'PartSolid.svg') ,
+            'MenuText': "Part Sol&id" ,
+            'ToolTip' : "Perform a Part Solid command:\n\
+No Modifier = Extrude\n\
+Ctrl + Click = Sweep\n\
+Shift + Click = Loft\n\
+Alt + Click = Revolution\n\
+"}
+ 
+    def Activated(self):
+        doc = FreeCAD.ActiveDocument
+        selobj = FreeCADGui.Selection.getSelectionEx()
+        modifiers = QtGui.QApplication.keyboardModifiers()
+        if not modifiers == (QtCore.Qt.ControlModifier & QtCore.Qt.ShiftModifier & QtCore.Qt.AltModifier): #one or more modifiers
+            if modifiers == QtCore.Qt.ControlModifier: #sweep
+                sections = [obj.Object for obj in selobj if obj.HasSubObjects == False]
+                if len(selobj) < 1+len(sections) or not sections: #user did not select an edge to use for the spline
+                    FreeCAD.Console.PrintMessage("Running Sweep command using the Gui\n")
+                    FreeCAD.Console.PrintMessage("Note: you can bypass the Gui if you select one or more profiles **in the tree view**\n")
+                    FreeCAD.Console.PrintMessage("and one or more edges (of a single object) in the 3D view to use as a spine,\n")
+                    FreeCAD.Console.PrintMessage("and then run this command.\n")
+                    FreeCADGui.runCommand("Part_Sweep",0)
+                    return
+                if len(selobj) > len(sections) + 1: #need a subshapebinder
+                    window = QtGui.QApplication.activeWindow()
+                    items=["Make detached (nonparametric) SubShapeBinder","Make synchronized (parametric) SubShapeBinder","Cancel"]
+                    item,ok = QtGui.QInputDialog.getItem(window,'Mesh Remodel v'+__version__,
+'Part::Sweep requires Spine edges all be from the same object.\n\
+If you like a SubShapeBinder can be created for this purpose.\n\
+You will need to do the sweep again, this time selecting the \n\
+desired edges of the SubShapeBinder to use for the Sweep Spine.\n\n\
+But it is generally better to make a wire from the edges and use\n\
+the edges of the wire as this ensures they are connected.\n\
+\n',items,0,False,windowFlags)
+                    if ok and item != items[-1]:
+                        doc.openTransaction("Create SubShapeBinder")
+                        binder = doc.addObject("PartDesign::SubShapeBinder","Binder")
+                        support = []
+                        for ff in range(len(sections),len(selobj)):
+                            subnames = [elem for elem in selobj[ff].SubElementNames if "Edge" in elem]
+                            selobj[ff].Object.ViewObject.Visibility = False
+                            for sub in subnames:
+                                support.append((selobj[ff].Object,sub))
+                        binder.Support = support
+                        binder.Fuse = True
+                        if item == items[0]: #nonparametric
+                            binder.BindMode = "Detached"
+                        elif item == items[1]:
+                            binder.BindMode = "Synchronized"
+                            binder.ClaimChildren = True
+                        doc.commitTransaction()
+                        doc.recompute()
+                        FreeCADGui.Selection.clearSelection()
+                        for sec in sections:
+                            FreeCADGui.Selection.addSelection(doc.Name,sec.Name)
+                    return
+                doc.openTransaction("Part Sweep")
+                f = doc.addObject("Part::Sweep","Sweep")
+                f.Sections = sections
+                for sec in f.Sections:
+                    sec.ViewObject.Visibility = False
+                subnames = [elem for elem in selobj[len(f.Sections)].SubElementNames]
+                f.Spine = (selobj[len(f.Sections)].Object, subnames)
+                selobj[len(f.Sections)].Object.ViewObject.Visibility = False
+                f.Solid = self.checkClosed(selobj[0].Object)
+                doc.commitTransaction()
+            elif modifiers == QtCore.Qt.ShiftModifier: #loft
+                if len(selobj)<2:
+                    FreeCAD.Console.PrintMessage("Running Loft command using the Gui\n")
+                    FreeCAD.Console.PrintMessage("Note: you can bypass the Gui if you select two or more profiles,\n")
+                    FreeCAD.Console.PrintMessage("and then run this command.\n")
+                    FreeCADGui.runCommand("Part_Loft",0)
+                    return
+                sections = [obj.Object for obj in selobj]
+                doc.openTransaction("Part Loft")
+                f = doc.addObject("Part::Loft","Loft")
+                f.Sections = sections
+                for sec in f.Sections:
+                    sec.ViewObject.Visibility = False
+                f.Solid = self.checkClosed(selobj[0].Object)
+                doc.commitTransaction()
+            elif modifiers == QtCore.Qt.AltModifier: #revolution
+                doc.openTransaction("Part Revolve")
+                f = doc.addObject("Part::Revolution","Revolve")
+                f.Source = selobj[0].Object #profile
+                f.Source.ViewObject.Visibility = False
+                if len(selobj) >= 2:
+                    subnames = [elem for elem in selobj[1].SubElementNames]
+                    f.AxisLink = (selobj[1].Object, subnames)
+                f.Solid = self.checkClosed(selobj[0].Object)
+                doc.commitTransaction()
+
+        else: #extrude
+            doc.openTransaction("Part Extrude")
+            f = doc.addObject("Part::Extrusion","Extrude")
+            f.Solid = self.checkClosed(selobj[0].Object)
+            f.Base = selobj[0].Object #profile
+            f.Base.ViewObject.Visibility = False
+            if len(selobj) >= 2:
+                f.DirMode = "Edge"
+                subnames = [elem for elem in selobj[1].SubElementNames]
+                f.DirLink = (selobj[1].Object, subnames)
+            else:
+                f.DirMode = self.checkNormal(f.Base)
+                f.LengthFwd = 10
+            doc.commitTransaction()
+        doc.recompute()
+        return
+
+    def checkClosed(self,obj):
+        import DraftGeomUtils as dgu
+        bClosed = False
+        if hasattr(obj.Shape,"OuterWire"):
+            bClosed = obj.Shape.OuterWire.isClosed()
+            FreeCAD.Console.PrintWarning("OuterWire of "+obj.Label+" is not closed.  Setting Solid property to False.\n")
+        elif obj.Shape.Wires:
+            bClosed = obj.Shape.Wires[0].isClosed()
+        else:
+            return False #must be point or line
+        bPlanar = dgu.isPlanar(obj.Shape)
+        if not bPlanar:
+            FreeCAD.Console.PrintWarning("Shape is non planar.  Setting Solid to False.\n")
+        return bClosed and bPlanar
+
+    def checkNormal(self,obj):
+        if hasattr(obj.Shape,"OuterWire"):
+            return "Normal"
+        return "Custom"
+
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        selobj = Gui.Selection.getSelectionEx()
+        if len(selobj) < 1:
+             return False
+        elif hasattr(selobj[0].Object,"Shape"):
+                return True
+        return False
+
+# end part solid
+
+
 ####################################################################################
 # Create the Mesh Remodel Point Object
 
@@ -817,7 +970,7 @@ class MeshRemodelFlattenPointsObjectCommandClass(object):
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'FlattenPoints.png') ,
-            'MenuText': "%Flatten a points object" ,
+            'MenuText': "Fla&tten a points object" ,
             'ToolTip' : "\
 Flattens a points object from 3 selected points on that object.\
 \n\
@@ -1739,6 +1892,7 @@ def initialize():
         Gui.addCommand("MeshRemodelCreateWireFrameObject",MeshRemodelCreateWireFrameObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateCrossSectionsObject",MeshRemodelCreateCrossSectionsCommandClass())
         Gui.addCommand("MeshRemodelAddSelectionObserver",MeshRemodelAddSelectionObserverCommandClass())
+        Gui.addCommand("MeshRemodelPartSolid",MeshRemodelPartSolidCommandClass())
         Gui.addCommand("MeshRemodelCreatePointObject", MeshRemodelCreatePointObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateCoplanarPointsObject", MeshRemodelCreateCoplanarPointsObjectCommandClass())
         Gui.addCommand("MeshRemodelFlattenPointsObject", MeshRemodelFlattenPointsObjectCommandClass())
