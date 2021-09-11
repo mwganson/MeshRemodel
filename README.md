@@ -48,12 +48,13 @@ Select the mesh object in the tree, then use this command to create one or more 
 <br/>
 ## Create Coplanar Points Object
 <img src="Resources/icons/CreateCoplanar.png" alt = "create coplanar"><br/>
-Select 3 (non-colinear) points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  If you use Alt+Click an empty sketch is created, and added to that empty sketch are links to external geometry for all of the points in the new coplanar points object.  You can recreate the profile inside the sketch using those external links and the sketcher tools or directly in the 3d view using the MeshRemodel tools.<br/>
+Select 3 (non-colinear) points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  You can recreate the profile inside the sketch using those external links and the sketcher tools or directly in the 3d view using the MeshRemodel tools.  The Coplanar Points Object (CPO) is now a feature python object.<br/>
 <br/>
 In order to filter the original points object into a set of coplanar points aligned on the plane defined by the 3 selected points an internal isCoplanar algorithm is used.  There is a settings option for changing the tolerance level.  The smaller the number the fewer points get produced.  The filtering is done by using the 3 selected points and each other point in turn to create a tetrahedron.  If the 4 points are coplanar, then the tetrahedron should have volume ~= zero.  Default tolerance is 0.01 mm^3. If too high a tolerance value is used you will get points that are not truly coplanar, but they will forced into coplanarity by projecting them onto the plane.
 <br/>
+## CPO Properties
 ### Base Points Object
-This is typically a MR_Points object.  It is the object upon which the Coplanar Points Object (CPO) is based, so do not delete it or else you will break the CPO.<br/>
+This is typically a MR_Points object.  It is the object upon which the CPO is based, so do not delete it or else you will break the CPO.<br/>
 <br/>
 ### Explode Compound
 Trigger.  Triggers a command and sets itself back to False.  Explodes the CPO just as if you had used Part workbench Compound Explode tool on it.  The points are now individually editable, meaning you can delete the ones you do not want or adjust their placement properties.  This also makes them selectable via the Shift+B box selection tool.  Adjusting placement of individual points can be very handy at times, so remember this feature, but be wary of the working plane when moving points.<br/>
@@ -159,6 +160,8 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might actually be coplanar.  But even if they're not coplanar they'll be forced into coplanarity starting with v1.81.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
 #### Release notes:<br/>
+* 2021.09.11 (version 1.86)<br/>
+** Disable compound explode and make sketch during coplanar points object creation.  Use the trigger properties after the object is created.<br/>
 * 2021.09.11 (version 1.85)<br/>
 ** Remove Flatten Points command since it is no longer needed now that the Coplanar Points object can do the same function
 with Tolerance = 0<br/>

@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2021.09.10"
-__version__ = "1.85"
-version = 1.85
+__date__    = "2021.09.11"
+__version__ = "1.86"
+version = 1.86
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -1035,8 +1035,6 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
             'ToolTip' : "\
 Makes coplanar points object from 3 selected points, used to define the plane\n\
 Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
-(Alt+Click -- Creates empty sketch and places links to external geometry to coplanar points\n\
-(Shift+Click for exploded compound, compatible with Shift+B block select)\n\
 "}
 
     def Activated(self):
@@ -1058,13 +1056,6 @@ Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
         cp.Tolerance = coplanar_tolerance
         cp.Trio = (self.obj,self.vertexNames)
         cp.BasePointsObject.ViewObject.Visibility = False
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        if modifiers == QtCore.Qt.AltModifier or modifiers == QtCore.Qt.AltModifier.__or__(QtCore.Qt.ShiftModifier):
-            FreeCAD.Console.PrintMessage("Not implemented yet\n")
-            cp.MakeSketch = True
-        if modifiers == QtCore.Qt.ShiftModifier or modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.AltModifier):
-            FreeCAD.Console.PrintMessage("Not implemented yet\n")
-            cp.ExplodeCompound = True
         doc.commitTransaction()
         FreeCADGui.Selection.clearSelection()
         FreeCADGui.Selection.addSelection(doc.Name,cp.Name)
