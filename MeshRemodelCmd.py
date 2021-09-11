@@ -148,8 +148,13 @@ class MeshRemodelGeomUtils(object):
         normal = plane.normalAt(0,0)
         base = align_plane.Shape.Vertexes[0].Point
         verts = []
+        flatPts = [] #eliminate duplicate points
         for p in pts:
-            verts.append(Part.Vertex(p.Point.projectToPlane(base,normal)))
+            fpt = p.Point.projectToPlane(base,normal)
+            if not self.hasPoint(fpt,flatPts,1e-7):
+                flatPts.append(fpt)
+        for p in flatPts:
+            verts.append(Part.Vertex(p))
         return verts
 
     def nearestPoint(self, pt, pts, exclude):
@@ -857,9 +862,7 @@ class CoplanarPoints:
     def onChanged(self,fp,prop):
         #FreeCAD.Console.PrintMessage(prop+" changed\n")
         self.inhibitRecomputes = False
-        if prop == "Shape":
-            self.inhibitRecomputes = True
-        elif prop == "PointSize":
+        if prop == "PointSize":
             self.inhibitRecomputes = True
             fp.ViewObject.PointSize = fp.PointSize
         elif prop == "ExplodeCompound" and fp.ExplodeCompound == True:
@@ -870,6 +873,9 @@ class CoplanarPoints:
             self.inhibitRecomputes = True
             self.makeSketch(fp)
             fp.MakeSketch = False
+        elif prop == "Points":
+            self.inhibitRecomputes = True
+
 
 class CoplanarPointsVP:
     """View Provider for Coplanar Points FP object"""
