@@ -161,10 +161,10 @@ This sets the tolerance to use when determining which points lie on the same pla
 #### Release notes:<br/>
 * 2021.09.11 (version 1.85)<br/>
 ** Remove Flatten Points command since it is no longer needed now that the Coplanar Points object can do the same function
-with Tolerance = 0
-** Implement Points property for Coplanar Points object
-** Implement MakeSketch trigger (makes a sketch attached to the Trio points, adds all coplanar points as external geometry)
-** Implement ExplodeCompound trigger (explodes coplanar points object into individually editable points, selectable via Shift+B)
+with Tolerance = 0<br/>
+** Implement Points property for Coplanar Points object<br/>
+** Implement MakeSketch trigger (makes a sketch attached to the Trio points, adds all coplanar points as external geometry)<br/>
+** Implement ExplodeCompound trigger (explodes coplanar points object into individually editable points, selectable via Shift+B)<br/>
 * 2021.09.10 (version 1.84)<br/>
 ** Improve performance of Create Coplanar Points object command<br/>
 ** Improve performance of Flatten Points command<br/>
