@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2021.09.08"
-__version__ = "1.83"
-version = 1.83
+__date__    = "2021.09.09"
+__version__ = "1.84"
+version = 1.84
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -144,66 +144,12 @@ class MeshRemodelGeomUtils(object):
             align_plane is part::plane object or 
             can be any object with a face (face1 will be used)
             returns: new list of Part.Vertex objects on the plane"""
-
-        #import WorkingPlane
-        ###n = align_plane.Shape.Faces[0].normalAt(0,0)
-
-        ###o = pts[0].Point
-        ###o = align_plane.Shape.Vertexes[0].Point
-        #plane = WorkingPlane.plane()
-        ###plane.alignToPointAndAxis(o, n, 0)
-        #plane.alignToFace(align_plane.Shape.Faces[0])
-        #verts = []
-
-        #for v in pts:
-        #    verts.append(Part.Vertex(plane.projectPoint(v.Point)))
-
-        #return verts
-
-        #above cleaner workingplane method should work in theory, but in reality does not
-        #so this messy way to ensure all points are coplanar
-        #make a compound of the points and display as document object
-        # make a temporary sketch, attach it to the plane and add links to external geometry to the points
-        #add points to the sketch constraining to the externally linked points
-        #extract these constrained points now guaranteed to be coplanar and return as list of vertexes
-
-        import Sketcher, Part, Draft
-        doc = FreeCAD.ActiveDocument
-        sketch = doc.addObject("Sketcher::SketchObject","MR_Align_Sketch")
-        sketch.Support = [align_plane,"Face1"]
-        sketch.MapMode = "FlatFace"
-        points = [Part.Vertex(p) for p in pts]
-        comp = Part.makeCompound(points)
-        Part.show(comp,"MR_Sketch_Pts")
-        skpts = doc.ActiveObject
-        for ii in range(0,len(pts)):
-            sketch.addExternal(skpts.Name,"Vertex"+str(ii+1))
-            sketch.addGeometry(Part.Point(FreeCAD.Vector(0,0,0)))
-            sketch.addConstraint(Sketcher.Constraint('Coincident',ii,1,-3-ii,1))
-
-        #this bit borrowed and modified from draft point array code get_point_list
-        #so we don't need to create a point array and then delete it
-        #but rather can instead extract the geometry directly from the sketch
-        #this is needed because all the points have z=0 in sketch local coordinates
+        plane = align_plane.Shape.Faces[0]
+        normal = plane.normalAt(0,0)
+        base = align_plane.Shape.Vertexes[0].Point
         verts = []
-
-        place = sketch.Placement
-        points = []
-        for geo in sketch.Geometry:
-            # It must contain at least one Part::GeomPoint.
-            if (hasattr(geo, 'X')
-                    and hasattr(geo, 'Y') and hasattr(geo, 'Z')):
-                point = geo.copy()
-                point.translate(place.Base)
-                point.rotate(place)
-                pt = FreeCAD.Vector(point.X,point.Y,point.Z)
-                if not self.hasPoint(pt,points,1e-7): #avoid duplicate points
-                    points.append(pt)
-        for p in points:
-            verts.append(Part.Vertex(p))
-        doc.removeObject(sketch.Name)
-        doc.removeObject(skpts.Name)
-
+        for p in pts:
+            verts.append(Part.Vertex(p.Point.projectToPlane(base,normal)))
         return verts
 
     def nearestPoint(self, pt, pts, exclude):
@@ -736,7 +682,8 @@ the edges of the wire as this ensures they are connected.\n\
         bClosed = False
         if hasattr(obj.Shape,"OuterWire"):
             bClosed = obj.Shape.OuterWire.isClosed()
-            FreeCAD.Console.PrintWarning("OuterWire of "+obj.Label+" is not closed.  Setting Solid property to False.\n")
+            if not bClosed:
+                FreeCAD.Console.PrintWarning("OuterWire of "+obj.Label+" is not closed.  Setting Solid property to False.\n")
         elif obj.Shape.Wires:
             bClosed = obj.Shape.Wires[0].isClosed()
         else:
@@ -826,6 +773,247 @@ class MeshRemodelCreatePointObjectCommandClass(object):
 ####################################################################################
 # Create a coplanar points object from 3 selected points
 
+class CoplanarPoints:
+    def __init__(self,obj):
+        obj.addExtension("Part::AttachExtensionPython") #make attachable, why not?
+        obj.addProperty("App::PropertyVectorList","Points","CoplanarPoints","The points")
+        obj.addProperty("App::PropertyLinkSubList","Trio","CoplanarPoints","3 points that define the plane")
+        obj.addProperty("App::PropertyFloatConstraint","Tolerance","CoplanarPoints","Bigger means more points can be included, Zero = include all points").Tolerance = (0.3,0.0,float("inf"),0.1)
+        obj.addProperty("App::PropertyLink","BasePointsObject","CoplanarPoints","The base points object from which these coplanar points are selected")
+        obj.addProperty("App::PropertyFloat","PointSize","CoplanarPoints","Point size taken from settings")
+        obj.addProperty("App::PropertyBool","ExplodeCompound","CoplanarPoints","Whether to explode compound of points shapes").ExplodeCompound = False
+        obj.addProperty("App::PropertyBool","MakeSketch","CoplanarPoints","Whether to make a sketch and add points to it as external geometry links").MakeSketch = False
+        obj.setEditorMode("Points",1) #readonly
+        obj.setEditorMode("MakeSketch",2) #hidden
+        obj.setEditorMode("ExplodeCompound",2) #hidden
+        obj.Proxy = self
+        self.inhibitRecomputes = False
+
+    def makeSketch(self,fp):
+        pass
+        #if bMakeSketch:
+        #    if not "Sketcher_NewSketch" in Gui.listCommands():
+        #        Gui.activateWorkbench("SketcherWorkbench")
+        #        Gui.activateWorkbench("MeshRemodelWorkbench")
+        #    Gui.runCommand("Sketcher_NewSketch")
+        #    sketch=doc.ActiveObject
+        #    sketch.Label = mr.Name+'_Sketch'
+        #    sketch.MapReversed = False
+        #    for ii in range(0,len(mr.Shape.Vertexes)):
+        #        vname = 'Vertex'+str(ii+1)
+        #        sketch.addExternal(mr.Name, vname)
+
+    def explodePoints(self,fp):
+        pass
+        #if modifiers == QtCore.Qt.ShiftModifier or modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.AltModifier):
+        #    doc.openTransaction("explode coplanar points")
+        #    import CompoundTools.Explode
+        #    input_obj = doc.ActiveObject
+        #    comp = CompoundTools.Explode.explodeCompound(input_obj)
+        #    input_obj.ViewObject.hide()
+        #    for obj in comp[1]:
+        #        obj.ViewObject.PointSize = point_size
+        #    doc.recompute()
+        #    doc.commitTransaction()
+
+    def execute(self,fp):
+        #FreeCAD.Console.PrintMessage("execute called.\n")
+        if self.inhibitRecomputes:
+            #self.inhibitRecomputes = False;
+            return
+        doc = FreeCAD.ActiveDocument
+        #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        candidates = []
+        if fp.BasePointsObject:
+            candidates = fp.BasePointsObject.Shape.Vertexes
+        coplanar = []
+        trio = []
+        for vertName in fp.Trio[0][1]:
+            trio.append(fp.Trio[0][0].Shape.Vertexes[int(vertName[6:])-1].Point)
+        for v in candidates:
+            if gu.isCoplanar(trio,v.Point,fp.Tolerance):
+                planar = True
+            else:
+                planar = False
+            if planar:
+                coplanar.append(Part.Point(v.Point).toShape())
+        coplanar.extend([Part.Point(v).toShape() for v in trio])
+        if len(trio) != 3:
+            FreeCAD.Console.PrintError("MeshRemodel: Cannot attach plane without 3 named subobjects.  Cannot simply use picked points.")
+        else:
+            #add a part::plane and project all the points to it
+            plane = doc.addObject("Part::Plane","MR_Alignment_Plane")
+            plane.ViewObject.Transparency = 80
+            plane.Width = 10
+            plane.Length = 10
+            plane.Support = fp.Trio
+            plane.MapMode = 'ThreePointsPlane'
+            plane.ViewObject.Visibility = False
+            coplanar2 = gu.flattenPoints(coplanar,plane)
+            doc.removeObject(plane.Name)
+        self.inhibitRecomputes = True
+        fp.Shape = Part.makeCompound(coplanar2)
+        fp.ViewObject.PointSize = fp.PointSize
+
+    def onChanged(self,fp,prop):
+        #FreeCAD.Console.PrintMessage(prop+" changed\n")
+        self.inhibitRecomputes = False
+        if prop == "Shape":
+            self.inhibitRecomputes = True
+        elif prop == "PointSize":
+            self.inhibitRecomputes = True
+            fp.ViewObject.PointSize = fp.PointSize
+
+class CoplanarPointsVP:
+    """View Provider for Coplanar Points FP object"""
+    def __init__(self, obj):
+        '''Set this object to the proxy object of the actual view provider'''
+        obj.Proxy = self
+ 
+    def attach(self, obj):
+        '''Setup the scene sub-graph of the view provider, this method is mandatory'''
+        self.Object = obj.Object
+ 
+    def updateData(self, fp, prop):
+        '''If a property of the handled feature has changed we have the chance to handle this here'''
+        # fp is the handled feature, prop is the name of the property that has changed
+        pass
+ 
+    def getDisplayModes(self,obj):
+        '''Return a list of display modes.'''
+        modes=[]
+        modes.append("Flat Lines")
+        return modes
+ 
+    def getDefaultDisplayMode(self):
+        '''Return the name of the default display mode. It must be defined in getDisplayModes.'''
+        return "Flat Lines"
+ 
+    def setDisplayMode(self,mode):
+        '''Map the display mode defined in attach with those defined in getDisplayModes.\
+                Since they have the same names nothing needs to be done. This method is optional'''
+        return mode
+ 
+    def onChanged(self, vp, prop):
+        '''Here we can do something when a single property got changed'''
+        #FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
+
+ 
+    def getIcon(self):
+        '''Return the icon in XPM format which will appear in the tree view. This method is\
+                optional and if not defined a default icon is shown.'''
+        return """
+/* XPM */
+static char *_631325336634[] = {
+/* columns rows colors chars-per-pixel */
+"64 64 26 1 ",
+"  c black",
+". c #ED1C24",
+"X c #22B14C",
+"o c #FFF200",
+"O c #3F48CC",
+"+ c #F79498",
+"@ c #F8A3A7",
+"# c #FABABD",
+"$ c #97DAAB",
+"% c #A6DFB7",
+"& c #A5A9E7",
+"* c #B1B5EA",
+"= c #BCE7C9",
+"- c #C3EACF",
+"; c #C5C8F0",
+": c #CBCDF1",
+"> c #FDE4E5",
+", c #E5F6EA",
+"< c #E8E9F9",
+"1 c #FFFEF7",
+"2 c #FEF8F8",
+"3 c snow",
+"4 c #F8FDFA",
+"5 c #FAFDFB",
+"6 c #F9F9FD",
+"7 c white",
+/* pixels */
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"777                                                         7777",
+"777                                                         7777",
+"777                                                         7777",
+"777                                                         7777",
+"777                                                         7777",
+"777     777777777.......7777:OOOOO&777-XXXXX$7777777777     7777",
+"777     777777772.......7777OOOOOOO777XXXXXXX7777777777     7777",
+"777     777777772.......7776OOOOOOO775XXXXXXX7777777777     7777",
+"777     777777777@......7776OOOOOOO775XXXXXXX7777777777     7777",
+"777     777777777>+....#7777*OOOOOO777%XXXXXX7777777777     7777",
+"777     77777777777777777777<&OOOO;777,$XXXX=7777777777     7777",
+"777     77777777777777777777777777777777777777777777777     7777",
+"777     77777777777771oo7777777777777777777777777777777     7777",
+"777                                                         7777",
+"777                                                         7777",
+"777                                                         7777",
+"777                                                         7777",
+"777                                                         7777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777",
+"7777777777777777777777777777777777777777777777777777777777777777"
+};
+"""
+ 
+    def __getstate__(self):
+        '''When saving the document this object gets stored using Python's json module.\
+                Since we have some un-serializable parts here -- the Coin stuff -- we must define this method\
+                to return a tuple of all serializable objects or None.'''
+        return {"name": self.Object.Name}
+ 
+    def __setstate__(self,state):
+        '''When restoring the serialized object from document we have the chance to set some internals here.\
+                Since no data were serialized nothing needs to be done here.'''
+        self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
+        return None
+
+
 class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
     """Create coplanar points object from 3 selected points"""
 
@@ -843,7 +1031,7 @@ Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
 (Alt+Click -- Creates empty sketch and places links to external geometry to coplanar points\n\
 (Shift+Click for exploded compound, compatible with Shift+B block select)\n\
 "}
- 
+
     def Activated(self):
         if len(global_picked) == 3:
             self.pts = global_picked #use preselect-picked points
@@ -852,75 +1040,28 @@ Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
             return
         doc = FreeCAD.ActiveDocument
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
-        line_width = pg.GetFloat("LineWidth",5.0)
         point_size = pg.GetFloat("PointSize",4.0)
         coplanar_tolerance = pg.GetFloat("CoplanarTolerance", .001)
-        #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         doc.openTransaction("Create coplanar")
+        cp = doc.addObject("Part::FeaturePython","MR_Coplanar_Points")
+        CoplanarPoints(cp)
+        CoplanarPointsVP(cp.ViewObject)
+        cp.BasePointsObject = self.obj
+        cp.PointSize = point_size
+        cp.Tolerance = coplanar_tolerance
+        cp.Trio = (self.obj,self.vertexNames)
+        cp.BasePointsObject.ViewObject.Visibility = False
         modifiers = QtGui.QApplication.keyboardModifiers()
-        trio = [self.pts[0],self.pts[1],self.pts[2]]
-        candidates = []
-        if self.obj and hasattr(self.obj,"Shape"):
-            candidates = self.obj.Shape.Vertexes
-        coplanar = []
-        bMakeSketch = False;
         if modifiers == QtCore.Qt.AltModifier or modifiers == QtCore.Qt.AltModifier.__or__(QtCore.Qt.ShiftModifier):
-            bMakeSketch = True
-        for v in candidates:
-            if gu.isCoplanar(trio,v.Point,coplanar_tolerance):
-                planar = True
-            else:
-                planar = False
-            if planar:
-                coplanar.append(Part.Point(v.Point).toShape())
-        coplanar.extend([Part.Point(v).toShape() for v in trio])
-        if len(self.vertexNames) != 3:
-            FreeCAD.Console.PrintError("MeshRemodel: Cannot attach plane without 3 named subobjects.  Cannot simply use picked points.")
-        else:
-            #add a part::plane and project all the points to it
-            plane = doc.addObject("Part::Plane","MR_Alignment_Plane")
-            plane.ViewObject.Transparency = 80
-            plane.Width = 10
-            plane.Length = 10
-            plane.Support = [(self.obj,self.vertexNames[0]),(self.obj,self.vertexNames[1]),(self.obj,self.vertexNames[2])]
-            plane.MapMode = 'ThreePointsPlane'
-            plane.ViewObject.Visibility = False
-            doc.recompute()
-            coplanar2 = gu.flattenPoints(coplanar,plane)
-            doc.removeObject(plane.Name)
-        Part.show(Part.makeCompound(coplanar2),"MR_Points_Coplanar")
-        doc.ActiveObject.ViewObject.PointSize = point_size
-        mr = doc.ActiveObject
-
-        if bMakeSketch:
-            if not "Sketcher_NewSketch" in Gui.listCommands():
-                Gui.activateWorkbench("SketcherWorkbench")
-                Gui.activateWorkbench("MeshRemodelWorkbench")
-            Gui.runCommand("Sketcher_NewSketch")
-            sketch=doc.ActiveObject
-            sketch.Label = mr.Name+'_Sketch'
-            sketch.MapReversed = False
-            for ii in range(0,len(mr.Shape.Vertexes)):
-                vname = 'Vertex'+str(ii+1)
-                sketch.addExternal(mr.Name, vname)
-        
-            doc.recompute()
-
-        if self.obj and hasattr(self.obj,"ViewObject"):
-            self.obj.ViewObject.Visibility = False
-        doc.recompute()
-        doc.commitTransaction()
+            FreeCAD.Console.PrintMessage("Not implemented yet\n")
+            cp.MakeSketch = True
         if modifiers == QtCore.Qt.ShiftModifier or modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.AltModifier):
-            doc.openTransaction("explode coplanar points")
-            import CompoundTools.Explode
-            input_obj = doc.ActiveObject
-            comp = CompoundTools.Explode.explodeCompound(input_obj)
-            input_obj.ViewObject.hide()
-            for obj in comp[1]:
-                obj.ViewObject.PointSize = point_size
-            doc.recompute()
-            doc.commitTransaction()
-        #QtGui.QApplication.restoreOverrideCursor()
+            FreeCAD.Console.PrintMessage("Not implemented yet\n")
+            cp.ExplodeCompound = True
+        doc.commitTransaction()
+        FreeCADGui.Selection.clearSelection()
+        FreeCADGui.Selection.addSelection(doc.Name,cp.Name)
+        doc.recompute()
         return
 
     def IsActive(self):
