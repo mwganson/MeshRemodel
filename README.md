@@ -52,10 +52,26 @@ Select 3 (non-colinear) points from the points object in the 3d view to enable t
 <br/>
 In order to filter the original points object into a set of coplanar points aligned on the plane defined by the 3 selected points an internal isCoplanar algorithm is used.  There is a settings option for changing the tolerance level.  The smaller the number the fewer points get produced.  The filtering is done by using the 3 selected points and each other point in turn to create a tetrahedron.  If the 4 points are coplanar, then the tetrahedron should have volume ~= zero.  Default tolerance is 0.01 mm^3. If too high a tolerance value is used you will get points that are not truly coplanar, but they will forced into coplanarity by projecting them onto the plane.
 <br/>
-## Flatten Points object
-<img src="Resources/icons/FlattenPoints.png" alt = "flatten points"><br/>
-This is similar to the Create Coplanar Points Object command except it flattens all the points in the object without testing for proximity.  This can be used with a discretized edge created in Curves workbench if the edge that was initially discretized wasn't coplanar.  Discretize, flatten, then interpolate/approximate back into a bspline.<br/>
-<br/?
+### Base Points Object
+This is typically a MR_Points object.  It is the object upon which the Coplanar Points Object (CPO) is based, so do not delete it or else you will break the CPO.<br/>
+<br/>
+### Explode Compound
+Trigger.  Triggers a command and sets itself back to False.  Explodes the CPO just as if you had used Part workbench Compound Explode tool on it.  The points are now individually editable, meaning you can delete the ones you do not want or adjust their placement properties.  This also makes them selectable via the Shift+B box selection tool.  Adjusting placement of individual points can be very handy at times, so remember this feature, but be wary of the working plane when moving points.<br/>
+<br/>
+### Make Sketch
+Trigger.  Triggers a command and sets itself back to False.  Makes a new sketch, attaches it to the Trio points (the 3 points of the BasePoints object originally selected when the CPO was first created) using MapMode = "ThreePointsPlane", and adds all points in the CPO to the sketch as links to external geometry.<br/>
+<br/>
+### Point Size
+Adjust this to change the point size for this CPO (does not change default value in the settings).  The same property is available in the view tab, but this overrides that one.  It is here for convenience.<br/>
+<br/>
+### Points
+These are the vectors of the points in the CPO.  They are not readonly, but you should not modify them directly because they get recreated with each recompute.  I was intending to make this property readonly, but in that mode you cannot access the editor and see the table view.  If you want to remove or modify individual points, use the Explode Compound feature.<br/>
+<br/>
+### Tolerance
+Tolerance defines how the points that are coplanar are selected.  I will likely be changing the algorithm in the future, but for now a 4 sided tetrahedron is created with vertices: the Trio and each other point in the BasePoints object in turn.  If the volume of the tetrahedron is tolerance or less the 4th point is considered to be on the plane.  Higher tolerance values will produce more points in the plane.  Do not worry about the extra points not being on the plane as they are projected to the plane.  Setting Tolerance = 0 means do not use any tolerance, but rather put all the BasePoints object points in.<br/>
+<br/>
+### Trio
+These are the 3 vertices you selected when you first created the CPO.  They are used in a number of ways.  If a sketch is created they are the support for the sketch attachment.  When the CPO is created they are used to define the plane.
 ## Add Selection Observer
 <img src="Resources/icons/AddSelectionObserver.png" alt="add selection observer"><br/>
 This enables preselection mode where points get automatically selected by holding Ctrl key down while hovering over the point in the 3d view.  This is intended to make it easier to select all the points needed for making bsplines since there are usually very many points needing selection, but will work with all MeshRemodel tools that create objects from selected points.  DO NOT mix selection modes in the same operation.  For example, if you select any of the points using Ctrl+preselect mode, then do not click on any points to select them in the usual way for the same operation or else it is likely to fail.<br/>
@@ -143,6 +159,12 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might actually be coplanar.  But even if they're not coplanar they'll be forced into coplanarity starting with v1.81.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
 #### Release notes:<br/>
+* 2021.09.11 (version 1.85)<br/>
+** Remove Flatten Points command since it is no longer needed now that the Coplanar Points object can do the same function
+with Tolerance = 0
+** Implement Points property for Coplanar Points object
+** Implement MakeSketch trigger (makes a sketch attached to the Trio points, adds all coplanar points as external geometry)
+** Implement ExplodeCompound trigger (explodes coplanar points object into individually editable points, selectable via Shift+B)
 * 2021.09.10 (version 1.84)<br/>
 ** Improve performance of Create Coplanar Points object command<br/>
 ** Improve performance of Flatten Points command<br/>
