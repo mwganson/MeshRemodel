@@ -62,7 +62,6 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelCreateWireFrameObject",
                     "MeshRemodelCreateCrossSectionsObject",
                     "MeshRemodelCreateCoplanarPointsObject",
-                    "MeshRemodelFlattenPointsObject",
                     "MeshRemodelAddSelectionObserver",
                     "MeshRemodelPartSolid",
                     "MeshRemodelCreatePointObject",

@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2021.09.09"
-__version__ = "1.84"
-version = 1.84
+__date__    = "2021.09.10"
+__version__ = "1.85"
+version = 1.85
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -776,50 +776,44 @@ class MeshRemodelCreatePointObjectCommandClass(object):
 class CoplanarPoints:
     def __init__(self,obj):
         obj.addExtension("Part::AttachExtensionPython") #make attachable, why not?
-        obj.addProperty("App::PropertyVectorList","Points","CoplanarPoints","The points")
+        obj.addProperty("App::PropertyVectorList","Points","CoplanarPoints","Not readonly, but they will be updated with each recompute")
         obj.addProperty("App::PropertyLinkSubList","Trio","CoplanarPoints","3 points that define the plane")
         obj.addProperty("App::PropertyFloatConstraint","Tolerance","CoplanarPoints","Bigger means more points can be included, Zero = include all points").Tolerance = (0.3,0.0,float("inf"),0.1)
         obj.addProperty("App::PropertyLink","BasePointsObject","CoplanarPoints","The base points object from which these coplanar points are selected")
         obj.addProperty("App::PropertyFloat","PointSize","CoplanarPoints","Point size taken from settings")
-        obj.addProperty("App::PropertyBool","ExplodeCompound","CoplanarPoints","Whether to explode compound of points shapes").ExplodeCompound = False
-        obj.addProperty("App::PropertyBool","MakeSketch","CoplanarPoints","Whether to make a sketch and add points to it as external geometry links").MakeSketch = False
-        obj.setEditorMode("Points",1) #readonly
-        obj.setEditorMode("MakeSketch",2) #hidden
-        obj.setEditorMode("ExplodeCompound",2) #hidden
+        obj.addProperty("App::PropertyBool","ExplodeCompound","Triggers","Whether to explode compound of points shapes").ExplodeCompound = False
+        obj.addProperty("App::PropertyBool","MakeSketch","Triggers","Whether to make a sketch and add points to it as external geometry links").MakeSketch = False
         obj.Proxy = self
         self.inhibitRecomputes = False
 
     def makeSketch(self,fp):
-        pass
-        #if bMakeSketch:
-        #    if not "Sketcher_NewSketch" in Gui.listCommands():
-        #        Gui.activateWorkbench("SketcherWorkbench")
-        #        Gui.activateWorkbench("MeshRemodelWorkbench")
-        #    Gui.runCommand("Sketcher_NewSketch")
-        #    sketch=doc.ActiveObject
-        #    sketch.Label = mr.Name+'_Sketch'
-        #    sketch.MapReversed = False
-        #    for ii in range(0,len(mr.Shape.Vertexes)):
-        #        vname = 'Vertex'+str(ii+1)
-        #        sketch.addExternal(mr.Name, vname)
+        doc = FreeCAD.ActiveDocument
+        sketch=doc.addObject("Sketcher::SketchObject","Sketch")
+        trio = []
+        #for vertName in fp.Trio[0][1]:
+        #    trio.append(fp.Trio[0][0].Shape.Vertexes[int(vertName[6:])-1].Point)
+        sketch.Support = fp.Trio
+        sketch.MapMode = "ThreePointsPlane"
+        for ii in range(0,len(fp.Shape.Vertexes)):
+            vname = 'Vertex'+str(ii+1)
+            sketch.addExternal(fp.Name, vname)
 
-    def explodePoints(self,fp):
-        pass
-        #if modifiers == QtCore.Qt.ShiftModifier or modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.AltModifier):
-        #    doc.openTransaction("explode coplanar points")
-        #    import CompoundTools.Explode
-        #    input_obj = doc.ActiveObject
-        #    comp = CompoundTools.Explode.explodeCompound(input_obj)
-        #    input_obj.ViewObject.hide()
-        #    for obj in comp[1]:
-        #        obj.ViewObject.PointSize = point_size
-        #    doc.recompute()
-        #    doc.commitTransaction()
+    def explodeCompound(self,fp):
+        doc = FreeCAD.ActiveDocument
+        doc.openTransaction("explode coplanar points")
+        import CompoundTools.Explode
+        input_obj = fp
+        comp = CompoundTools.Explode.explodeCompound(input_obj)
+        input_obj.ViewObject.hide()
+        for obj in comp[1]:
+            obj.ViewObject.PointSize = fp.PointSize
+        doc.recompute()
+        doc.commitTransaction()
 
     def execute(self,fp):
         #FreeCAD.Console.PrintMessage("execute called.\n")
         if self.inhibitRecomputes:
-            #self.inhibitRecomputes = False;
+            self.inhibitRecomputes = False;
             return
         doc = FreeCAD.ActiveDocument
         #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
@@ -830,8 +824,12 @@ class CoplanarPoints:
         trio = []
         for vertName in fp.Trio[0][1]:
             trio.append(fp.Trio[0][0].Shape.Vertexes[int(vertName[6:])-1].Point)
+        if fp.Tolerance == 0:
+            tolerance = float("inf")
+        else:
+            tolerance = fp.Tolerance
         for v in candidates:
-            if gu.isCoplanar(trio,v.Point,fp.Tolerance):
+            if gu.isCoplanar(trio,v.Point,tolerance):
                 planar = True
             else:
                 planar = False
@@ -852,6 +850,7 @@ class CoplanarPoints:
             coplanar2 = gu.flattenPoints(coplanar,plane)
             doc.removeObject(plane.Name)
         self.inhibitRecomputes = True
+        fp.Points = [v.Point for v in coplanar2]
         fp.Shape = Part.makeCompound(coplanar2)
         fp.ViewObject.PointSize = fp.PointSize
 
@@ -863,6 +862,14 @@ class CoplanarPoints:
         elif prop == "PointSize":
             self.inhibitRecomputes = True
             fp.ViewObject.PointSize = fp.PointSize
+        elif prop == "ExplodeCompound" and fp.ExplodeCompound == True:
+            self.inhibitRecomputes = True
+            self.explodeCompound(fp)
+            fp.ExplodeCompound = False
+        elif prop == "MakeSketch" and fp.MakeSketch == True:
+            self.inhibitRecomputes = True
+            self.makeSketch(fp)
+            fp.MakeSketch = False
 
 class CoplanarPointsVP:
     """View Provider for Coplanar Points FP object"""
@@ -1095,107 +1102,6 @@ Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
 # end create coplanar points object
 ####################################################################################
 
-# Flatten points object from 3 selected points or from first 3 vertices if it is a non-selectable points cloud object
-
-class MeshRemodelFlattenPointsObjectCommandClass(object):
-    """Flatten points object to 3 selected points
-       Difference between this an create coplanar points object is this
-       flattens all the points in the object regardless of whether they
-       are already somewhat coplanar or not
-"""
-
-    def __init__(self):
-        self.pts = []
-        self.obj = None #original points object
-        self.vertexNames = [] #for attaching a part::plane
-
-    def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'FlattenPoints.png') ,
-            'MenuText': "Fla&tten a points object" ,
-            'ToolTip' : "\
-Flattens a points object from 3 selected points on that object.\
-\n\
-"}
- 
-    def Activated(self):
-        if len(global_picked) == 3:
-            self.pts = global_picked #use preselect-picked points
-        if gu.isColinear(self.pts[0],self.pts[1],self.pts[2]):
-            FreeCAD.Console.PrintError('Please select 3 non-colinear points in the plane\n')
-            return
-        doc = FreeCAD.ActiveDocument
-        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
-        line_width = pg.GetFloat("LineWidth",5.0)
-        point_size = pg.GetFloat("PointSize",4.0)
-        #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
-        doc.openTransaction("Flatten points")
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        trio = [self.pts[0],self.pts[1],self.pts[2]]
-        candidates = []
-        if self.obj and hasattr(self.obj,"Shape"):
-            candidates = self.obj.Shape.Vertexes
-        coplanar = []
-
-        for v in candidates:
-            coplanar.append(Part.Point(v.Point).toShape())
-        coplanar.extend([Part.Point(v).toShape() for v in trio])
-        if len(self.vertexNames) != 3:
-            FreeCAD.Console.PrintError("MeshRemodel: Cannot attach plane without 3 named subobjects.  Cannot simply use picked points.")
-        else:
-            #add a part::plane and project all the points to it
-            plane = doc.addObject("Part::Plane","MR_Alignment_Plane")
-            plane.ViewObject.Transparency = 80
-            plane.Width = 10
-            plane.Length = 10
-            plane.Support = [(self.obj,self.vertexNames[0]),(self.obj,self.vertexNames[1]),(self.obj,self.vertexNames[2])]
-            plane.MapMode = 'ThreePointsPlane'
-            plane.ViewObject.Visibility = False
-            doc.recompute()
-            coplanar2 = gu.flattenPoints(coplanar,plane)
-            doc.removeObject(plane.Name)
-        doc.recompute()
-        Part.show(Part.makeCompound(coplanar2),"MR_Flattened")
-        doc.ActiveObject.ViewObject.PointSize = point_size
-        mr = doc.ActiveObject
-        doc.recompute()
-
-        if self.obj and hasattr(self.obj,"ViewObject"):
-            self.obj.ViewObject.Visibility = False
-        doc.recompute()
-        doc.commitTransaction()
-        #QtGui.QApplication.restoreOverrideCursor()
-        return
-
-    def IsActive(self):
-        if not FreeCAD.ActiveDocument:
-            return False
-        sel = Gui.Selection.getSelectionEx()
-        if len(sel) == 0:
-            return False
-        if not hasattr(sel[0],"PickedPoints"):
-            return False
-        count = 0
-        self.pts = []
-        self.obj = sel[0].Object
-        for s in sel:
-            if hasattr(s,"PickedPoints"):
-                p = s.PickedPoints
-                for pt in s.PickedPoints:
-                    self.pts.append(pt)
-                    count += 1
-                if len(p)==0: #might be individual part point objects
-                    if len(s.Object.Shape.Vertexes)==1:
-                        self.pts.append(s.Object.Shape.Vertexes[0].Point)
-                        count += 1
-            if count > 3:
-                return False
-        if count == 3:
-            self.vertexNames = sel[0].SubElementNames
-            return True
-        return False
-
-# end create coplanar points object
-####################################################################################
 # Create a line from 2 selected points
 
 class MeshRemodelCreateLineCommandClass(object):
@@ -2036,7 +1942,6 @@ def initialize():
         Gui.addCommand("MeshRemodelPartSolid",MeshRemodelPartSolidCommandClass())
         Gui.addCommand("MeshRemodelCreatePointObject", MeshRemodelCreatePointObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateCoplanarPointsObject", MeshRemodelCreateCoplanarPointsObjectCommandClass())
-        Gui.addCommand("MeshRemodelFlattenPointsObject", MeshRemodelFlattenPointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateLine", MeshRemodelCreateLineCommandClass())
         Gui.addCommand("MeshRemodelCreatePolygon", MeshRemodelCreatePolygonCommandClass())
         Gui.addCommand("MeshRemodelCreateBSpline", MeshRemodelCreateBSplineCommandClass())
