@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2021.09.11"
-__version__ = "1.86"
-version = 1.86
+__version__ = "1.861"
+version = 1.861
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -788,6 +788,8 @@ class CoplanarPoints:
         obj.addProperty("App::PropertyFloat","PointSize","CoplanarPoints","Point size taken from settings")
         obj.addProperty("App::PropertyBool","ExplodeCompound","Triggers","Whether to explode compound of points shapes").ExplodeCompound = False
         obj.addProperty("App::PropertyBool","MakeSketch","Triggers","Whether to make a sketch and add points to it as external geometry links").MakeSketch = False
+        obj.addProperty("App::PropertyString","Version","CoplanarPoints","Version of MeshRemodel used to create this object").Version = __version__
+        obj.setEditorMode("Version",1) #readonly
         obj.Proxy = self
         self.inhibitRecomputes = False
 
