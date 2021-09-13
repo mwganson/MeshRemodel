@@ -29,7 +29,7 @@ meshremodelWB_icons_path = os.path.join(meshremodelWBPath,'Resources','icons')
 
 global main_meshremodelWB_Icon
 
-main_meshremodelWB_Icon = os.path.join(meshremodelWB_icons_path , 'MeshRemodelLogo.png')
+main_meshremodelWB_Icon = os.path.join(meshremodelWB_icons_path , 'CreatePointsObject.svg')
 
 #def myFunc(string):
 #    print (string)

@@ -1,9 +1,9 @@
 # MeshRemodel Workbench
-<img src="Resources/icons/MeshRemodelLogo.svg" alt="icon">
+<img src="Resources/icons/CreatePointsObject.svg" alt="icon">
 <br/>
 
 ## Toolbar Icon
-Download the <a href = "https://github.com/mwganson/MeshRemodel/blob/master/Resources/icons/MeshRemodelSVGLogo.svg">SVG Toolbar Icon</a><br/>
+Download the <a href = "https://github.com/mwganson/MeshRemodel/blob/master/Resources/icons/CreatePointsObject.svg">SVG Toolbar Icon</a><br/>
 
 ## Installation
 Can be installed via the AddonManager in Tools menu -> AddonManager.  After restarting the AddonManager you should find MeshRemodel in the list of workbenches you can install.
