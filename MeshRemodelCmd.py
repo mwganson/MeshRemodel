@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2021.09.11"
-__version__ = "1.861"
-version = 1.861
+__date__    = "2021.09.12"
+__version__ = "1.87"
+version = 1.87
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -282,7 +282,7 @@ class MeshRemodelSettingsCommandClass(object):
         pass
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'Settings.png') , # the name of an icon file available in the resources
+        return {'Pixmap'  : os.path.join( iconPath , 'Settings.svg') , # the name of an icon file available in the resources
             'MenuText': "&Settings" ,
             'ToolTip' : "Workbench settings dialog"}
  
@@ -350,7 +350,7 @@ class MeshRemodelCreatePointsObjectCommandClass(object):
         self.mesh = None
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreatePointsObject.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'CreatePointsObject.svg') ,
             'MenuText': "Create points &object" ,
             'ToolTip' : "Create the points object from selected Mesh or Points cloud object\n\
 (Ctrl + Click to make mesh partially transparent and non-selectable.\n\
@@ -415,7 +415,7 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         self.bCanceled = False
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateWireFrameObject.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateWireFrameObject.svg') ,
             'MenuText': "Create Wire&Frame object" ,
             'ToolTip' : "Create the WireFrame object\n\
 (Ctrl + Click to make mesh partially transparent and non-selectable.\n\
@@ -536,7 +536,7 @@ class MeshRemodelCreateCrossSectionsCommandClass(object):
         self.mesh = None
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateCrossSections.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateCrossSections.svg') ,
             'MenuText': "Create cross-sections ob&ject..." ,
             'ToolTip' : "Create the cross-sections object\n\
 Convenience link to the Mesh Design workbench cross-sections tool\n\
@@ -726,7 +726,7 @@ class MeshRemodelCreatePointObjectCommandClass(object):
         self.obj = None
         self.pts = None
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreatePointObject.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'CreatePointObject.svg') ,
             'MenuText': "Create poin&t object" ,
             'ToolTip' : "Create a single point from the selected point"}
  
@@ -919,101 +919,129 @@ class CoplanarPointsVP:
                 optional and if not defined a default icon is shown.'''
         return """
 /* XPM */
-static char *_631325336634[] = {
+static char *_631507973351[] = {
 /* columns rows colors chars-per-pixel */
-"64 64 26 1 ",
+"51 51 66 1 ",
 "  c black",
-". c #ED1C24",
-"X c #22B14C",
-"o c #FFF200",
-"O c #3F48CC",
-"+ c #F79498",
-"@ c #F8A3A7",
-"# c #FABABD",
-"$ c #97DAAB",
-"% c #A6DFB7",
-"& c #A5A9E7",
-"* c #B1B5EA",
-"= c #BCE7C9",
-"- c #C3EACF",
-"; c #C5C8F0",
-": c #CBCDF1",
-"> c #FDE4E5",
-", c #E5F6EA",
-"< c #E8E9F9",
-"1 c #FFFEF7",
-"2 c #FEF8F8",
-"3 c snow",
-"4 c #F8FDFA",
-"5 c #FAFDFB",
-"6 c #F9F9FD",
-"7 c white",
+". c #020202021414",
+"X c gray8",
+"o c gray11",
+"O c #202020202020",
+"+ c #1E1E1D1D5A5A",
+"@ c #0B0B0B0B6767",
+"# c #585814136766",
+"$ c #656416167575",
+"% c #1D1C76766E6E",
+"& c #434340404040",
+"* c #646464646464",
+"= c #CFCF19192020",
+"- c #DCDB1B1B2E2D",
+"; c #CFCF1B1A3737",
+": c #EDED1C1C2423",
+"> c #989719185756",
+", c #9D9D70704C4C",
+"< c #1D1C8A8A4D4C",
+"1 c #1E1E9B9B4241",
+"2 c #2222B1B04C4B",
+"3 c #2120A5A45352",
+"4 c #9F9F97970000",
+"5 c #B9B982822323",
+"6 c #D2D293931313",
+"7 c #F0F0A8A81616",
+"8 c #D7D797972525",
+"9 c #DEDE9C9C2121",
+"0 c #101010109191",
+"q c #121212129E9E",
+"w c #1E1E1D1D9E9E",
+"e c #292812128383",
+"r c #2E2E14139695",
+"t c #2B2A14139898",
+"y c #24241E1E9A9A",
+"u c #121222218786",
+"i c #141324249C9B",
+"p c #161538379090",
+"a c #282820208181",
+"s c #2B2B23239696",
+"d c #2A292A299B9A",
+"f c #30302E2E9191",
+"g c #16161616A3A3",
+"h c #13131313A6A6",
+"j c #1D1C1413A09F",
+"k c #30303030B1B1",
+"l c #464615148786",
+"z c #464635358484",
+"x c #5E5E5E5EAEAE",
+"c c #4A4A4A4ABBBA",
+"v c #605F605FC3C3",
+"b c #6B6A6B6AC7C7",
+"n c #6F6E6F6EC9C9",
+"m c gray55",
+"M c #8D8D8D8D9797",
+"N c #A0A0A0A0A0A0",
+"B c #92929292C2C2",
+"V c #A7A7A7A7DEDE",
+"C c #B2B2B2B2E2E2",
+"Z c #C6C6C6C6D6D6",
+"A c #C8C8C8C8EAEA",
+"S c gray88",
+"D c #E1E1E1E1F3F3",
+"F c #E2E2E2E2F4F4",
+"G c #F4F4F4F4FBFB",
+"H c none",
 /* pixels */
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"777                                                         7777",
-"777                                                         7777",
-"777                                                         7777",
-"777                                                         7777",
-"777                                                         7777",
-"777     777777777.......7777:OOOOO&777-XXXXX$7777777777     7777",
-"777     777777772.......7777OOOOOOO777XXXXXXX7777777777     7777",
-"777     777777772.......7776OOOOOOO775XXXXXXX7777777777     7777",
-"777     777777777@......7776OOOOOOO775XXXXXXX7777777777     7777",
-"777     777777777>+....#7777*OOOOOO777%XXXXXX7777777777     7777",
-"777     77777777777777777777<&OOOO;777,$XXXX=7777777777     7777",
-"777     77777777777777777777777777777777777777777777777     7777",
-"777     77777777777771oo7777777777777777777777777777777     7777",
-"777                                                         7777",
-"777                                                         7777",
-"777                                                         7777",
-"777                                                         7777",
-"777                                                         7777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777",
-"7777777777777777777777777777777777777777777777777777777777777777"
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HCkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkHHH",
+"HVh0000000000000000000000000000000000000000000qhHHH",
+"HVh.                                          @hHHH",
+"HVh.                                          @hHHH",
+"HVh.  mSSSSSZ#=====eSSx5666adB0<111udSSSSSSo  @hHHH",
+"HVh.  NHHHHHF$:::::rHVy87777kV%22222kHHHHHHO  @hHHH",
+"HVh.  NHHHHHFl;::::rHV,77777kV%22222kHHHHHHO  @hHHH",
+"HVh.  NHHHHHGnl-::>jHVz97777kVp32222kHHHHHHO  @hHHH",
+"HVh.  NHHHHHHVhtrrjAHGvs777zkGvi222pkHHHHHHO  @hHHH",
+"HVh.  NHHHHHHHHHDwfgHHHckkkkHHHckkkkHHHHHHHO  @hHHH",
+"HVh.  *NNNNNNNNNM&4+NNNNNNNNNNNNNNNNNNNNNNNX  @hHHH",
+"HVh.                                          @hHHH",
+"HVh.                                          @hHHH",
+"HVhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhHHH",
+"HAbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH",
+"HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH"
 };
+
 """
  
     def __getstate__(self):
@@ -1038,7 +1066,7 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
         self.vertexNames = [] #for attaching a part::plane
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateCoplanar.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateCoplanar.svg') ,
             'MenuText': "Create copla&nar points object" ,
             'ToolTip' : "\
 Makes coplanar points object from 3 selected points, used to define the plane\n\
@@ -1110,7 +1138,7 @@ class MeshRemodelCreateLineCommandClass(object):
         self.pts = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateLine.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateLine.svg') ,
             'MenuText': "Create &line" ,
             'ToolTip' : "Create a line from 2 selected points\n(Ctrl+Click to add midpoint)\n(Ctrl+Shift+Click for only midpoint)"}
  
@@ -1187,7 +1215,7 @@ class MeshRemodelCreatePolygonCommandClass(object):
         self.edges = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreatePolygon.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'CreatePolygon.svg') ,
             'MenuText': "Create &Polygon" ,
             'ToolTip' : "\
 Create a Polygon from 3 or more selected points or 2 or more selected edges\n\
@@ -1291,7 +1319,7 @@ class MeshRemodelCreateBSplineCommandClass(object):
         self.pts = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateBSpline.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateBSpline.svg') ,
             'MenuText': "Create &BSpline" ,
             'ToolTip' : "Create a BSPline from 3 or more selected points\n(Shift+Click to not close bspline)\n(Alt+Click to sort selected points)"}
  
@@ -1355,7 +1383,7 @@ class MeshRemodelCreateCircleCommandClass(object):
         self.pts = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateCircle.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateCircle.svg') ,
             'MenuText': "Create &circle" ,
             'ToolTip' : "Create a circle from first 3 selected points\n(Ctrl+Click to include Center point)\n(Ctrl+Shift+Click for only center)"}
  
@@ -1443,7 +1471,7 @@ class MeshRemodelCreateCircleCommandClass(object):
 class MeshRemodelCreateArcCommandClass(object):
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateArc.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateArc.svg') ,
             'MenuText': "Create &arc" ,
             'ToolTip' : "Create an arc from first 3 selected points\n(Ctrl+Click to include Center point)\n\
 (Ctrl+Shift+Click for only center)\n\
@@ -1542,7 +1570,7 @@ class MeshRemodelCreateSketchCommandClass(object):
         self.objs = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateSketch.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateSketch.svg') ,
             'MenuText': "Create s&ketch" ,
             'ToolTip' : "\
 Create a new empty sketch, optionally attaching to selected objects, e.g. 3 points to define a plane.\n\
@@ -1657,7 +1685,7 @@ class MeshRemodelCreateWireCommandClass(object):
         self.objs = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateWire.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateWire.svg') ,
             'MenuText': "Create &wire" ,
             'ToolTip' : "Create a wire from selected objects\n(All selected objects should be connected.)\n\
 (Runs draft upgrade)\n\
@@ -1796,7 +1824,7 @@ class MeshRemodelAddSelectionObserverCommandClass(object):
         self.bar = None
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'AddSelectionObserver.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'AddSelectionObserver.svg') ,
             'MenuText': "Add Selection &Observer" ,
             'ToolTip' : "Allows to select vertices by Ctrl + preselection\n\
 This is intended for use with BSpline selection of points, but\n\
@@ -1850,7 +1878,7 @@ class MeshRemodelMergeSketchesCommandClass(object):
         self.objs = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'MergeSketches.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'MergeSketches.svg') ,
             'MenuText': "&Merge sketches" ,
             'ToolTip' : "Merge selected sketches with sketcher merge sketches tool"}
  
@@ -1899,7 +1927,7 @@ class MeshRemodelValidateSketchCommandClass(object):
         self.objs = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'ValidateSketch.png') ,
+        return {'Pixmap'  : os.path.join( iconPath , 'ValidateSketch.svg') ,
             'MenuText': "&Validate sketch" ,
             'ToolTip' : "Validate selected sketch with sketcher validate sketch tool"}
  
