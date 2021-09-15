@@ -33,6 +33,7 @@ version = 1.88
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
 import Draft, DraftGeomUtils, DraftVecUtils
+import time
 
 
 if FreeCAD.GuiUp:
@@ -64,14 +65,16 @@ class MeshRemodelGeomUtils(object):
             self.bCanceled = False
             self.value = 0
             self.total = 0
+            self.mw = FreeCADGui.getMainWindow()
+            self.lastUpdate = time.time()
 
-        def makeProgressBar(self,total,buttonText = "Cancel",tooltip = "Cancel current operation",mod=1):
-            """total is max value for progress bar, mod = n is to update every nth iteration (default = 1)"""
+        def makeProgressBar(self,total=0,buttonText = "Cancel",tooltip = "Cancel current operation",updateInterval = .5):
+            """total is max value for progress bar, mod = number of updates you want"""
             self.btn = QtGui.QPushButton(buttonText)
             self.btn.setToolTip(tooltip)
             self.btn.clicked.connect(self.on_clicked)
             self.pb = QtGui.QProgressBar()
-            self.bar = Gui.getMainWindow().statusBar()
+            self.bar = self.mw.statusBar()
             self.bar.addWidget(self.pb)
             self.bar.addWidget(self.btn)
             self.btn.show()
@@ -79,11 +82,12 @@ class MeshRemodelGeomUtils(object):
             self.pb.reset()
             self.value = 0
             self.pb.setMinimum(0)
+            self.updateInterval = updateInterval
             self.pb.setMaximum(total);
             self.total = total
-            self.mod = mod #used to skip updating ui if other than 1,e.g. mod=2 is update every other iteration
             self.pb.setFormat("%v/%m")
             self.bAlive = True #hasn't been killed yet
+            self.bCanceled = False
 
         def on_clicked(self):
             self.bCanceled = True
@@ -91,18 +95,15 @@ class MeshRemodelGeomUtils(object):
 
         def isCanceled(self):
             self.value += 1
-            if self.value % self.mod == 0:
+            timeNow = time.time()
+            if timeNow - self.lastUpdate >= self.updateInterval:
+                self.lastUpdate = timeNow
                 self.pb.setValue(self.value)
                 FreeCADGui.updateGui()
-            if self.value >= self.total:
+            if self.mw.isHidden():
                 self.bCanceled = True
                 self.killProgressBar()
-            if self.bCanceled:
-                self.bCanceled = False #in case object is re-used.
-                return True
-            else:
-                return False
-
+            return self.bCanceled
 
         def killProgressBar(self):
             if self.bAlive: #check if it has already been removed before removing
@@ -111,7 +112,6 @@ class MeshRemodelGeomUtils(object):
                 self.bAlive = False
             self.pb.hide()
             self.btn.hide()
-            self.bCanceled = False
             self.value = 0
             self.total = 0
 
@@ -215,18 +215,23 @@ class MeshRemodelGeomUtils(object):
         verts = []
         flatPts = [] #eliminate duplicate points
         pb = gu.MRProgress()
-        pb.makeProgressBar(len(pts),"Cancel Phase1/2",5)
+        pb.makeProgressBar(len(pts),buttonText = "Cancel Phase1/2",tooltip="Cancel projecting points to plane")
         for p in pts:
             fpt = p.Point.projectToPlane(base,normal)
             if not self.hasPoint(fpt,flatPts,1e-7):
                 flatPts.append(fpt)
             if pb.isCanceled():
+                FreeCAD.Console.PrintWarning("Phase 1 / 2 canceled, object may be incomplete.\n")
                 break
-        pb.makeProgressBar(len(flatPts),"Cancel Phase2/2",5)
+        pb.killProgressBar()
+
+        pb.makeProgressBar(len(flatPts),"Cancel Phase2/2")
         for p in flatPts:
             verts.append(Part.Vertex(p))
             if pb.isCanceled():
+                FreeCAD.Console.PrintWarning("Phase 2 / 2 canceled, object may be incomplete.\n")
                 break
+        pb.killProgressBar()
         return verts
 
     def nearestPoint(self, pt, pts, exclude):
@@ -516,8 +521,8 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
         lines=[]
         meshfacets = self.mesh.Mesh.Facets
         total = len(meshfacets)
-        #pb = gu.MRProgress()
-        #pb.makeProgressBar(total,"Cancel","Cancel Wireframe generation",mod=100)
+        pb = gu.MRProgress()
+        pb.makeProgressBar(total,"Cancel","Cancel Wireframe generation")
 
         idMap = {}
         for f in meshfacets:
@@ -543,12 +548,12 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
                     idMap[id] = id
             except:
                 FreeCAD.Console.PrintError("Exception creating wireframe.  Typically this is caused by defective mesh object.\n")
-        #        pb.killProgressBar()
-        #    if pb.isCanceled():
-        #        FreeCAD.Console.PrintMessage("MeshRemodel: WireFrame creation canceled\n")
-        #        break
-        #        return
-        #pb.killProgressBar()
+                pb.killProgressBar()
+            if pb.isCanceled():
+                FreeCAD.Console.PrintWarning("MeshRemodel: WireFrame creation canceled.  WireFrame may be incomplete.\n")
+                break
+                return
+        pb.killProgressBar()
 
         doc.openTransaction("Create WireFrame object")
         Part.show(Part.makeCompound(lines),"MR_WireFrame")
