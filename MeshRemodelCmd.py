@@ -26,13 +26,14 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2021.09.12"
-__version__ = "1.87"
-version = 1.87
+__date__    = "2021.09.14"
+__version__ = "1.88"
+version = 1.88
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
 import Draft, DraftGeomUtils, DraftVecUtils
+import time
 
 
 if FreeCAD.GuiUp:
@@ -44,11 +45,75 @@ keepToolbar = False
 windowFlags = QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint #no ? in title bar
 global_picked = [] #picked points list for use with selection by preselection observer
 
+
+
+
+
+
 ######################################################################################
 # geometry utilities
 
 class MeshRemodelGeomUtils(object):
     """Geometry Utilities"""
+
+    #progress bar on status bar with cancel button
+    class MRProgress:
+        def __init__(self):
+            self.pb = None
+            self.btn = None
+            self.bar = None
+            self.bCanceled = False
+            self.value = 0
+            self.total = 0
+            self.mw = FreeCADGui.getMainWindow()
+            self.lastUpdate = time.time()
+
+        def makeProgressBar(self,total=0,buttonText = "Cancel",tooltip = "Cancel current operation",updateInterval = .5):
+            """total is max value for progress bar, mod = number of updates you want"""
+            self.btn = QtGui.QPushButton(buttonText)
+            self.btn.setToolTip(tooltip)
+            self.btn.clicked.connect(self.on_clicked)
+            self.pb = QtGui.QProgressBar()
+            self.bar = self.mw.statusBar()
+            self.bar.addWidget(self.pb)
+            self.bar.addWidget(self.btn)
+            self.btn.show()
+            self.pb.show()
+            self.pb.reset()
+            self.value = 0
+            self.pb.setMinimum(0)
+            self.updateInterval = updateInterval
+            self.pb.setMaximum(total);
+            self.total = total
+            self.pb.setFormat("%v/%m")
+            self.bAlive = True #hasn't been killed yet
+            self.bCanceled = False
+
+        def on_clicked(self):
+            self.bCanceled = True
+            self.killProgressBar()
+
+        def isCanceled(self):
+            self.value += 1
+            timeNow = time.time()
+            if timeNow - self.lastUpdate >= self.updateInterval:
+                self.lastUpdate = timeNow
+                self.pb.setValue(self.value)
+                FreeCADGui.updateGui()
+            if self.mw.isHidden():
+                self.bCanceled = True
+                self.killProgressBar()
+            return self.bCanceled
+
+        def killProgressBar(self):
+            if self.bAlive: #check if it has already been removed before removing
+                self.bar.removeWidget(self.pb)
+                self.bar.removeWidget(self.btn)
+                self.bAlive = False
+            self.pb.hide()
+            self.btn.hide()
+            self.value = 0
+            self.total = 0
 
 #source for this block of code: https://stackoverflow.com/questions/9866452/calculate-volume-of-any-tetrahedron-given-4-points
 #4 points are coplanar if the tetrahedron defined by them has volume = 0
@@ -149,12 +214,24 @@ class MeshRemodelGeomUtils(object):
         base = align_plane.Shape.Vertexes[0].Point
         verts = []
         flatPts = [] #eliminate duplicate points
+        pb = gu.MRProgress()
+        pb.makeProgressBar(len(pts),buttonText = "Cancel Phase1/2",tooltip="Cancel projecting points to plane")
         for p in pts:
             fpt = p.Point.projectToPlane(base,normal)
             if not self.hasPoint(fpt,flatPts,1e-7):
                 flatPts.append(fpt)
+            if pb.isCanceled():
+                FreeCAD.Console.PrintWarning("Phase 1 / 2 canceled, object may be incomplete.\n")
+                break
+        pb.killProgressBar()
+
+        pb.makeProgressBar(len(flatPts),"Cancel Phase2/2")
         for p in flatPts:
             verts.append(Part.Vertex(p))
+            if pb.isCanceled():
+                FreeCAD.Console.PrintWarning("Phase 2 / 2 canceled, object may be incomplete.\n")
+                break
+        pb.killProgressBar()
         return verts
 
     def nearestPoint(self, pt, pts, exclude):
@@ -444,20 +521,9 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
         lines=[]
         meshfacets = self.mesh.Mesh.Facets
         total = len(meshfacets)
-        ii = 0
-        self.btn = QtGui.QPushButton("Cancel")
-        self.btn.setToolTip("Cancel Create WireFrame Object command")
-        self.btn.clicked.connect(self.on_clicked)
-        self.pb = QtGui.QProgressBar()
-        self.bar = Gui.getMainWindow().statusBar()
-        self.bar.addWidget(self.pb)
-        self.bar.addWidget(self.btn)
-        self.btn.show()
-        self.pb.show()
-        self.pb.reset()
-        self.pb.setMinimum(0)
-        self.pb.setMaximum(total);
-        self.pb.setFormat("%v/%m")
+        pb = gu.MRProgress()
+        pb.makeProgressBar(total,"Cancel","Cancel Wireframe generation")
+
         idMap = {}
         for f in meshfacets:
             try:
@@ -482,20 +548,13 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
                     idMap[id] = id
             except:
                 FreeCAD.Console.PrintError("Exception creating wireframe.  Typically this is caused by defective mesh object.\n")
-                self.bCanceled = True
-            ii += 1
-            self.pb.setValue(ii)
-            if ii % 10 == 0:
-                QtGui.QApplication.processEvents()
-            if self.bCanceled or Gui.getMainWindow().isVisible == False: #user exited with this still going, so quit
-                self.bCanceled = False #for the next go around
-                self.bar.removeWidget(self.pb)
-                self.bar.removeWidget(self.btn)
-                #QtGui.QApplication.restoreOverrideCursor()
-                FreeCAD.Console.PrintMessage("MeshRemodel: WireFrame creation canceled\n")
+                pb.killProgressBar()
+            if pb.isCanceled():
+                FreeCAD.Console.PrintWarning("MeshRemodel: WireFrame creation canceled.  WireFrame may be incomplete.\n")
+                break
                 return
-        self.bar.removeWidget(self.pb)
-        self.bar.removeWidget(self.btn)
+        pb.killProgressBar()
+
         doc.openTransaction("Create WireFrame object")
         Part.show(Part.makeCompound(lines),"MR_WireFrame")
         doc.ActiveObject.ViewObject.PointSize = point_size
@@ -507,10 +566,6 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
         doc.commitTransaction()
         doc.recompute()
         #QtGui.QApplication.restoreOverrideCursor()
-        return
-
-    def on_clicked(self):
-        self.bCanceled = True
         return
 
     def IsActive(self):
