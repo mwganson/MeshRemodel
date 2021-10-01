@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2021.09.14"
-__version__ = "1.88"
-version = 1.88
+__date__    = "2021.10.01"
+__version__ = "1.89"
+version = 1.89
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui

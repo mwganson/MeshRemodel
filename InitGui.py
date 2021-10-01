@@ -80,12 +80,17 @@ class MeshRemodelWorkbench(Workbench):
         #considered putting the menu inside the Edit menu, but decided against it
         #self.appendMenu(["&Edit","MeshRemodel"],self.list) # appends a submenu to an existing menu
 
-
+    def callback(self,hasUpdate):
+        if hasUpdate:
+            FreeCAD.Console.PrintMessage("MeshRemodel has an update available via the addon manager.\n")
  
     def Activated(self):
         "This function is executed when the workbench is activated"
         #global act
         #act.setVisible(True)
+        import AddonManager as AM
+        AM.check_updates("MeshRemodel",self.callback)
+
         return
  
     def Deactivated(self):
