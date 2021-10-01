@@ -93,7 +93,6 @@ class MeshRemodelWorkbench(Workbench):
         import AddonManager as AM
         if hasattr(AM,"check_updates"):
             AM.check_updates("MeshRemodel",self.callback)
-
         return
  
     def Deactivated(self):
