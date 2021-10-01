@@ -83,8 +83,8 @@ class MeshRemodelWorkbench(Workbench):
     def callback(self,hasUpdate):
         if hasUpdate:
             FreeCAD.Console.PrintMessage("MeshRemodel has an update available via the addon manager.\n")
-        else:
-            FreeCAD.Console.PrintMessage("MeshRemodel up to date\n")
+        #else:
+            #FreeCAD.Console.PrintMessage("MeshRemodel up to date\n")
  
     def Activated(self):
         "This function is executed when the workbench is activated"
