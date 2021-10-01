@@ -160,6 +160,8 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might actually be coplanar.  But even if they're not coplanar they'll be forced into coplanarity starting with v1.81.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
 #### Release notes:<br/>
+* 2020.10.01 (version 1.89.14)<br/>
+* notify when updates available<br/>
 * 2020.09.14 (version 1.88)<br/>
 * Add progress indicator and cancel button for recomputes of coplanar points objects<br/>
 * Now there is MRProgress() class available via scripting.  It provides an easy way to add a progress bar and cancel button to the FreeCAD statusbar.  Usage:<br/>
