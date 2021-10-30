@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<package format="1">
+  <name>MeshRemodel</name>
+  <description>Workbench for aid in remodeling mesh objects into FreeCAD format</description>
+  <version>1.8914</version>
+  <maintainer email="mwganson@gmail.com">TheMarkster</maintainer>
+  <license file="LICENSE">LGPL-2.1</license>
+  <url type="repository" branch="master">https://github.com/mwganson/MeshRemodel</url>
+  <url type="documentation">https://github.com/mwganson/MeshRemodel</url>
+
+  <content>
+    <workbench>
+      <name>MeshRemodel</name>
+      <classname>MeshRemodelWorkbench</classname>
+      <description>Workbench for aid in remodeling mesh objects into FreeCAD format</description>
+      <version>1.8914</version>
+      <subdirectory>./</subdirectory>
+      <icon>MeshRemodel/Resources/icons/CreatePointsObject.svg</icon>
+      <freecadmin>0.18.0</freecadmin>
+    </workbench>
+  </content>
+
+</package>
