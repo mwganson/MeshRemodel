@@ -15,7 +15,7 @@
       <description>Workbench for aid in remodeling mesh objects into FreeCAD format</description>
       <version>1.8914</version>
       <subdirectory>./</subdirectory>
-      <icon>MeshRemodel/Resources/icons/MeshRemodel_workbench_icon.svg</icon>
+      <icon>Resources/icons/MeshRemodel_workbench_icon.svg</icon>
       <freecadmin>0.18.0</freecadmin>
     </workbench>
   </content>
