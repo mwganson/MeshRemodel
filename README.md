@@ -159,10 +159,13 @@ This sets the precision to use when constraining radii (for circles and arcs) wh
 <br/>
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might actually be coplanar.  But even if they're not coplanar they'll be forced into coplanarity starting with v1.81.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
+### WireFrameTolerance
+Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
-* 2020.10.01 (version 1.89.14)<br/>
+* 2021.11.09 (version 1.89.15) -- add wireframe tolerance parameter in settings<br/>
+* 2021.10.01 (version 1.89.14)<br/>
 * notify when updates available<br/>
-* 2020.09.14 (version 1.88)<br/>
+* 2021.09.14 (version 1.88)<br/>
 * Add progress indicator and cancel button for recomputes of coplanar points objects<br/>
 * Now there is MRProgress() class available via scripting.  It provides an easy way to add a progress bar and cancel button to the FreeCAD statusbar.  Usage:<br/>
 * from MeshRemodelCmd import MeshRemodelGeomUtils as gu<br/>
@@ -173,7 +176,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 * Call pb.killProgressBar() to remove the progress bar and button from the status bar (on user cancel it removes itself, but after normal exit you must remove)<br/>
 * Note: pb.isCanceled() also returns True if the main window is hidden, an indicator the user has closed the macro window.<br/>
 * Note2: pb keeps track of whether the progress bar has already been killed, so it should be safe to call pb.killProgressBar() twice.<br/>
-* 2020.09.13 (version 1.87)<br/>
+* 2021.09.13 (version 1.87)<br/>
 * Update icons
 * 2021.09.11 (version 1.861)<br/>
 ** remove duplicate points from CPO <br/>
