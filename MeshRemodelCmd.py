@@ -521,7 +521,7 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         line_width = pg.GetFloat("LineWidth",5.0)
         point_size = pg.GetFloat("PointSize",4.0)
-        tolerance = pg.GetFloat("CoplanarTolerance",.01)
+        tolerance = pg.GetFloat("WireFrameTolerance",.01)
         #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         mids = []
         lines=[]
