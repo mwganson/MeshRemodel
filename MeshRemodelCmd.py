@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2021.10.01"
-__version__ = "1.89.14"
-version = 1.8914
+__date__    = "2021.11.09"
+__version__ = "1.89.15"
+version = 1.8915
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -373,12 +373,14 @@ class MeshRemodelSettingsCommandClass(object):
         line_width = pg.GetFloat("LineWidth", 5.0)
         prec = pg.GetInt("SketchRadiusPrecision", 1)
         coplanar_tol = pg.GetFloat("CoplanarTolerance",.01)
+        wireframe_tol = pg.GetFloat("WireFrameTolerance",.01)
         items=[("","*")[keep]+"Keep the toolbar active",
             ("","*")[not keep]+"Do not keep the toolbar active",
             "Change point size ("+str(point_size)+")",
             "Change line width ("+str(line_width)+")",
             "Change sketch radius precision ("+str(prec)+")",
             "Change coplanar tolerance ("+str(coplanar_tol)+")",
+            "Change wireframe tolerance("+str(wireframe_tol)+")",
             "Cancel"]
         item,ok = QtGui.QInputDialog.getItem(window,'Mesh Remodel v'+__version__,'Settings\n\nSelect the settings option\n',items,0,False,windowFlags)
         if ok and item == items[-1]:
@@ -409,6 +411,10 @@ Enter new sketch radius precision", prec, -1,12,1,flags=windowFlags)
             new_coplanar_tol, ok = QtGui.QInputDialog.getDouble(window,"Coplanar tolerance", "Enter coplanar tolerance\n(Used when creating coplanar points.  Increase if some points are missing.)", coplanar_tol,.0000001,1,8)
             if ok:
                 pg.SetFloat("CoplanarTolerance", new_coplanar_tol)
+        elif ok and item==items[6]:
+            new_wireframe_tol, ok = QtGui.QInputDialog.getDouble(window,"Wireframe tolerance", "Enter wireframe tolerance\n(Used when creating wireframes to check if 2 points are the same.)", wireframe_tol,.0000001,1,8)
+            if ok:
+                pg.SetFloat("WireFrameTolerance", new_wireframe_tol)
         return
 
     def IsActive(self):
@@ -515,7 +521,7 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         line_width = pg.GetFloat("LineWidth",5.0)
         point_size = pg.GetFloat("PointSize",4.0)
-        tolerance = pg.GetFloat("CoplanarTolerance",.01)
+        tolerance = pg.GetFloat("WireFrameTolerance",.01)
         #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         mids = []
         lines=[]
