@@ -50,7 +50,7 @@ class MeshRemodelWorkbench(Workbench):
 
     MenuText = "Mesh Remodel"
     ToolTip = "MeshRemodel workbench"
-    #Icon = main_meshremodelWB_Icon #defined in package.xml
+    Icon = main_meshremodelWB_Icon #defined in package.xml
     
     def __init__(self):
         pass
