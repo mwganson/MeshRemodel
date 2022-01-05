@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2022.01.01"
-__version__ = "1.89.17"
-version = 1.8917
+__date__    = "2022.01.04"
+__version__ = "1.89.18"
+version = 1.8918
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -44,8 +44,13 @@ iconPath = os.path.join( __dir__, 'Resources', 'icons' )
 keepToolbar = False
 windowFlags = QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint #no ? in title bar
 global_picked = [] #picked points list for use with selection by preselection observer
+FC_VERSION = float(FreeCAD.Version()[0]) + float(FreeCAD.Version()[1]) #e.g. 0.20, 0.18, 1.??
 
-
+def fixTip(tip):
+    if FC_VERSION >= 0.20:
+        return tip.replace("\n","<br/>")
+    else:
+        return tip
 
 
 
@@ -498,12 +503,13 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         self.bCanceled = False
 
     def GetResources(self):
+
+
         return {'Pixmap'  : os.path.join( iconPath , 'CreateWireFrameObject.svg') ,
             'MenuText': "Create Wire&Frame object" ,
-            'ToolTip' : "Create the WireFrame object\n\
+            'ToolTip' : fixTip("Create the WireFrame object\n\
 (Ctrl + Click to make mesh partially transparent and non-selectable.\n\
-Non-selectability can be reversed in the mesh object's view tab in the property view.)\n\
-"}
+Non-selectability can be reversed in the mesh object's view tab in the property view.)\n")}
 
     def makeId(self,a,b):
         """makeId(a,b)
@@ -599,10 +605,10 @@ class MeshRemodelCreateCrossSectionsCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateCrossSections.svg') ,
             'MenuText': "Create cross-sections ob&ject..." ,
-            'ToolTip' : "Create the cross-sections object\n\
-Convenience link to the Mesh Design workbench cross-sections tool\n\
-(These objects should not be directly used as wires, but rather as references for\n\
-creating wires using the Mesh Remodel workbench as with the Points and WireFrame objects)\n\
+            'ToolTip' : "Create the cross-sections object \
+Convenience link to the Mesh Design workbench cross-sections tool \
+(These objects should not be directly used as wires, but rather as references for \
+creating wires using the Mesh Remodel workbench as with the Points and WireFrame objects) \
 "}
  
     def Activated(self):
@@ -636,12 +642,12 @@ class MeshRemodelPartSolidCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'PartSolid.svg') ,
             'MenuText': "Part Sol&id" ,
-            'ToolTip' : "Perform a Part Solid command:\n\
+            'ToolTip' : fixTip("Perform a Part Solid command:\n\n\
 No Modifier = Extrude\n\
 Ctrl + Click = Sweep\n\
 Shift + Click = Loft\n\
-Alt + Click = Revolution\n\
-"}
+Alt + Click = Revolution \n\
+")}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
@@ -1083,8 +1089,8 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateCoplanar.svg') ,
             'MenuText': "Create copla&nar points object" ,
             'ToolTip' : "\
-Makes coplanar points object from 3 selected points, used to define the plane\n\
-Uses internal coplanar check, (see settings -- Coplanar tolerance)\n\
+Makes coplanar points object from 3 selected points, used to define the plane \
+Uses internal coplanar check, (see settings -- Coplanar tolerance)\
 "}
 
     def Activated(self):
@@ -1154,7 +1160,9 @@ class MeshRemodelCreateLineCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateLine.svg') ,
             'MenuText': "Create &line" ,
-            'ToolTip' : "Create a line from 2 selected points\n(Ctrl+Click to add midpoint)\n(Ctrl+Shift+Click for only midpoint)"}
+            'ToolTip' : fixTip("Create a line from 2 selected points\n\
+(Ctrl+Click to add midpoint)\n\
+(Ctrl+Shift+Click for only midpoint)")}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
@@ -1231,7 +1239,7 @@ class MeshRemodelCreatePolygonCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreatePolygon.svg') ,
             'MenuText': "Create &Polygon" ,
-            'ToolTip' : "\
+            'ToolTip' : fixTip("\
 Create a Polygon from 3 or more selected points or 2 or more selected edges\n\
 Might not always be coplanar, consider using links to external geometry in a sketch\n\
 Do **not** attempt to mix selected edges and selected points, should be all edges\n\
@@ -1239,7 +1247,7 @@ or all points, but not a combination of the 2 object types\n\
 (Makes individual lines, use Create wire to connect into a single wire object.)\n\
 (Shift+Click to not close polygon) -- but selected edges never close unless connected\n\
 (Alt+Click to sort selected points)\n\
-"}
+")}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
@@ -1335,7 +1343,9 @@ class MeshRemodelCreateBSplineCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateBSpline.svg') ,
             'MenuText': "Create &BSpline" ,
-            'ToolTip' : "Create a BSPline from 3 or more selected points\n(Shift+Click to not close bspline)\n(Alt+Click to sort selected points)"}
+            'ToolTip' : fixTip("Create a BSPline from 3 or more selected points\n\
+(Shift+Click to not close bspline)\n\
+(Alt+Click to sort selected points)")}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
@@ -1399,7 +1409,9 @@ class MeshRemodelCreateCircleCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateCircle.svg') ,
             'MenuText': "Create &circle" ,
-            'ToolTip' : "Create a circle from first 3 selected points\n(Ctrl+Click to include Center point)\n(Ctrl+Shift+Click for only center)"}
+            'ToolTip' : fixTip("Create a circle from first 3 selected points\n\
+(Ctrl+Click to include Center point)\n\
+(Ctrl+Shift+Click for only center)")}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
@@ -1487,10 +1499,11 @@ class MeshRemodelCreateArcCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateArc.svg') ,
             'MenuText': "Create &arc" ,
-            'ToolTip' : "Create an arc from first 3 selected points\n(Ctrl+Click to include Center point)\n\
+            'ToolTip' : fixTip("Create an arc from first 3 selected points\n\
+(Ctrl+Click to include Center point)\n\
 (Ctrl+Shift+Click for only center)\n\
 (Alt+Click for all permutations possible with the 3 selected points -- 6 arcs -- useful where you\n\
-are not getting the arc orientation you were expecting -- will need to delete unwanted extra arcs)"}
+are not getting the arc orientation you were expecting -- will need to delete unwanted extra arcs)")}
 
     def __init__(self):
         self.pts = []
@@ -1586,13 +1599,12 @@ class MeshRemodelCreateSketchCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateSketch.svg') ,
             'MenuText': "Create s&ketch" ,
-            'ToolTip' : "\
+            'ToolTip' : fixTip("\
 Create a new empty sketch, optionally attaching to selected objects, e.g. 3 points to define a plane.\n\
-(Ctrl+Click to make a sketch out of selected objects, e.g. circles, polygons, etc.)\n\
-(Alt+Click to make a separate sketch from each selected object, and then merge them together.)\n\
-(Shift+Click to make a new points object from all picked points, attach a new sketch to first 3 points, add all\n\
-picked points as links to external geometry -- useful to produce a coplanar wire)\n\
-"}
+Ctrl+Click out of selected objects\n\
+Alt+Click merged sketch\n\
+Shift+Click 1st 3 points define plane, points added as links to external geometry \n\
+")}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
@@ -1701,10 +1713,11 @@ class MeshRemodelCreateWireCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateWire.svg') ,
             'MenuText': "Create &wire" ,
-            'ToolTip' : "Create a wire from selected objects\n(All selected objects should be connected.)\n\
+            'ToolTip' : fixTip("Create a wire from selected objects\n\
+(All selected objects should be connected.)\n\
 (Runs draft upgrade)\n\
 Ctrl+Click to downgrade to edges\n\
-Tip: You can also use this to upgrade a wire to a face, which can be converted to a sketch to avoid some coplanar issues\n"}
+Tip: You can also use this to upgrade a wire to a face, which can be converted to a sketch to avoid some coplanar issues\n")}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
@@ -1840,10 +1853,10 @@ class MeshRemodelAddSelectionObserverCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'AddSelectionObserver.svg') ,
             'MenuText': "Add Selection &Observer" ,
-            'ToolTip' : "Allows to select vertices by Ctrl + preselection\n\
-This is intended for use with BSpline selection of points, but\n\
-can be used with all MeshRemodel tools that use selected points.  DOES NOT work if you \n\
-mix points selected in this mode with normal selection mode in the same operation\n"}
+            'ToolTip' : "Allows to select vertices by Ctrl + preselection \
+This is intended for use with BSpline selection of points, but \
+can be used with all MeshRemodel tools that use selected points.  DOES NOT work if you \
+mix points selected in this mode with normal selection mode in the same operation"}
 
     def on_clicked(self):
         self.bar.removeWidget(self.btn)
