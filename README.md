@@ -162,6 +162,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2022.01.04 (v1.89.18) -- format tool tips<br/>
 * 2021.11.09 (version 1.89.15) -- add wireframe tolerance parameter in settings<br/>
 * 2021.10.01 (version 1.89.14)<br/>
 * notify when updates available<br/>
