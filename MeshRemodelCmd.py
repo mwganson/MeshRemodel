@@ -242,7 +242,7 @@ class MeshRemodelGeomUtils(object):
     def nearestPoint(self, pt, pts, exclude):
         """ nearestPoint(pt, pts, exclude)
             pt is a vector, pts a list of vectors
-            exlude is a list of vectors to exclude from process
+            exclude is a list of vectors to exclude from process
             return nearest point to pt in pts and not in exclude"""
         if len(pts) == 0: #should never happen
             raise Exception("MeshRemodel GeomUtils Error: nearestPoint() pts length = 0\n")
