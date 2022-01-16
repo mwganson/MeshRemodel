@@ -249,7 +249,7 @@ all of which are now on the alignment plane.  For more gu functions see changelo
 * 2020.08.05 (version 1.42)<br/>
 ** add downgrade option to upgrade (shift+click to downgrade)
 * 2020.08.05 (version 1.41)<br/>
-** select the lines and arcs used to create a wire after wire creation (updgrade) so it is easier to delete them
+** select the lines and arcs used to create a wire after wire creation (upgrade) so it is easier to delete them
 ** select the lines after creating a polygon so it is easier to upgrade them to a wire
 * 2020.08.05 (version 1.4)<br/>
 ** improved settings dialog to show current settings
