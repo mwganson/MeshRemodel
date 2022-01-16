@@ -3,6 +3,7 @@
   <name>MeshRemodel</name>
   <description>Workbench for aid in remodeling mesh objects into FreeCAD format</description>
   <version>1.8918</version>
+  <date></date> <!-- YYYY.MM.DD of new release goes here -->
   <maintainer email="mwganson@gmail.com">TheMarkster</maintainer>
   <license file="LICENSE">LGPL-2.1</license>
   <url type="repository" branch="master">https://github.com/mwganson/MeshRemodel</url>
@@ -17,6 +18,7 @@
       <subdirectory>./</subdirectory>
       <icon>Resources/icons/MeshRemodel_workbench_icon.svg</icon>
       <freecadmin>0.18.0</freecadmin>
+      <tag>mesh</tag>
     </workbench>
   </content>
 
