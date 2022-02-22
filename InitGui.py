@@ -113,7 +113,7 @@ class MeshRemodelWorkbench(Workbench):
         keep = pg.GetBool('KeepToolbar',True)
         if not keep:
             return
-        tb = window.findChildren(QtGui.QToolBar) 
+        tb = window.findChildren(QtGui.QToolBar) if window else []
         for bar in tb:
             if "MeshRemodel Commands" in bar.objectName():
                 bar.setVisible(True)
