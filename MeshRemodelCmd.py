@@ -27,13 +27,14 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2022.02.22"
-__version__ = "1.89.19"
-version = 1.8919
+__version__ = "1.9.0"
+version = 1.9
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
 import Draft, DraftGeomUtils, DraftVecUtils
 import time
+import numpy as np
 
 
 if FreeCAD.GuiUp:
@@ -45,6 +46,7 @@ keepToolbar = False
 windowFlags = QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint #no ? in title bar
 global_picked = [] #picked points list for use with selection by preselection observer
 FC_VERSION = float(FreeCAD.Version()[0]) + float(FreeCAD.Version()[1]) #e.g. 0.20, 0.18, 1.??
+epsilon = Part.Precision.confusion() #1e-07
 
 def fixTip(tip):
     if FC_VERSION >= 0.20:
@@ -207,7 +209,64 @@ class MeshRemodelGeomUtils(object):
         for ii in range(0, len(pts)):
             newList.extend([self.nearestPoint(newList[ii],pts,newList)])
         return newList
+        
+    def planeFromPoints(self, pts):
+        """returns (base,normal) of pts by using pts[0], pts[mid], and pts[-1]
+           to find the plane defined by those 3 points"""
+        if len(pts) < 3:
+            raise Exception("planeFromPoints requires 3 or more points")
+        points = np.array([[v.x, v.y, v.z] for v in pts])
+        
+        # Define the plane using the three points: first, mid, last
+        mid = int(len(pts)/2)
+        #print(f"points used: {points[0], points[mid], points[-1]}")
+        plane_origin = points[0]
+        plane_normal = np.cross(np.array(points[mid]) - np.array(points[0]), np.array(points[-1]) - np.array(points[0]))
+        plane_normal /= np.linalg.norm(plane_normal)
+        base = FreeCAD.Vector(plane_origin[0], plane_origin[1], plane_origin[2])
+        normal = FreeCAD.Vector(plane_normal[0], plane_normal[1], plane_normal[2])
+        return (base,normal)
 
+    def projectVectorToPlane(self, point, base, normal):
+        """uses FreeCAD.Vectors, which are converted to numpy and returned as FreeCAD.Vector"""
+        pt = np.array(point)
+        b = np.array(base)
+        n = np.array(normal)
+        #print(f"point:{point},base:{base},normal:{normal}")
+        projected = self.projectPointToPlane(pt, b, n)
+        #print(f"projected: {projected}")
+        return FreeCAD.Vector(projected[0], projected[1], projected[2])
+
+    def projectPointToPlane(self, point, plane_origin, plane_normal):
+        """project np point to np plane, return np array"""
+        # Calculate vector from the plane origin to the point
+        v = np.array(point) - np.array(plane_origin)
+        
+        # Project the vector onto the plane
+        projected_v = v - np.dot(v, plane_normal) * plane_normal
+        
+        # Calculate the new position of the point on the plane
+        projected_point = np.array(plane_origin) + projected_v
+        
+        return projected_point.tolist()    
+
+    def projectPointsToPlane(self, pts):
+        """find the plane defined by the first 3 points in the points list, and then
+           project all remaining points to that plane using numpy"""
+
+        points = np.array([[v.x, v.y, v.z] for v in pts])
+        
+        # Define the plane using the three points: first, mid, last
+        mid = int(len(pts)/2)
+        plane_origin = points[0]
+        plane_normal = np.cross(np.array(points[mid]) - np.array(points[0]), np.array(points[-1]) - np.array(points[0]))
+        plane_normal /= np.linalg.norm(plane_normal)
+        
+        # Project all points onto the plane
+        projected_points = [self.projectPointToPlane(point, plane_origin, plane_normal) for point in points]
+        FCPoints = [FreeCAD.Vector(x,y,z) for x,y,z in projected_points]
+        return FCPoints
+        
     def flattenPoints(self, pts, align_plane):
         """ project points to align_plane.
             pts is list of Part.Vertex objects
@@ -223,7 +282,7 @@ class MeshRemodelGeomUtils(object):
         pb.makeProgressBar(len(pts),buttonText = "Cancel Phase1/2",tooltip="Cancel projecting points to plane")
         for p in pts:
             fpt = p.Point.projectToPlane(base,normal)
-            if not self.hasPoint(fpt,flatPts,1e-7):
+            if not self.hasPoint(fpt,flatPts,epsilon):
                 flatPts.append(fpt)
             if pb.isCanceled():
                 FreeCAD.Console.PrintWarning("Phase 1 / 2 canceled, object may be incomplete.\n")
@@ -1344,6 +1403,7 @@ class MeshRemodelCreateBSplineCommandClass(object):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateBSpline.svg') ,
             'MenuText': "Create &BSpline" ,
             'ToolTip' : fixTip("Create a BSPline from 3 or more selected points\n\
+(Ctrl+Click to not flatten bspline)\n\
 (Shift+Click to not close bspline)\n\
 (Alt+Click to sort selected points)")}
  
@@ -1357,10 +1417,12 @@ class MeshRemodelCreateBSplineCommandClass(object):
         #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         doc.openTransaction("Create BSpline")
         modifiers = QtGui.QApplication.keyboardModifiers()
-        is_periodic=True
-        if modifiers == QtCore.Qt.ShiftModifier or modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.AltModifier):
-            is_periodic=False #don't close bspline on shift+click
-        if modifiers == QtCore.Qt.AltModifier or modifiers == QtCore.Qt.AltModifier.__or__(QtCore.Qt.ShiftModifier) or modifiers == QtCore.Qt.ShiftModifier:
+        is_periodic = not modifiers & QtCore.Qt.ShiftModifier
+        do_sort = modifiers & QtCore.Qt.AltModifier
+        do_flatten = not modifiers & QtCore.Qt.ControlModifier
+        if do_flatten:
+            self.pts = gu.projectPointsToPlane(self.pts)
+        if do_sort:
             self.pts = gu.sortPoints(self.pts)[:-1]
         bs = Draft.makeBSpline(self.pts, is_periodic)
         bs.Label = "MR_BSpline"
@@ -1395,6 +1457,324 @@ class MeshRemodelCreateBSplineCommandClass(object):
         return False
 
 # end create BSpline class
+
+####################################################################################
+# Flatten an existing Draft BSpline object to a plane defined by first, last, and a
+# point from the middle of the points list
+
+class MeshRemodelFlattenDraftBSplineCommandClass(object):
+    """Flatten an existing Draft BSpline"""
+
+    def __init__(self):
+        self.spline = None
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'FlattenDraftBSpline.svg') ,
+            'MenuText': "Flatt&en BSpline" ,
+            'ToolTip' : fixTip("Flatten an existing Draft BSpline\n")}
+
+    def Activated(self):
+        doc = FreeCAD.ActiveDocument
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        line_width = pg.GetFloat("LineWidth",5.0)
+        point_size = pg.GetFloat("PointSize",4.0)
+        doc.openTransaction("Flatten Draft BSpline")
+        projected = gu.projectPointsToPlane(self.spline.Points)
+        new_spline = Part.BSplineCurve()
+        new_spline = Draft.makeBSpline(projected, closed=self.spline.Closed)
+        new_spline.Label = f"{self.spline.Label}_flattened"
+        new_spline.ViewObject.LineWidth = line_width
+        self.spline.ViewObject.Visibility = False
+        doc.recompute()
+        doc.commitTransaction()
+        return
+
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getSelection()
+        if len(sel) != 1:
+            return False
+        self.spline = sel[0]
+        if not hasattr(self.spline,"Points"):
+            return False
+        if not "BSpline" in self.spline.Name:
+            return False
+        return True
+
+# end create BSpline class
+
+###################################################################
+
+# Create a wire from selected subobjects
+class MeshRemodelCreateWireCommandClass(object):
+    """Create a wire from selected objects or subobjects"""
+    
+    def __init__(self):
+        self.shapes = [] #can be full shapes or subobjects
+        
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateWire.svg') ,
+            'MenuText': "Create &Wire" ,
+            'ToolTip' : fixTip("\
+Create a flattened wire from selected subobjects.  Nonplanar objects\n\
+are flattened to the plane defined by the first arc or circle found, \n\
+otherwise by some key points: first point of first subobject, last point \n\
+of last object, and the middle point of the key points, which are the starting\n\
+and ending points of the various edges.\n\
+\n\
+Needs at least 3 edges.  Wire should be closed or nearly closed.  Works on \n\
+SubShapeBinders, too, by selecting entire object.  Subobjects need not be \n\
+from a single object.\n\
+\n\
+Alt+Click = Use camera orientation for plane normal (circles become bsplines)\n")}      
+            
+    def Activated(self):
+        def rv(vector):
+            """used for printing display only"""
+            return FreeCAD.Vector(round(vector.x,6), round(vector.y,6), round(vector.z,6))
+        useCameraOrientation = False
+        modifiers = QtGui.QApplication.keyboardModifiers()
+        if modifiers & QtCore.Qt.AltModifier:
+            useCameraOrientation = True
+        plm = FreeCAD.Placement()
+        if not useCameraOrientation:
+            #look for a circle/arc and use that normal if found
+            base,normal = None,None
+            for shape in self.shapes:
+                if shape.Curve.TypeId == "Part::GeomCircle":
+                    base = shape.Curve.Location
+                    normal = shape.Curve.Axis
+                    break
+            if not base:
+                keypts = self.getKeyPoints()
+                if keypts[0] == keypts[-1]:
+                    keypts.pop()
+                base,normal = gu.planeFromPoints(keypts)
+        else:
+            #get from camera orientation
+            rot = FreeCADGui.ActiveDocument.ActiveView.getCameraOrientation()
+            base = self.shapes[0].Vertex1.Point
+            normal = rot.multVec(FreeCAD.Vector(0,0,1))
+
+        new_shapes = []
+        firstStartPoint = None
+        previousEndPoint = None
+        wasReversed = False
+        self.shapes.append(self.shapes[0])
+        for idx,(shape,next) in enumerate(zip(self.shapes[:-1],self.shapes[1:])):
+            firstEdge = bool(idx == 0)
+            lastEdge = bool(idx == len(self.shapes)-2)
+            if shape.Curve.TypeId == "Part::GeomLine":
+                startPoint = shape.valueAt(shape.ParameterRange[0])
+                endPoint = shape.valueAt(shape.ParameterRange[1])
+                nextStart = next.valueAt(next.ParameterRange[0])
+                nextEnd = next.valueAt(next.ParameterRange[1])
+                startPoint = gu.projectVectorToPlane(startPoint, base, normal)
+                endPoint = gu.projectVectorToPlane(endPoint, base, normal)
+                nextStart = gu.projectVectorToPlane(nextStart, base, normal)
+                nextEnd = gu.projectVectorToPlane(nextEnd, base, normal)
+                if wasReversed:
+                    startPoint,endPoint = endPoint,startPoint
+                #print(f"startPoint:{rv(startPoint)}, endPoint:{rv(endPoint)}, nextStart:{rv(nextStart)}, nextEnd:{rv(nextEnd)}")
+                needsReversing = self.needsReversing(startPoint, endPoint, nextStart, nextEnd)
+                #print(f"needsReversing: {needsReversing}, idx: {idx}")
+                if needsReversing:
+                    startPoint,endPoint = endPoint,startPoint
+                    wasReversed = True
+                else:
+                    wasReversed = False
+                previousEndPoint = endPoint
+                if firstEdge:
+                    firstStartPoint = startPoint
+                elif lastEdge:
+                    endPoint = firstStartPoint
+                #print(f"making line segment from {rv(startPoint)} to {rv(endPoint)}")
+                new_shape = Part.LineSegment(startPoint, endPoint).toShape()
+                new_shapes.append(new_shape)
+                #print(f"appending shape")
+            elif shape.Curve.TypeId == "Part::GeomBSplineCurve" or shape.Curve.TypeId == "Part::GeomEllipse" \
+                                        or bool(useCameraOrientation and shape.Curve.TypeId == "Part::GeomCircle"):
+                numpoints = int(shape.Curve.length()*4)
+                numpoints = 10 if numpoints < 10 else numpoints
+                pts = shape.discretize(numpoints)
+                pts2 = []
+                for p in pts:
+                    pts2.append(gu.projectVectorToPlane(p, base, normal))
+                startPoint = shape.valueAt(shape.ParameterRange[0])
+                endPoint = shape.valueAt(shape.ParameterRange[1])
+                nextStart = next.valueAt(next.ParameterRange[0])
+                nextEnd = next.valueAt(next.ParameterRange[1])
+                startPoint = gu.projectVectorToPlane(startPoint, base, normal)
+                endPoint = gu.projectVectorToPlane(endPoint, base, normal)
+                nextStart = gu.projectVectorToPlane(nextStart, base, normal)
+                nextEnd = gu.projectVectorToPlane(nextEnd, base, normal)
+                if wasReversed:
+                    startPoint,endPoint = endPoint,startPoint
+                #print(f"startPoint:{rv(startPoint)}, endPoint:{rv(endPoint)}, nextStart:{rv(nextStart)}, nextEnd:{rv(nextEnd)}")
+                needsReversing = self.needsReversing(startPoint, endPoint, nextStart, nextEnd)
+                #print(f"needsReversing: {needsReversing}, idx: {idx}")
+                if needsReversing:
+                    startPoint,endPoint = endPoint,startPoint
+                    wasReversed = True
+                else:
+                    wasReversed = False
+                if firstEdge:
+                    firstStartPoint = startPoint
+                elif lastEdge:
+                    endPoint = firstStartPoint
+                previousEndPoint = endPoint
+                #print(f"making bspline from {rv(startPoint)} to {rv(endPoint)}")
+                new_shape = Part.BSplineCurve()
+                if wasReversed:
+                   pts2.reverse()
+                new_shape.interpolate(pts2)
+                new_shapes.append(new_shape.toShape())
+
+            elif shape.Curve.TypeId == "Part::GeomCircle":
+                #handle arcs and circles
+                startPoint = shape.valueAt(shape.ParameterRange[0])
+                endPoint = shape.valueAt(shape.ParameterRange[1])
+                nextStart = next.valueAt(next.ParameterRange[0])
+                nextEnd = next.valueAt(next.ParameterRange[1])
+                startPoint = gu.projectVectorToPlane(startPoint, base, normal)
+                endPoint = gu.projectVectorToPlane(endPoint, base, normal)
+                nextStart = gu.projectVectorToPlane(nextStart, base, normal)
+                nextEnd = gu.projectVectorToPlane(nextEnd, base, normal)
+                if wasReversed:
+                    startPoint,endPoint = endPoint,startPoint
+                #print(f"startPoint:{rv(startPoint)}, endPoint:{rv(endPoint)}, nextStart:{rv(nextStart)}, nextEnd:{rv(nextEnd)}")
+                needsReversing = self.needsReversing(startPoint, endPoint, nextStart, nextEnd)
+                #print(f"needsReversing: {needsReversing}, idx: {idx}")
+                if needsReversing:
+                    startPoint,endPoint = endPoint,startPoint
+                    wasReversed = True
+                else:
+                    wasReversed = False
+                if firstEdge:
+                    firstStartPoint = startPoint
+                elif lastEdge:
+                    endPoint = firstStartPoint if endPoint.distanceToPoint(firstStartPoint) < 1e-3 else endPoint
+                previousEndPoint = endPoint
+                #print(f"making arc/circle from {rv(startPoint)} to {rv(endPoint)}")
+                midPoint = shape.discretize(3)[1]
+                midPoint = gu.projectVectorToPlane(midPoint, base, normal)
+                if startPoint.distanceToPoint(endPoint) < epsilon:
+                    center = gu.projectVectorToPlane(shape.Curve.Center, base, normal)
+                    new_shape = Part.Circle(center, normal, shape.Curve.Radius)
+                else:
+                    new_shape = Part.ArcOfCircle(startPoint, midPoint, endPoint)
+                new_shapes.append(new_shape.toShape())
+
+
+        #print(f"new_shapes: {new_shapes}, len(new_shapes): {len(new_shapes)}")
+        try:
+            new_shapes = Part.sortEdges(new_shapes)
+        except Exception as e:
+            FreeCAD.Console.PrintWarning("MeshRemodel: Part.sortEdges function failed. {e}\n")
+        #print(f"new_shapes: {new_shapes}, len(new_shapes): {len(new_shapes)}")
+        wires = []
+        for ns in new_shapes:
+            wirename = "MR_Wire"
+            wire = Part.Wire(ns)
+            if wire.isClosed():
+                wire = Part.makeFace([wire],"Part::FaceMakerBullseye")
+                wirename = "MR_Face"
+            else: #wire not closed, so close it
+                p1 = wire.Vertexes[0].Point
+                p2 = wire.Vertexes[-1].Point
+                if p2 == p1:
+                    wire = Part.Face([wire], "Part::FaceMakerBullseye")
+                    wirename = "MR_Face"
+                elif p2.distanceToPoint(p1) < 1e-3:
+                    edges = wire.Edges
+                    edges.append(Part.LineSegment(p1,p2).toShape())
+                    wire = Part.Wire(Part.__sortEdges__(edges))
+                    wire = Part.makeFace([wire], "Part::FaceMakerBullseye")
+                    wirename = "MR_Face"
+            wires.append(Part.show(wire, wirename))
+        if len(wires) > 1:
+            new_wires = [w.Shape.Wire1 for w in wires]
+            face = Part.makeFace(new_wires, "Part::FaceMakerBullseye")
+            Part.show(face,"MR_Face")
+        elif len(wires) == 1:
+            sel = Gui.Selection.getSelection()
+            for s in sel:
+                s.ViewObject.Visibility = False
+            
+        
+    def needsReversing(self, startPoint, endPoint, nextStart, nextEnd):
+        """determine if this edge needs to be reversed to be coincident with the previous shape"""
+        dist1 = startPoint.distanceToPoint(nextStart)
+        dist2 = endPoint.distanceToPoint(nextStart)
+        dist3 = startPoint.distanceToPoint(nextEnd)
+        dist4 = endPoint.distanceToPoint(nextEnd)
+        lis = [dist1,dist2,dist3,dist4]
+
+        shortest = lis.index(min(lis))
+        bools = [True,False,True,False]
+        #print(f"distances:{[dist1,dist2,dist3,dist4]}, shortest:{shortest}, bools[shortest]:{bools[shortest]}")
+        return bools[shortest]
+        
+    def getKeyPoints(self):
+        pts = []
+        for shape in self.shapes:
+            if hasattr(shape,"ParameterRange"):
+                pts.append(shape.valueAt(shape.ParameterRange[0]))
+                pts.append(shape.valueAt(shape.ParameterRange[1]))
+            else:
+                raise Exception (f"getKeyPoints(): Unsupported shape type: {shape.Curve.TypeId}")
+        while pts[-1].distanceToPoint(pts[0]) < epsilon:
+            pts.pop()
+        return pts
+        
+    def IsActive(self):
+        self.shapes = []
+        sel = Gui.Selection.getCompleteSelection()
+        if not sel:
+            return False
+        for s in sel:
+            if not self.subElements(s):
+                return False
+            element = self.subElements(s)
+            if hasattr(element, "X") and hasattr(element, "Y") and hasattr(element, "Z"): #vertex
+                return False
+            if hasattr(element, "Surface"):
+                return False
+            if isinstance(element,list) or isinstance(element,tuple):
+                for el in element:
+                    self.shapes.append(el)
+            else:
+                self.shapes.append(element)
+        if self.shapes:
+            try:
+                self.shapes = Part.sortEdges(self.shapes)
+            except:
+                pass
+            self.shapes = self.flattenList(self.shapes)
+            if len(self.shapes) < 3:
+                return False
+        else:
+            return False
+        return True
+    
+    def subElements(self, selobj):
+        if selobj.SubElementNames == ('',):
+            if hasattr(selobj.Object,"Shape"):
+                return selobj.Object.Shape.Edges
+            return []
+        return selobj.SubObjects
+        
+    def flattenList(self, nested_list):
+        flattened_list = []
+        for item in nested_list:
+            if isinstance(item, list):
+                flattened_list.extend(self.flattenList(item))
+            else:
+                flattened_list.append(item)
+        return flattened_list
+        
+
 
 ###################################################################
 
@@ -1704,31 +2084,30 @@ Shift+Click 1st 3 points define plane, points added as links to external geometr
 ####################################################################################
 
 # Make a wire from selected objects
-class MeshRemodelCreateWireCommandClass(object):
+class MeshRemodelDraftUpgradeCommandClass(object):
     """Create wire from selected objects"""
 
     def __init__(self):
         self.objs = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateWire.svg') ,
-            'MenuText': "Create &wire" ,
-            'ToolTip' : fixTip("Create a wire from selected objects\n\
-(All selected objects should be connected.)\n\
-(Runs draft upgrade)\n\
-Ctrl+Click to downgrade to edges\n\
-Tip: You can also use this to upgrade a wire to a face, which can be converted to a sketch to avoid some coplanar issues\n")}
+        return {'Pixmap'  : os.path.join( iconPath , 'DraftUpgrade.svg') ,
+            'MenuText': "Draft upgrade or downgrade" ,
+            'ToolTip' : fixTip("Run Draft upgrade on selected objects\n\
+Ctrl+Click to run Draft downgrade\n\
+Tip: this can be used to upgrade connected edges into a wire, a wire \n\
+into a face, or downgrade objects in the other direction.")}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
         modifiers = QtGui.QApplication.keyboardModifiers()
         if (modifiers == QtCore.Qt.ControlModifier):
-            doc.openTransaction("Downgrade to edges")
+            doc.openTransaction("Draft downgrade")
             Draft.downgrade(self.objs)
             doc.recompute()
         else:
             selbackup = FreeCAD.Gui.Selection.getSelection()
-            doc.openTransaction("Create wire (upgrade)")
+            doc.openTransaction("Draft upgrade")
             Draft.upgrade(self.objs)
             doc.recompute()
             for o in self.objs:
@@ -1758,7 +2137,7 @@ Tip: You can also use this to upgrade a wire to a face, which can be converted t
             return True
         return False
 
-# end create wire class
+# end draft upgrade class
 
 ####################################################################################
 class MeshRemodelSelectionObserver():
@@ -1985,6 +2364,95 @@ class MeshRemodelValidateSketchCommandClass(object):
 # end validate sketch
 
 ##################################################################################################
+
+# check geometry
+class MeshRemodelPartCheckGeometryCommandClass(object):
+    """Check Geometry"""
+
+    def __init__(self):
+        self.objs = []
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'CheckGeometry.svg') ,
+            'MenuText': "Part CheckGeometry" ,
+            'ToolTip' : "Execute Part workbench CheckGeometry tool"}
+ 
+    def Activated(self):
+        if not "Part_CheckGeometry" in Gui.listCommands():
+            Gui.activateWorkbench("PartWorkbench")
+            Gui.activateWorkbench("MeshRemodelWorkbench")
+        Gui.runCommand("Part_CheckGeometry",0)
+        return
+   
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getSelectionEx()
+        if len(sel) == 0:
+            return False
+        count = 0
+        self.objs = []
+        for s in sel:
+            if hasattr(s,"Object"):
+                if s.Object.isDerivedFrom("Part::Feature"):
+                    self.objs.append(s.Object)
+                    count += 1
+        if count >= 1:
+            return True
+        return False
+
+# end check geometry
+
+##################################################################################################
+
+# check geometry
+class MeshRemodelSubShapeBinderCommandClass(object):
+    """PartDesign SubShapeBinder"""
+
+    def __init__(self):
+        self.objs = []
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'SubShapeBinder.svg') ,
+            'MenuText': "PartDesign SubShapeBinder" ,
+            'ToolTip' : "Create a PartDesign SubShapeBinder object"}
+ 
+    def Activated(self):
+        if not "PartDesign_SubShapeBinder" in Gui.listCommands():
+            Gui.activateWorkbench("PartDesignWorkbench")
+            Gui.activateWorkbench("MeshRemodelWorkbench")
+        doc = FreeCAD.ActiveDocument
+        binder = doc.addObject("PartDesign::SubShapeBinder","Binder")
+        sel = Gui.Selection.getCompleteSelection()
+        support = []
+        for s in sel:
+            support.append((s.Object, s.SubElementNames))
+        binder.Support = support
+        return
+   
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getSelectionEx()
+        if len(sel) == 0:
+            return False
+        count = 0
+        self.objs = []
+        for s in sel:
+            if hasattr(s,"Object"):
+                if s.Object.isDerivedFrom("Part::Feature"):
+                    self.objs.append(s.Object)
+                    count += 1
+        if count >= 1:
+            return True
+        return False
+
+# end check geometry
+
+##################################################################################################
+
+
+
 # initialize
 
 def initialize():
@@ -1999,12 +2467,16 @@ def initialize():
         Gui.addCommand("MeshRemodelCreateLine", MeshRemodelCreateLineCommandClass())
         Gui.addCommand("MeshRemodelCreatePolygon", MeshRemodelCreatePolygonCommandClass())
         Gui.addCommand("MeshRemodelCreateBSpline", MeshRemodelCreateBSplineCommandClass())
+        Gui.addCommand("MeshRemodelFlattenDraftBSpline", MeshRemodelFlattenDraftBSplineCommandClass())
         Gui.addCommand("MeshRemodelCreateCircle", MeshRemodelCreateCircleCommandClass())
         Gui.addCommand("MeshRemodelCreateArc", MeshRemodelCreateArcCommandClass())
         Gui.addCommand("MeshRemodelCreateWire", MeshRemodelCreateWireCommandClass())
+        Gui.addCommand("MeshRemodelDraftUpgrade", MeshRemodelDraftUpgradeCommandClass())
         Gui.addCommand("MeshRemodelCreateSketch", MeshRemodelCreateSketchCommandClass())
         Gui.addCommand("MeshRemodelMergeSketches", MeshRemodelMergeSketchesCommandClass())
         Gui.addCommand("MeshRemodelValidateSketch", MeshRemodelValidateSketchCommandClass())
+        Gui.addCommand("MeshRemodelPartCheckGeometry", MeshRemodelPartCheckGeometryCommandClass())
+        Gui.addCommand("MeshRemodelSubShapeBinder", MeshRemodelSubShapeBinderCommandClass())
         Gui.addCommand("MeshRemodelSettings", MeshRemodelSettingsCommandClass())
 
 
