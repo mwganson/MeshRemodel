@@ -162,6 +162,12 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2023.11.28 (v1.9.0) -- rename create wire function to draft upgrade, since that's what it does -- calls draft workbench upgrade/downgrade function<br/>
+** add new function: Create wire, which actually creates a wire.  It also flattens existing wires, forcing them into coplanarity and creating a face, on success <br/>
+** add links to Part::CheckGeometry and PartDesign::SubShapeBinder functions in the menu.<br/>
+** add new functions to GeomUtils: projectVectorToPlane(vector, base, normal) -> vector, projectPointsToPlane(vectorlist) -> vector list,<br/>
+--   and projectPointToPlane(vector, base, normal) -> numpy array.  projectPointsToPlane calculates the plane based on first, last, and a middle point<br/>
+--   from the vectorlist argument.<br/>
 * 2022.01.04 (v1.89.18) -- format tool tips<br/>
 * 2021.11.09 (version 1.89.15) -- add wireframe tolerance parameter in settings<br/>
 * 2021.10.01 (version 1.89.14)<br/>
