@@ -72,6 +72,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelCreateCircle",
                     "MeshRemodelCreateArc",
                     "MeshRemodelCreateWire",
+                    "MeshRemodelMoveAxial",
                     "MeshRemodelDraftUpgrade",
                     "MeshRemodelCreateSketch",
                     "MeshRemodelMergeSketches",
@@ -79,7 +80,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelPartCheckGeometry",
                     "MeshRemodelSubShapeBinder",
                     "MeshRemodelSettings"] # A list of command names created in the line above
-        self.appendToolbar("MeshRemodel Commands",self.list[:-5]) # leave settings, validate sketch and merge sketch off toolbar
+        self.appendToolbar("MeshRemodel Commands",self.list[:-6]) # leave settings, validate sketch and merge sketch off toolbar
         self.appendMenu("Mesh&Remodel",self.list) # creates a new menu
         #considered putting the menu inside the Edit menu, but decided against it
         #self.appendMenu(["&Edit","MeshRemodel"],self.list) # appends a submenu to an existing menu

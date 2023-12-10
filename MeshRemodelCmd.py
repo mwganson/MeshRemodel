@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2022.02.22"
-__version__ = "1.9.0"
-version = 1.9
+__date__    = "2023.12.09"
+__version__ = "1.9.1"
+version = 1.91
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -1504,6 +1504,85 @@ class MeshRemodelFlattenDraftBSplineCommandClass(object):
 
 # end create BSpline class
 
+
+###################################################################
+
+# Move an object in the axial direction
+class MeshRemodelMoveAxialCommandClass(object):
+    """Move an object in the normal direction, if a normal can be found"""
+    
+    def __init__(self):
+        self.obj = None
+        self.normal = None
+        
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'MoveAxial.svg') ,
+            'MenuText': "Move A&xial" ,
+            'ToolTip' : fixTip("\
+Move an object in the axial (normal) direction of selected subobject\n\
+(Edits object's Placement property)\n\
+If subobject is a planar face, direction is normal to that face\n\
+If subobject is a non planar face, direction is normal to the face center\n\
+If subobject is a line segment, direction is the direction of the line\n\
+\n\
+Click = move 1 mm\n\
+Ctrl+Click = move 0.1 mm\n\
+Shift+Click = move 10 mm\n\
+Alt+Click = move in opposite direction\n")}      
+            
+    def Activated(self):
+        #FreeCAD.Console.PrintMessage(f"obj: {self.obj.Label}, normal: {self.normal}\n")
+        distance = 1
+        modifiers = QtGui.QApplication.keyboardModifiers()
+        if modifiers & QtCore.Qt.ControlModifier:
+            distance *= 0.1
+        if modifiers & QtCore.Qt.ShiftModifier:
+            distance *= 10.0
+        if modifiers & QtCore.Qt.AltModifier:
+            distance *= -1.0
+        doc = self.obj.Document
+        doc.openTransaction("MR_Move")
+        self.obj.Placement = FreeCAD.Placement(self.obj.Placement.Base 
+                        + self.normal * distance, self.obj.Placement.Rotation)
+        doc.commitTransaction()
+        
+    def IsActive(self):
+        sel = FreeCADGui.Selection.getSelectionEx()
+        if len(sel) != 1:
+            return False
+        self.obj = sel[0].Object
+        if not hasattr(self.obj, "Shape"):
+            return False
+        sub = sel[0].SubObjects[0]
+        if hasattr(sub,"Curve"):
+            if sub.Curve.TypeId == "Part::GeomLine":
+                self.normal = sub.Curve.Direction
+                return True
+            if sub.Curve.TypeId == "Part::GeomCircle":
+                self.normal = sub.Curve.Axis
+                return True
+                
+        if hasattr(sub,"Surface"):
+            if not sub.Surface.isPlanar():
+                cog = sub.CenterOfGravity
+                pr = sub.ParameterRange
+                u = (pr[0] + pr[1]) / 2.0
+                v = (pr[2] + pr[3]) / 2.0
+                self.normal = sub.valueAt(u,v) - cog
+                return True
+        shp = sub if sub else self.obj.Shape
+        try:
+            self.normal = shp.normalAt(0,0)
+            return True
+        except:
+            try:
+                self.normal = shp.normalAt(0)
+                return True
+            except:
+                return False
+            return False
+
+# end Move Axial command class
 ###################################################################
 
 # Create a wire from selected subobjects
@@ -2471,6 +2550,7 @@ def initialize():
         Gui.addCommand("MeshRemodelCreateCircle", MeshRemodelCreateCircleCommandClass())
         Gui.addCommand("MeshRemodelCreateArc", MeshRemodelCreateArcCommandClass())
         Gui.addCommand("MeshRemodelCreateWire", MeshRemodelCreateWireCommandClass())
+        Gui.addCommand("MeshRemodelMoveAxial", MeshRemodelMoveAxialCommandClass())
         Gui.addCommand("MeshRemodelDraftUpgrade", MeshRemodelDraftUpgradeCommandClass())
         Gui.addCommand("MeshRemodelCreateSketch", MeshRemodelCreateSketchCommandClass())
         Gui.addCommand("MeshRemodelMergeSketches", MeshRemodelMergeSketchesCommandClass())
