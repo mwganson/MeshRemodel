@@ -170,6 +170,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2023.12.10 (v1.9.1) -- add move axial command
 * 2023.11.28 (v1.9.0) -- rename create wire function to draft upgrade, since that's what it does -- calls draft workbench upgrade/downgrade function<br/>
 ** add new function: Create wire, which actually creates a wire.  It also flattens existing wires, forcing them into coplanarity and creating a face, on success <br/>
 ** add links to Part::CheckGeometry and PartDesign::SubShapeBinder functions in the menu.<br/>
