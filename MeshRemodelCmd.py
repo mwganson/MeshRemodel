@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2023.12.10"
-__version__ = "1.9.2"
-version = 1.92
+__date__    = "2023.12.15"
+__version__ = "1.9.3"
+version = 1.93
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -2059,14 +2059,24 @@ class MeshRemodelCreateSketchCommandClass(object):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateSketch.svg') ,
             'MenuText': "Create s&ketch" ,
             'ToolTip' : fixTip("\
-Create a new empty sketch, optionally attaching to selected objects, e.g. 3 points to define a plane.\n\
-Ctrl+Click out of selected objects\n\
-Alt+Click merged sketch\n\
-Shift+Click 1st 3 points define plane, points added as links to external geometry \n\
+Create a new sketch.\n\
+If no object is selected the attachment editor opens\n\
+Ctrl+Click to make sketch out of selected objects\n\
+Alt+Click make merged sketch out of selected objects\n\
+Shift+Click 1st 3 points selected define sketch plane, points added as links to external geometry \n\
 ")}
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
+        if not self.objs:
+            doc.openTransaction("New sketch")
+            sk = doc.addObject("Sketcher::SketchObject", "Sketch")
+            doc.commitTransaction()
+            FreeCADGui.Selection.addSelection(sk)
+            from AttachmentEditor import Commands
+            Commands.editAttachment(sk)
+            doc.recompute()
+            return
         modifiers = QtGui.QApplication.keyboardModifiers()
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         prec = pg.GetInt("SketchRadiusPrecision", 1)
@@ -2129,7 +2139,7 @@ Shift+Click 1st 3 points define plane, points added as links to external geometr
                 Gui.activateWorkbench("MeshRemodelWorkbench")
             Gui.runCommand("Sketcher_NewSketch")
             sketch=doc.ActiveObject
-            sketch.Label = 'MR_Picked_Sketch'
+            sketch.Label = 'Picked_Pts_Sketch'
             sketch.MapReversed = False
             for ii in range(0,len(sk_pts.Shape.Vertexes)):
                 vname = 'Vertex'+str(ii+1)
@@ -2146,18 +2156,8 @@ Shift+Click 1st 3 points define plane, points added as links to external geometr
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
-        sel = Gui.Selection.getSelectionEx()
-        if len(sel) == 0:
-            return False
-        count = 0
-        self.objs = []
-        for s in sel:
-            if hasattr(s,"Object"):
-                self.objs.append(s.Object)
-                count += 1
-        if count >= 1:
-            return True
-        return False
+        self.objs = Gui.Selection.getSelection()
+        return True
 
 # end create sketch class
 ####################################################################################

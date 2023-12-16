@@ -148,7 +148,7 @@ Select 2 or more objects to enable this command.  It uses Draft.upgrade() to con
 
 ## Merge Sketches
 <img src="Resources/icons/MergeSketches.svg" alt = "merge sketches"><br/>
-Select 2 or more sketches to enable this command.  This uses Sketcher workbench merge sketches command.  It is here as a convenience. 
+Select 2 or more sketches to enable this command.  This uses Sketcher workbench merge sketches command.  It is here as a convenience.
 <br/>
 <br/>
 ## Validate Sketch
