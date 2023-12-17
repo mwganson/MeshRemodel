@@ -2,7 +2,7 @@
 <package format="1">
   <name>MeshRemodel</name>
   <description>Workbench for aid in remodeling mesh objects into FreeCAD format</description>
-  <version>1.9.3</version>
+  <version>1.9.4</version>
   <date>2023.12.15</date> <!-- YYYY.MM.DD of new release goes here -->
   <maintainer email="mwganson@gmail.com">TheMarkster</maintainer>
   <license file="LICENSE">LGPL-2.1</license>
@@ -14,7 +14,7 @@
       <name>MeshRemodel</name>
       <classname>MeshRemodelWorkbench</classname>
       <description>Workbench for aid in remodeling mesh objects into FreeCAD format</description>
-      <version>1.9.3</version>
+      <version>1.9.4</version>
       <subdirectory>./</subdirectory>
       <icon>Resources/icons/MeshRemodel_workbench_icon.svg</icon>
       <freecadmin>0.18.0</freecadmin>

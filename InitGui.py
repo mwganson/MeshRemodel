@@ -64,6 +64,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelCreateCoplanarPointsObject",
                     "MeshRemodelAddSelectionObserver",
                     "MeshRemodelPartSolid",
+                    "MeshRemodelSubObjectLoft",
                     "MeshRemodelCreatePointObject",
                     "MeshRemodelCreateLine",
                     "MeshRemodelCreatePolygon",

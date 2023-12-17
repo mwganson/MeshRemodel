@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2023.12.15"
-__version__ = "1.9.3"
-version = 1.93
+__version__ = "1.9.4"
+version = 1.94
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -1528,7 +1528,7 @@ If subobject is a line segment, direction is the direction of the line\n\
 Click = move 1 mm\n\
 Ctrl+Click = move 0.1 mm\n\
 Shift+Click = move 10 mm\n\
-Alt+Click = move in opposite direction\n")}      
+Alt+Click = move in opposite direction\n")}
             
     def Activated(self):
         #FreeCAD.Console.PrintMessage(f"obj: {self.obj.Label}, normal: {self.normal}\n")
@@ -1584,7 +1584,322 @@ Alt+Click = move in opposite direction\n")}
 
 # end Move Axial command class
 ###################################################################
+#SubObjectLoft
 
+class ParametricLine:
+    def __init__(self, obj, sub1=None, sub2=None):
+        obj.Proxy = self
+        obj.addProperty("App::PropertyLinkSub", "Link1", "ParametricLine").Link1 = sub1
+        obj.addProperty("App::PropertyLinkSub", "Link2", "ParametricLine").Link2 = sub2
+        obj.addProperty("App::PropertyDistance","Link1Extend","ParametricLine","Extend line before Link1")
+        obj.addProperty("App::PropertyDistance","Link2Extend","ParametricLine","Extend line after Link2")
+        obj.addProperty("App::PropertyString","Info","ParametricLine", "Status information about line")
+        
+    def execute(self, fp):
+        p1 = getattr(fp.Link1[0].Shape, fp.Link1[1][0]).Point if fp.Link1 else None
+        p2 = getattr(fp.Link2[0].Shape, fp.Link2[1][0]).Point if fp.Link2 else None
+        if not bool(p1 and p2):
+            fp.Shape = Part.Shape()
+            return
+        dir = (p2 - p1).normalize()
+        p1 = p1 + (dir * fp.Link1Extend)
+        p2 = p2 + (dir * fp.Link2Extend)
+        
+        fp.Info = f"Line Length: {p1.distanceToPoint(p2)}\nLineDirection: {dir}"
+        
+        if p1 == p2:
+            fp.Shape = Part.Vertex(p1)
+            return
+            
+        line = Part.LineSegment(p1,p2)  
+        fp.Shape = line.toShape()
+        
+class ParametricLineVP:
+    def __init__(self, obj):
+        obj.Proxy = self
+        
+    def attach(self, obj):
+        self.Object = obj
+        
+    def __getstate__(self):
+        '''When saving the document this object gets stored using Python's json module.\
+                Since we have some un-serializable parts here -- the Coin stuff -- we must define this method\
+                to return a tuple of all serializable objects or None.'''
+        return None
+    
+    def __setstate__(self,state):
+        '''When restoring the serialized object from document we have the chance to set some internals here.\
+                Since no data were serialized nothing needs to be done here.'''
+        return None
+    
+    def getDisplayModes(self,obj):
+        '''Return a list of display modes.'''
+        modes=[]
+        modes.append("Flat Lines")
+        return modes
+
+    def getIcon(self):
+        
+        icon = """        
+/* XPM */
+static char *dummy[]={
+"64 64 5 1",
+"b c black",
+"a c #55ff00",
+"c c #55ff7f",
+"# c #bcbcbc",
+". c None",
+"................................................................",
+"................................................................",
+"................................................................",
+"..........#####.................................................",
+".........#######................................................",
+"........###aaaa##...............................................",
+".......###aaaaa###..............................................",
+".......##aaaaaaa##..............................................",
+".......##aaaaaaa##..............................................",
+".......##aaaaaaa###.............................................",
+".......##aaaaaaa####............................................",
+"........##aaaaa##b###...........................................",
+".........#######bbb###..........................................",
+"..........######bbbb##..........................................",
+"..............###bbbb##.........................................",
+"...............##bbbbb##........................................",
+"................##bbbb###.......................................",
+".................##bbbb##.......................................",
+".................###bbbb##......................................",
+"..................##bbbbb##.....................................",
+"...................##bbbb###....................................",
+"....................##bbbb###...................................",
+"....................###bbbb##...................................",
+".....................###bbbb##..................................",
+"......................##bbbbb##.................................",
+".......................##bbbb###................................",
+"........................##bbbb###...............................",
+"........................###bbbb##...............................",
+".........................###bbbb##..............................",
+"..........................##bbbbb##.............................",
+"...........................##bbbb###............................",
+"............................##bbbb##............................",
+"............................###bbbb##...........................",
+".............................##bbbbb##..........................",
+"..............................##bbbb###.........................",
+"...............................##bbbb###........................",
+"...............................###bbbb##........................",
+"................................###bbbb##.......................",
+".................................##bbbbb##......................",
+"..................................##bbbb###.....................",
+"...................................##bbbb###....................",
+"...................................###bbbb##....................",
+"....................................###bbbb##...................",
+".....................................##bbbbb##..................",
+"......................................##bbbb###.................",
+".......................................##bbbb##.................",
+".......................................###bbbb##................",
+"........................................##bbbbb##...............",
+".........................................##bbbb###..............",
+"..........................................##bbbb#####...........",
+"..........................................###bb#######..........",
+"...........................................######cccc##.........",
+"............................................####ccccc###........",
+".............................................##ccccccc##........",
+".............................................##ccccccc##........",
+".............................................##ccccccc##........",
+".............................................##ccccccc##........",
+"..............................................##ccccc##.........",
+"...............................................#######..........",
+"................................................#####...........",
+"................................................................",
+"................................................................",
+"................................................................",
+"................................................................"};
+"""
+        return icon
+
+class SubObjectLoft:
+    def __init__(self, obj, sub1=None, sub2=None):
+        obj.Proxy = self
+        obj.addProperty("App::PropertyLinkSub", "Link1", "SubObjectLoft").Link1 = sub1
+        obj.addProperty("App::PropertyLinkSub", "Link2", "SubObjectLoft").Link2 = sub2
+        obj.addProperty("App::PropertyFloat", "VertexFaceScale", "SubObjectLoft","""
+When lofting a face to a vertex a tiny copy of the face is created to take the place
+of the vertex in the loft.  This property sets the scale of that face.""" \
+).VertexFaceScale = 1e-5
+        obj.addProperty("App::PropertyRotation","VertexFaceRotation","SubObjectLoft","""
+Rotation offset of the scaled copy of the face made when lofting to a vertex.  This
+property is relative to the face's local coordinate system, z=1 always being the normal.""")
+
+    
+    def execute(self, fp):
+        sub1 = getattr(fp.Link1[0].Shape, fp.Link1[1][0]) if fp.Link1 else None
+        sub2 = getattr(fp.Link2[0].Shape, fp.Link2[1][0]) if fp.Link2 else None
+        if not bool(sub1 and sub2):
+            fp.Shape = Part.Shape()
+            return
+        #subs have already been filtered to be either 2 faces or 1 face and 1 vertex
+        if hasattr(sub1,"Surface") and hasattr(sub2,"Surface"): #2 faces
+            fp.setEditorMode("VertexFaceRotation", 1) #hidden
+            fp.setEditorMode("VertexFaceScale", 1)
+            inners = []
+            outer = None
+            for wire1,wire2 in zip(sub1.Wires, sub2.Wires):
+                if wire1.isSame(sub1.OuterWire):
+                    outer = Part.makeLoft([wire1, wire2], True)
+                else:
+                    inners.append(Part.makeLoft([wire1, wire2], True))
+            if outer:
+                for inner in inners:
+                    outer = outer.cut(inner)
+                fp.Shape = outer
+        elif hasattr(sub1, "Point") or hasattr(sub2, "Point"):
+            fp.setEditorMode("VertexFaceRotation", 0) #shown
+            fp.setEditorMode("VertexFaceScale", 0)
+            if hasattr(sub1, "Point"):
+                face = sub2
+                v = sub1
+            else:
+                face = sub1
+                v = sub2
+                
+            copy = face.copy()
+            copy.scale(fp.VertexFaceScale, copy.CenterOfGravity)
+            dir = (face.CenterOfGravity - v.CenterOfGravity).normalize()
+            copy.Placement.Rotation = FreeCAD.Rotation(copy.normalAt(0,0), dir).multiply(fp.VertexFaceRotation)
+            copy.translate(v.CenterOfGravity - copy.CenterOfGravity)
+
+            inners = []
+            outer = None
+            for wire1, wire2 in zip(face.Wires, copy.Wires):
+                if wire1.isSame(face.OuterWire):
+                    outer = Part.makeLoft([wire1, wire2], True)
+                else:
+                    inners.append(Part.makeLoft([wire1, wire2], True))
+            for inner in inners:
+                outer = outer.cut(inner)
+            fp.Shape = outer
+        else:
+            FreeCAD.Console.PrintError("SubObjectLoft error: Links must be either 2 faces or 1 face and 1 vertex\n")
+            fp.Shape = Part.Shape()
+        
+    def show(self, shape, label):
+        """debug helper, can show a shape without throwing recursive recompute error"""
+        obj = FreeCAD.ActiveDocument.addObject("Part::Feature",label)
+        obj.Shape = shape
+
+#end SubObjectLoftVP class
+        
+        
+class SubObjectLoftVP:
+    def __init__(self, obj):
+        obj.Proxy = self
+        
+    def attach(self, obj):
+        self.Object = obj
+        
+    def __getstate__(self):
+        return None
+    
+    def __setstate__(self,state):
+        return None
+    
+    def getDisplayModes(self,obj):
+        '''Return a list of display modes.'''
+        modes=[]
+        modes.append("Flat Lines")
+        return modes
+
+    def getIcon(self):
+        cmd = MeshRemodelSubObjectLoftCommandClass()
+        return cmd.GetResources()["Pixmap"]
+#end SubObjectLoftVP class
+
+class MeshRemodelSubObjectLoftCommandClass(object):
+    def __init__(self):
+        self.subs = [] #list of tuples [(obj1,(subnames)),(obj2,(subnames))]
+        self.face_count = 0 #counts of selected faces, edges, vertices
+        self.edge_count = 0
+        self.vertex_count = 0
+    
+    def GetResources(self):
+        return {'Pixmap': os.path.join(iconPath, "SubObjectLoft.svg"),
+                "MenuText": "SubObject Loft",
+                "ToolTip":\
+"""Loft between selected subobjects.
+
+Selection (result)
+2 faces (SubObjectLoft -> Solid)
+1 face, 1 vertex (SubObjectLoft -> Solid)
+2 vertices (ParametricLine -> Line)
+2 edges (Part::Loft -> Face)
+1 edge, 1 vertex (Part::Loft -> Face)
+
+Not supported:
+1 edge, 1 face
+
+Alt+Click = reverses references to reverse object for all but SubObjectLofts
+"""
+        }
+        
+    def Activated(self):
+        doc = FreeCAD.ActiveDocument
+        doc.openTransaction("MeshRemodel:SubObjectLoft")
+
+        if self.face_count >= 1:
+            loft = doc.addObject("Part::FeaturePython","SubObjectLoft")
+            SubObjectLoft(loft, self.subs[0], self.subs[1])
+            SubObjectLoftVP(loft.ViewObject)
+
+        elif self.vertex_count == 2:
+            loft = doc.addObject("Part::FeaturePython","ParametricLine")
+            if not QtCore.Qt.AltModifier & QtGui.QApplication.keyboardModifiers():
+                ParametricLine(loft, self.subs[0], self.subs[1])
+            else:
+                ParametricLine(loft, self.subs[1], self.subs[0])
+            ParametricLineVP(loft.ViewObject)
+        else:
+            loft = doc.addObject("Part::Loft","SubObjectLoft")
+            #Part::Loft cannot use subobjects, so we use subshapebinders
+            binder1 = doc.addObject("PartDesign::SubShapeBinder","Binder")
+            binder1.Support = [self.subs[0]]
+            binder2 = doc.addObject("PartDesign::SubShapeBinder","Binder")
+            binder2.Support = [self.subs[1]]
+            if not QtCore.Qt.AltModifier & QtGui.QApplication.keyboardModifiers():
+                loft.Sections = [binder1, binder2]
+            else:
+                loft.Sections = [binder2, binder1]
+            binder1.ViewObject.Visibility = False
+            binder2.ViewObject.Visibility = False
+            loft.Solid = False
+        doc.commitTransaction()
+        doc.recompute()
+        
+    def IsActive(self):
+        self.subs = []
+        self.face_count = 0
+        self.edge_count = 0
+        self.vertex_count = 0
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = FreeCADGui.Selection.getCompleteSelection()
+        for s in sel:
+            if not s.Object.isDerivedFrom("Part::Feature"):
+                return False
+            self.subs.append((s.Object, s.SubElementNames))
+            if "Face" in s.SubElementNames[0]:
+                self.face_count += 1
+            elif "Edge" in s.SubElementNames[0]:
+                self.edge_count += 1
+            elif "Vertex" in s.SubElementNames[0]:
+                self.vertex_count += 1
+        if len(self.subs) == 2:
+            if self.face_count == 1 and self.edge_count == 1:
+                return False #cannot loft between face and edge
+            return True
+        return False
+        
+
+# end subobject loft command class
+###################################################################
 # Create a wire from selected subobjects
 class MeshRemodelCreateWireCommandClass(object):
     """Create a wire from selected objects or subobjects"""
@@ -1602,7 +1917,7 @@ otherwise by some key points: first point of first subobject, last point \n\
 of last object, and the middle point of the key points, which are the starting\n\
 and ending points of the various edges.\n\
 \n\
-Needs at least 3 edges.  Wire should be closed or nearly closed.  Works on \n\
+Needs at least 2 edges.  Wire should be closed or nearly closed.  Works on \n\
 SubShapeBinders, too, by selecting entire object.  Subobjects need not be \n\
 from a single object.\n\
 \n\
@@ -1621,7 +1936,7 @@ Alt+Click = Use camera orientation for plane normal (circles become bsplines)\n"
             #look for a circle/arc and use that normal if found
             base,normal = None,None
             for shape in self.shapes:
-                if shape.Curve.TypeId == "Part::GeomCircle":
+                if hasattr(shape,"Curve") and shape.Curve.TypeId == "Part::GeomCircle":
                     base = shape.Curve.Location
                     normal = shape.Curve.Axis
                     break
@@ -1642,6 +1957,9 @@ Alt+Click = Use camera orientation for plane normal (circles become bsplines)\n"
         wasReversed = False
         self.shapes.append(self.shapes[0])
         for idx,(shape,next) in enumerate(zip(self.shapes[:-1],self.shapes[1:])):
+            if not hasattr(shape,"Curve"):
+                FreeCAD.Console.PrintWarning("MeshRemodel Create Flat Wire: Faces not supported at this time.\n")
+                continue
             firstEdge = bool(idx == 0)
             lastEdge = bool(idx == len(self.shapes)-2)
             if shape.Curve.TypeId == "Part::GeomLine":
@@ -1799,8 +2117,12 @@ Alt+Click = Use camera orientation for plane normal (circles become bsplines)\n"
         pts = []
         for shape in self.shapes:
             if hasattr(shape,"ParameterRange"):
-                pts.append(shape.valueAt(shape.ParameterRange[0]))
-                pts.append(shape.valueAt(shape.ParameterRange[1]))
+                if len(shape.ParameterRange) == 2:
+                    pts.append(shape.valueAt(shape.ParameterRange[0]))
+                    pts.append(shape.valueAt(shape.ParameterRange[1]))
+                elif len(shape.ParameterRange) >= 4:
+                    pts.append(shape.valueAt(shape.ParameterRange[0],shape.ParameterRange[1]))
+                    pts.append(shape.valueAt(shape.ParameterRange[2],shape.ParameterRange[3]))
             else:
                 raise Exception (f"getKeyPoints(): Unsupported shape type: {shape.Curve.TypeId}")
         while pts[-1].distanceToPoint(pts[0]) < epsilon:
@@ -1831,7 +2153,7 @@ Alt+Click = Use camera orientation for plane normal (circles become bsplines)\n"
             except:
                 pass
             self.shapes = self.flattenList(self.shapes)
-            if len(self.shapes) < 3:
+            if len(self.shapes) < 2:
                 return False
         else:
             return False
@@ -2023,7 +2345,7 @@ are not getting the arc orientation you were expecting -- will need to delete un
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
-        sel = Gui.Selection.getSelectionEx()
+        sel = Gui.Selection.getCompleteSelection()
         if len(sel) == 0:
             return False
         if not hasattr(sel[0],"PickedPoints"):
@@ -2541,6 +2863,7 @@ def initialize():
         Gui.addCommand("MeshRemodelCreateCrossSectionsObject",MeshRemodelCreateCrossSectionsCommandClass())
         Gui.addCommand("MeshRemodelAddSelectionObserver",MeshRemodelAddSelectionObserverCommandClass())
         Gui.addCommand("MeshRemodelPartSolid",MeshRemodelPartSolidCommandClass())
+        Gui.addCommand("MeshRemodelSubObjectLoft", MeshRemodelSubObjectLoftCommandClass())
         Gui.addCommand("MeshRemodelCreatePointObject", MeshRemodelCreatePointObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateCoplanarPointsObject", MeshRemodelCreateCoplanarPointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateLine", MeshRemodelCreateLineCommandClass())

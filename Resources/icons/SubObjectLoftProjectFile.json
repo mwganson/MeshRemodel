@@ -1,0 +1,210 @@
+{
+    "1": {
+        "layer": 1,
+        "seed_x": 0,
+        "seed_y": 0,
+        "zoomFactor": 4,
+        "textEdit": "SketchImported:\nline(5,10,5,55)\nline(58,10,58,55)\nline(42,23,58,10)\nline(58,55,42,41)\nline(42,41,42,23)\nline(5,10,17,16)\nline(5,55,17,48)\nline(17,48,17,16)",
+        "fontBox": "HERSHEY_COMPLEX",
+        "lineTypeBox": "cv2.LINE_4",
+        "color": [
+            150,
+            150,
+            150,
+            0
+        ],
+        "borderColor": [
+            5,
+            5,
+            5,
+            0
+        ],
+        "scaleSpinBox": 1.0,
+        "angleAdjust": 0,
+        "thickness": 2,
+        "borderThickness": 3,
+        "xAdjust": 0,
+        "yAdjust": 0,
+        "basePixmapMethod": null,
+        "pointsBox": [],
+        "pointsColor": [
+            128,
+            128,
+            128
+        ],
+        "pointsBoxBackupPoints": [],
+        "whiteToTransparent": true,
+        "blackToTransparent": true
+    },
+    "2": {
+        "layer": 2,
+        "seed_x": 0,
+        "seed_y": 0,
+        "zoomFactor": 4,
+        "textEdit": "floodfillall(20)",
+        "fontBox": "HERSHEY_COMPLEX",
+        "lineTypeBox": "cv2.LINE_4",
+        "color": [
+            150,
+            150,
+            150,
+            0
+        ],
+        "borderColor": [
+            5,
+            5,
+            5,
+            0
+        ],
+        "scaleSpinBox": 1.0,
+        "angleAdjust": 0,
+        "thickness": 2,
+        "borderThickness": 2,
+        "xAdjust": 0,
+        "yAdjust": 0,
+        "basePixmapMethod": null,
+        "pointsBox": [
+            [
+                53,
+                31
+            ],
+            [
+                10,
+                29
+            ]
+        ],
+        "pointsColor": [
+            128,
+            128,
+            128
+        ],
+        "pointsBoxBackupPoints": [],
+        "whiteToTransparent": true,
+        "blackToTransparent": true
+    },
+    "3": {
+        "layer": 3,
+        "seed_x": 0,
+        "seed_y": 0,
+        "zoomFactor": 4,
+        "textEdit": "SketchImported:\nline(17,16,42,23)\nline(42,41,17,48)",
+        "fontBox": "HERSHEY_COMPLEX",
+        "lineTypeBox": "cv2.LINE_4",
+        "color": [
+            188,
+            188,
+            0,
+            0
+        ],
+        "borderColor": [
+            5,
+            5,
+            5,
+            0
+        ],
+        "scaleSpinBox": 1.0,
+        "angleAdjust": 0,
+        "thickness": 0,
+        "borderThickness": 2,
+        "xAdjust": 0,
+        "yAdjust": 0,
+        "basePixmapMethod": null,
+        "pointsBox": [],
+        "pointsColor": [
+            128,
+            128,
+            128
+        ],
+        "pointsBoxBackupPoints": [],
+        "whiteToTransparent": true,
+        "blackToTransparent": true
+    },
+    "4": {
+        "layer": 4,
+        "seed_x": 29,
+        "seed_y": 32,
+        "zoomFactor": 4,
+        "textEdit": "floodfill(29,32,20)",
+        "fontBox": "HERSHEY_COMPLEX",
+        "lineTypeBox": "cv2.LINE_4",
+        "color": [
+            188,
+            188,
+            0,
+            0
+        ],
+        "borderColor": [
+            5,
+            5,
+            5,
+            0
+        ],
+        "scaleSpinBox": 1.0,
+        "angleAdjust": 0,
+        "thickness": 2,
+        "borderThickness": 2,
+        "xAdjust": 0,
+        "yAdjust": 0,
+        "basePixmapMethod": null,
+        "pointsBox": [
+            [
+                29,
+                32
+            ]
+        ],
+        "pointsColor": [
+            128,
+            128,
+            128
+        ],
+        "pointsBoxBackupPoints": [],
+        "whiteToTransparent": true,
+        "blackToTransparent": true
+    },
+    "5": {
+        "layer": 5,
+        "seed_x": 0,
+        "seed_y": 0,
+        "zoomFactor": 4,
+        "textEdit": "floodfillall(20)",
+        "fontBox": "HERSHEY_COMPLEX",
+        "lineTypeBox": "cv2.LINE_4",
+        "color": [
+            85,
+            85,
+            255,
+            0
+        ],
+        "borderColor": [
+            5,
+            5,
+            5,
+            0
+        ],
+        "scaleSpinBox": 1.0,
+        "angleAdjust": 0,
+        "thickness": 2,
+        "borderThickness": 2,
+        "xAdjust": 0,
+        "yAdjust": 0,
+        "basePixmapMethod": null,
+        "pointsBox": [
+            [
+                51,
+                30
+            ],
+            [
+                12,
+                32
+            ]
+        ],
+        "pointsColor": [
+            128,
+            128,
+            128
+        ],
+        "pointsBoxBackupPoints": [],
+        "whiteToTransparent": true,
+        "blackToTransparent": true
+    }
+}
