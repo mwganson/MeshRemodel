@@ -42,6 +42,22 @@ RECAP: Select the profile first in the Tree view, and then the path edges in the
 Usage: Select your profiles in the tree view or in the 3D view and Shift + Click the toolbar icon to do the Loft.  A limitation of the Part Loft tool is the profiles may not contain inner wires (for example, donut shape).  The Gui dialog checks for this and you don't even see the profiles with inner wires in the selection column as options, but no checks are done here.  This same limitation applies to Part Sweep, but not to Part Extrude and Part Revolve.  (But Part Extrude cannot extrude such profiles at a taper.)<br/>
 ### Part Revolution
 Usage: Select your profile in the tree view or the 3D view and optionally your edge to serve as an axis of revolution, and Alt + Click the toolbar icon.
+## SubObjectLoft
+<img src="Resources/icons/SubObjectLoft.svg" alt="SubObjectLoft icon"><br/>
+Select 2 subobjects in the 3d view, then run this command to loft between those subobjects.  Uses the new SubObjectLoft object for some selection types, the new ParametricLine type for some, and Part::Loft for others.<br/>
+<br/>
+Selection type -> result
+* 2 Faces -> SubObjectLoft (solid)
+* 1 Face, 1 Vertex -> SubObjectLoft (solid)
+* 2 Edges -> Part::Loft (face)
+* 2 Vertices -> ParametricLine (line segment)
+* 1 Edge, 1 Vertex -> Part::Loft (face)
+### ParametricLine
+This is a parametric line object.  Select 2 vertices, and then run the SubObjectLoft command to create a "loft" between them.  Link1 and Link2 refer to the referenced vertices.  Link1Extend and Link2Extend are length properties that can extend the line segment beyond Link1 and Link2 or shorten the line.  Info gives information about the line: Length and Direction.
+
+### SubObjectLoft Object
+This object lofts between a face and a vertex or 2 faces to each other.  It supports faces with inner wires where Part::Loft fails, but it does not support more than 2 sections, unlike Part::Loft, which supports any number of sections.  When the loft is between a face and a vertex a scaled copy of the face is made, which is positioned at the location of the vertex and pointed towards the original face, and then the loft is made between those 2 faces.  There are 2 hidden properties that are shown when a vertex is one of the subobjects: VertexFaceScale and VertexFaceRotation.  The scale option controls the scale factor.  The rotation property controls the rotation of the scaled face.  This can be used where you want to loft a face to a scaled and rotated copy of itself.  Here, the rotation property acts much like an attachment offset property, with the Z axis always being the face normal.  You can use the rotation to better control the seamlines of the loft to prevent some twisting.
+
 ## Create Cross-Sections Object
 <img src="Resources/icons/CreateCrossSections.svg" alt="create cross-sections object"><br/>
 Select the mesh object in the tree, then use this command to create one or more cross-section objects.  This is just a convenience link to the Cross-sections tool in the Mesh Design workbench.  These cross-sections should not be directly used as wires, but rather as references for creating the wires within the MeshRemodel workbench.  This is because these cross-section objects will have extra points and multiple line segments where only one segment is desired.<br/>
