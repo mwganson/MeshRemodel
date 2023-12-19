@@ -70,6 +70,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelCreatePolygon",
                     "MeshRemodelCreateBSpline",
                     "MeshRemodelFlattenDraftBSpline",
+                    "MeshRemodelCreatePlane",
                     "MeshRemodelCreateCircle",
                     "MeshRemodelCreateArc",
                     "MeshRemodelCreateWire",

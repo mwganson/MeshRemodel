@@ -124,6 +124,16 @@ Select 3 or more points in the 3d view to enable this command.  It creates a BSp
 <br/>
 This command supports block selections (Shift+B, draw rectangle).  Generally, the points will need to be sorted when using that block selection method.  Use Alt+Click to sort.  See the section on Create polygon for details on the sorting algorithm used.<br/>
 <br/>
+## Create Plane
+<img src="Resources/icons/CreatePlane.svg" alt = "create plane"><br/>
+Create a 50 x 50 Part::Plane object.  Position it on the plane defined
+by selected subobjects:<br/>
+* 3 points = plane defined by the 3 points
+* 1 edge (line) = plane's normal is the edge's direction
+* 1 edge (circle or arc) = plane's normal is circle's normal
+* 2 edges = plane defined by 3 points from the edges.
+* 1 face = face normal
+* no selection = xy plane at origin
 ## Create Circle
 <img src="Resources/icons/CreateCircle.svg" alt = "create circle"><br/>
 Select 3 (or more) points in the 3d view to enable this command.  It creates a circle from those first 3 selected points.  Any points after the first 3 are ignored, but you are allowed to select more.  This is to support easier block selection mode (Shift+B, draw rectangle).  Use Ctrl+Click to add a point at the center of the new circle.  Use Ctrl+Shift+Click if only the center is desired.<br/>

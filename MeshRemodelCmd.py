@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2023.12.15"
-__version__ = "1.9.4"
-version = 1.94
+__date__    = "2023.12.18"
+__version__ = "1.9.5"
+version = 1.95
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -2174,7 +2174,87 @@ Alt+Click = Use camera orientation for plane normal (circles become bsplines)\n"
             else:
                 flattened_list.append(item)
         return flattened_list
+
+###################################################################
+# Create a plane
+
+class MeshRemodelCreatePlaneCommandClass(object):
+    """Create a plane"""
+    def __init__(self):
+        self.subs = []
         
+    def GetResources(self):
+        return {
+            'Pixmap'  : os.path.join( iconPath , 'CreatePlane.svg') ,
+            'MenuText': "Create plane" ,
+            'ToolTip' : fixTip(\
+"""Create a 50 x 50 Part::Plane object.  Position it on the plane defined
+by selected subobjects:
+
+3 points = plane defined by the 3 points
+1 edge (line) = plane's normal is the edge's direction
+1 edge (circle or arc) = plane's normal is circle's normal
+2 edges = plane defined by 3 points from the edges.
+1 face = face normal
+no selection = xy plane at origin
+
+""")}
+
+    def Activated(self):
+        doc = FreeCAD.ActiveDocument
+        self.subs = []
+        sel = FreeCADGui.Selection.getCompleteSelection()
+        count_vertices = 0
+        count_faces = 0
+        count_edges = 0
+        for s in sel:
+            if s.HasSubObjects and s.SubObjects:
+                self.subs.append(s.SubObjects[0])
+                for name in s.SubElementNames:
+                    if "Vertex" in name:
+                        count_vertices += 1
+                    elif "Face" in name:
+                        count_faces += 1
+                    elif "Edge" in name:
+                        count_edges += 1
+        # print(f"self.subs: {self.subs}, vertices, edges, faces = {count_vertices, count_edges, count_faces}")
+        base,normal = FreeCAD.Vector(0,0,0), FreeCAD.Vector(0,0,1)
+        if count_vertices == 3 and count_faces + count_edges == 0:
+            pts = [obj.Point for obj in self.subs if hasattr(obj,"Point")]
+            base,normal = gu.planeFromPoints(pts)
+        if count_faces == 1 and count_edges + count_vertices == 0:
+            base,normal = self.subs[0].CenterOfGravity, self.subs[0].normalAt(0,0)
+        if count_edges == 1 and count_faces + count_vertices == 0:
+            edge = self.subs[0]
+            if edge.Curve.TypeId == "Part::Circle" or edge.Curve.TypeId == "Part::ArcOfCircle":
+                base,normal = edge.Curve.Center, edge.Curve.Axis
+            elif edge.Curve.TypeId == "Part::GeomLine":
+                base,normal = sub.CenterOfGravity, sub.Curve.Direction
+        elif count_edges == 2 and count_faces + count_vertices == 0:
+            edge1 = self.subs[0]
+            edge2 = self.subs[1]
+            pts = [edge1.discretize(10)[1], edge1.CenterOfMass, edge2.CenterOfMass]
+            base,normal = gu.planeFromPoints(pts)
+        elif global_picked and len(global_picked) >= 3:
+            pts = global_picked
+            base,normal = gu.planeFromPoints(pts)
+        doc.openTransaction("Create plane")
+        plane = doc.addObject("Part::Plane", "Plane")
+        plane.Length = 50
+        plane.Width = 50
+        doc.recompute()
+        plane.Placement.Rotation = FreeCAD.Rotation(FreeCAD.Vector(0,0,1), normal)
+        #plane.Placement.translate(base)
+        plane.Placement.translate(base - FreeCAD.Vector(plane.Shape.CenterOfGravity))
+        doc.commitTransaction() 
+        doc.recompute()
+            
+
+
+    def IsActive(self):
+        if FreeCAD.ActiveDocument:
+            return True
+        return False
 
 
 ###################################################################
@@ -2375,7 +2455,7 @@ class MeshRemodelCreateSketchCommandClass(object):
     """Create sketch from selected objects"""
 
     def __init__(self):
-        self.objs = []
+        self.subs = []
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateSketch.svg') ,
@@ -2870,6 +2950,7 @@ def initialize():
         Gui.addCommand("MeshRemodelCreatePolygon", MeshRemodelCreatePolygonCommandClass())
         Gui.addCommand("MeshRemodelCreateBSpline", MeshRemodelCreateBSplineCommandClass())
         Gui.addCommand("MeshRemodelFlattenDraftBSpline", MeshRemodelFlattenDraftBSplineCommandClass())
+        Gui.addCommand("MeshRemodelCreatePlane", MeshRemodelCreatePlaneCommandClass())
         Gui.addCommand("MeshRemodelCreateCircle", MeshRemodelCreateCircleCommandClass())
         Gui.addCommand("MeshRemodelCreateArc", MeshRemodelCreateArcCommandClass())
         Gui.addCommand("MeshRemodelCreateWire", MeshRemodelCreateWireCommandClass())
