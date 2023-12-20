@@ -26,13 +26,13 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2023.12.18"
-__version__ = "1.9.5"
-version = 1.95
+__date__    = "2023.12.19"
+__version__ = "1.9.6"
+version = 1.96
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
-import Draft, DraftGeomUtils, DraftVecUtils
+import Draft, DraftGeomUtils, DraftVecUtils, Mesh
 import time
 import numpy as np
 
@@ -121,50 +121,34 @@ class MeshRemodelGeomUtils(object):
             self.btn.hide()
             self.value = 0
             self.total = 0
+            
+    #### end progress bar class
 
-#source for this block of code: https://stackoverflow.com/questions/9866452/calculate-volume-of-any-tetrahedron-given-4-points
-#4 points are coplanar if the tetrahedron defined by them has volume = 0
-##################################################################
-    def determinant_3x3(self,m):
-        """helper for isCoplanar()"""
-        return (m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) -
-                m[1][0] * (m[0][1] * m[2][2] - m[0][2] * m[2][1]) +
-                m[2][0] * (m[0][1] * m[1][2] - m[0][2] * m[1][1]))
+    def getBaseAndNormal(self, trio):
+        """return base,normal of plane defined by trio, list of Vector"""
+        trio = np.array([np.array(v.Point) for v in trio[:3]])
+        normal = np.cross(trio[1] - trio[0], trio[2] - trio[0])
+        normal /= np.linalg.norm(normal) #normalize
+        norm = FreeCAD.Vector(normal[0], normal[1], normal[2])
+        return trio[0], norm
 
-
-    def subtract(self, a, b):
-        """ helper for isCoplanar()"""
-        return (a[0] - b[0],
-                a[1] - b[1],
-                a[2] - b[2])
-
-    def tetrahedron_calc_volume(self, a, b, c, d):
-        """helper for isCoplanar()"""
-        return (abs(self.determinant_3x3((self.subtract(a, b),
-                                 self.subtract(b, c),
-                                 self.subtract(c, d),
-                                 ))) / 6.0)
-
-#a = [0.0, 0.0, 0.0]
-#d = [2.0, 0.0, 0.0]
-#c = [0.0, 2.0, 0.0]
-#b = [0.0, 0.0, 2.0]
-
-#print(tetrahedron_calc_volume(a, b, c, d))
-    def isCoplanar(self, trio, pt, tol=1e-3):
-        """ isCoplanar(trio, pt, tol=1e-3)
-            trio is a 3-element list of vectors, pt is a vector to test, tol is tolerance, return True if all 4 are coplanar
-            test is done by creating a tetrahedron and testing its volume against tol
-            a tetrahedron from 4 coplanar points should have volume ~= 0
-        """
-        if len(trio) != 3:
-            raise Exception("MeshRemodel GeomUtils Error: isCoplanar() trio parameter must be list of 3 vectors")
-        A,B,C,D = trio[0],trio[1],trio[2],pt
-        vol = self.tetrahedron_calc_volume(A,B,C,D)
-
-        if vol <= tol:
-            return True
-        return False
+    def isCoplanar(self, trio, pt, tol=1e-5):
+        """ check if pt is one the same plane as the one defined by
+        trio, a trio of points.  pt is considered to be on the plane if
+        its distance to the plane <= tol"""
+        def distance_to_plane(point, plane_point, plane_normal):
+            point = np.array(point)
+            plane_point = np.array(plane_point)
+            plane_normal = np.array(plane_normal)
+            vector_to_point = point - plane_point
+            distance = np.abs(np.dot(vector_to_point, plane_normal)) / np.linalg.norm(plane_normal)
+            return distance
+ 
+        trio = np.array([np.array(v.Point) for v in trio])
+        pt = np.array(pt)
+        normal = np.cross(trio[1] - trio[0], trio[2] - trio[0])
+        normal /= np.linalg.norm(normal) #normalize
+        return distance_to_plane(pt, trio[0], normal) <= tol
 
     def hasPoint(self,pt,lis,tol):
         """hasPoint(pt,lis,tol)"""
@@ -652,6 +636,115 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
         return True
 
 # end create WireFrame class
+
+####################################################################################
+
+#add a facet to a mesh
+
+class MeshRemodelAddFacetCommandClass(object):
+    """Add a facet(s) to a mesh object"""
+    def __init__(self):
+        self.mesh = None
+        self.pts = []
+        
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'AddFacet.svg') ,
+            'MenuText': "Add facet(s) to a mesh object" ,
+            'ToolTip' : \
+"""Add facet(s) to a mesh object.  Select the mesh, select the points
+to define the facet(s), and then execute the command.
+
+Ctrl+Click = undo and reverse the order of selection (flips normals)
+
+Tip: If you have a mesh with one or more missing facets, create a points
+object, then select the 3 points on the points object that represent the
+missing facet, along with the mesh object to add the facet to the mesh.
+
+If you notice the normal is flipped, undo and redo with Ctrl+Click on the 
+toolbar icon.
+
+If you have multiple facets to make you can select first the anchor point,
+which will be common to all the facets, then the remaining points that
+will make up the rest of the facets.  These will be added in a loop as:
+
+anchor, pt2, pt3
+anchor, pt3, pt4
+anchor, pt4, pt5...
+
+Care should be taken to ensure the facets do not intersect previous facets.
+
+Note: This changes the mesh object, but you can use Undo to undo the
+change if it is not successful or work on a duplicate of the mesh instead
+of working on the original.
+"""}
+
+    def Activated(self):
+        doc = self.mesh.Document
+        if len(global_picked) > 2:
+            self.pts = global_picked 
+        modifiers = QtGui.QApplication.keyboardModifiers()
+        mesh = self.mesh.Mesh.copy()
+        if modifiers & QtCore.Qt.ControlModifier:
+            if doc.UndoNames:
+                if doc.UndoNames[0] == "Add facet" or doc.UndoNames[0] == "Add facets":
+                    doc.undo()
+                    mesh = self.mesh.Mesh.copy()
+                else:
+                    if doc.UndoNames:
+                        FreeCAD.Console.PrintWarning(f"MeshRemodel: not undoing {doc.UndoNames[0]}\n")
+        if len(self.pts) == 3:
+            if modifiers & QtCore.Qt.ControlModifier:
+                mesh.addFacet(self.pts[2],self.pts[1],self.pts[0])
+            else:
+                mesh.addFacet(self.pts[0],self.pts[1],self.pts[2])
+            doc.openTransaction("Add facet")
+            self.mesh.Mesh = mesh
+            doc.commitTransaction()
+        # when more than 3 points are selected we make facets of all of them
+        # and add all the facets.  First selected point becomes the anchor
+        # point, then we go 1,2,3; 1,3,4; 1;4,5 and so on
+        else:
+            anchor = self.pts[0]
+            for cur,next in zip(self.pts[1:-1], self.pts[2:]):
+                if modifiers & QtCore.Qt.ControlModifier:
+                    mesh.addFacet(next, cur, anchor)
+                else:
+                    mesh.addFacet(anchor, cur, next)
+            doc.openTransaction("Add facets")
+            self.mesh.Mesh = mesh
+            doc.commitTransaction()
+        doc.recompute()
+        
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getCompleteSelection()
+        if len(sel) == 0:
+            return False
+        if not hasattr(sel[0],"PickedPoints"):
+            return False
+        count = 0
+        meshcount = 0
+        self.pts = []
+        for s in sel:
+            if s.Object.isDerivedFrom("Mesh::Feature"):
+                meshcount += 1
+                self.mesh = s.Object
+                continue
+            if hasattr(s,"PickedPoints"):
+                p = s.PickedPoints
+                for pt in s.PickedPoints:
+                    self.pts.append(pt)
+                    count += 1
+                if len(p)==0: #might be individual part point objects
+                    if len(s.Object.Shape.Vertexes)==1:
+                        self.pts.append(s.Object.Shape.Vertexes[0].Point)
+                        count += 1
+        if count >= 3 and meshcount == 1:
+            return True
+        return False       
+
+
 ####################################################################################
 # Create the Mesh Cross Sections Object
 
@@ -914,6 +1007,7 @@ class CoplanarPoints:
         obj.addProperty("App::PropertyFloat","PointSize","CoplanarPoints","Point size taken from settings")
         obj.addProperty("App::PropertyBool","ExplodeCompound","Triggers","Whether to explode compound of points shapes").ExplodeCompound = False
         obj.addProperty("App::PropertyBool","MakeSketch","Triggers","Whether to make a sketch and add points to it as external geometry links").MakeSketch = False
+        obj.addProperty("App::PropertyBool","FlattenToPlane","CoplanarPoints","Flatten all points to the same plane defined by Trio").FlattenToPlane=True
         obj.addProperty("App::PropertyString","Version","CoplanarPoints","Version of MeshRemodel used to create this object").Version = __version__
         obj.setEditorMode("Version",1) #readonly
         obj.Proxy = self
@@ -956,35 +1050,22 @@ class CoplanarPoints:
         coplanar = []
         trio = []
         for vertName in fp.Trio[0][1]:
-            trio.append(fp.Trio[0][0].Shape.Vertexes[int(vertName[6:])-1].Point)
+            trio.append(fp.Trio[0][0].Shape.Vertexes[int(vertName[6:])-1])
+        base,normal = gu.getBaseAndNormal(trio)
         if fp.Tolerance == 0:
             tolerance = float("inf")
         else:
             tolerance = fp.Tolerance
         for v in candidates:
             if gu.isCoplanar(trio,v.Point,tolerance):
-                planar = True
-            else:
-                planar = False
-            if planar:
-                coplanar.append(Part.Point(v.Point).toShape())
-        coplanar.extend([Part.Point(v).toShape() for v in trio])
-        if len(trio) != 3:
-            FreeCAD.Console.PrintError("MeshRemodel: Cannot attach plane without 3 named subobjects.  Cannot simply use picked points.")
-        else:
-            #add a part::plane and project all the points to it
-            plane = doc.addObject("Part::Plane","MR_Alignment_Plane")
-            plane.ViewObject.Transparency = 80
-            plane.Width = 10
-            plane.Length = 10
-            plane.Support = fp.Trio
-            plane.MapMode = 'ThreePointsPlane'
-            plane.ViewObject.Visibility = False
-            coplanar2 = gu.flattenPoints(coplanar,plane)
-            doc.removeObject(plane.Name)
+                coplanar.append(Part.Vertex(v.Point))
+        coplanar = [Part.Vertex(v) for v in trio] + coplanar
+        if hasattr(fp, "FlattenToPlane") and fp.FlattenToPlane:
+            base,normal = gu.getBaseAndNormal(coplanar[:3])
+            coplanar = [Part.Vertex(gu.projectVectorToPlane(v.Point, base, normal)) for v in coplanar]
         self.inhibitRecomputes = True
-        fp.Points = [v.Point for v in coplanar2]
-        fp.Shape = Part.makeCompound(coplanar2)
+        fp.Points = [v.Point for v in coplanar]
+        fp.Shape = Part.makeCompound(coplanar)
         fp.ViewObject.PointSize = fp.PointSize
 
     def onChanged(self,fp,prop):
@@ -1147,10 +1228,23 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateCoplanar.svg') ,
             'MenuText': "Create copla&nar points object" ,
-            'ToolTip' : "\
-Makes coplanar points object from 3 selected points, used to define the plane \
-Uses internal coplanar check, (see settings -- Coplanar tolerance)\
-"}
+            'ToolTip' : """\
+Filters the vertices in the selected object based on the first 3 vertices
+selected from that object.  Only those vertices that are on the plane (within
+the given tolerance set in the Tolerance property) are put into the coplanar
+points object.
+
+See also MeshRemodel settings to set the default Tolerance.  Tolerance is the
+shortest distance from the point to the plane.  (Formerly it was something else.)
+
+If FlattenToPlane = True, then the points are forced to the same plane even
+if the original vertices are not exactly on the plane.
+
+Tip: If you are using this to remodel a mesh, then leave FlattenToPlane True,
+but if you are adding facets to a mesh, set the FlattenToPlane property to 
+False because you want them referencing the exact positions of the points in
+the original mesh object.
+"""}
 
     def Activated(self):
         if len(global_picked) == 3:
@@ -1161,7 +1255,7 @@ Uses internal coplanar check, (see settings -- Coplanar tolerance)\
         doc = FreeCAD.ActiveDocument
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         point_size = pg.GetFloat("PointSize",4.0)
-        coplanar_tolerance = pg.GetFloat("CoplanarTolerance", .001)
+        coplanar_tolerance = pg.GetFloat("CoplanarTolerance", .00001)
         doc.openTransaction("Create coplanar")
         cp = doc.addObject("Part::FeaturePython","MR_Coplanar_Points")
         CoplanarPoints(cp)
@@ -2940,6 +3034,7 @@ def initialize():
     if FreeCAD.GuiUp:
         Gui.addCommand("MeshRemodelCreatePointsObject", MeshRemodelCreatePointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateWireFrameObject",MeshRemodelCreateWireFrameObjectCommandClass())
+        Gui.addCommand("MeshRemodelAddFacet", MeshRemodelAddFacetCommandClass())
         Gui.addCommand("MeshRemodelCreateCrossSectionsObject",MeshRemodelCreateCrossSectionsCommandClass())
         Gui.addCommand("MeshRemodelAddSelectionObserver",MeshRemodelAddSelectionObserverCommandClass())
         Gui.addCommand("MeshRemodelPartSolid",MeshRemodelPartSolidCommandClass())

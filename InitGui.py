@@ -61,6 +61,7 @@ class MeshRemodelWorkbench(Workbench):
         self.list = ["MeshRemodelCreatePointsObject",
                     "MeshRemodelCreateWireFrameObject",
                     "MeshRemodelCreateCrossSectionsObject",
+                    "MeshRemodelAddFacet",
                     "MeshRemodelCreateCoplanarPointsObject",
                     "MeshRemodelAddSelectionObserver",
                     "MeshRemodelPartSolid",
