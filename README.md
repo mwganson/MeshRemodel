@@ -58,7 +58,7 @@ This command works on the selected mesh object by adding facet(s) to it.  To use
 * (anchor, pt2, pt3)
 * (anchor, pt4, pt5)
 * (anchor, pt6, pt7)
-* etc.
+* and so on...<br/>
 If Ctrl is pressed, then the normals of the facets are reversed.  Expected usage is to select the desired points, run the command, and while everything is still selected press Ctrl+Click to run the command again and reverse the normals.  The way this works is the command runs undo to remove the facet, then adds it as (pt2, pt1, anchor) in the reverse direction for all of the points in the selection.  In other words, click the icon to make the facet, then Ctrl+Click the icon again to undo and add the facet again with the opposite normal direction.
 
 ## Create Coplanar Points Object
@@ -211,6 +211,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2023.12.19 (v1.9.6) -- add Add facet(s) command, add FlattenToPlane boolean to coplanar points object, update SubObjectLoft icon
 * 2023.12.18 (v1.9.5) -- Add part::plane command
 * 2023.12.17 (v1.9.4) -- add SubObjectLoft feature
 * 2023.12.15 (v1.9.3) -- make create sketch tool work even if nothing is preselected, bring up attachment editor in such cases.
