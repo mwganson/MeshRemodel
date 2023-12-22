@@ -242,6 +242,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2023.12.22 (v1.9.7) -- add more mesh object functions: add / remove facet, remove point, move point, expand mesh
 * 2023.12.19 (v1.9.6) -- add Add facet(s) command, add FlattenToPlane boolean to coplanar points object, update SubObjectLoft icon
 * 2023.12.18 (v1.9.5) -- Add part::plane command
 * 2023.12.17 (v1.9.4) -- add SubObjectLoft feature
