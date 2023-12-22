@@ -26,13 +26,13 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2023.12.19"
-__version__ = "1.9.6"
-version = 1.96
+__date__    = "2023.12.20"
+__version__ = "1.9.7"
+version = 1.97
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
-import Draft, DraftGeomUtils, DraftVecUtils, Mesh
+import Draft, DraftGeomUtils, DraftVecUtils, Mesh, MeshPart
 import time
 import numpy as np
 
@@ -123,6 +123,14 @@ class MeshRemodelGeomUtils(object):
             self.total = 0
             
     #### end progress bar class
+    
+    def checkComponents(self,mesh):
+        """check for multiple components in a mesh and warn user"""
+        if mesh.countComponents() > 1:
+            FreeCAD.Console.PrintWarning("\
+MeshRemodel: selected mesh has multiple components.  Consider using \
+Split by components operation in Mesh workbench to separate these into \
+component objects before attempting modifications.\n")
 
     def getBaseAndNormal(self, trio):
         """return base,normal of plane defined by trio, list of Vector"""
@@ -489,6 +497,7 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
 "}
  
     def Activated(self):
+        gu.checkComponents(self.mesh.Mesh)
         modifiers = QtGui.QApplication.keyboardModifiers()
         doc = FreeCAD.ActiveDocument
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
@@ -514,6 +523,8 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
         if modifiers == QtCore.Qt.ControlModifier:
             self.mesh.ViewObject.Transparency = 75
             self.mesh.ViewObject.Selectable = False
+        self.mesh.ViewObject.DisplayMode = "Flat Lines"
+        self.mesh.ViewObject.Lighting = "One side"
         doc.commitTransaction()
         doc.recompute()
         QtGui.QApplication.restoreOverrideCursor()
@@ -522,13 +533,12 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
-        sel = Gui.Selection.getSelectionEx()
+        sel = Gui.Selection.getSelection()
         if len(sel) == 0:
             return False
-        elif "Mesh.Feature" not in str(type(sel[0].Object)) and not hasattr(sel[0].Object,"Points") and not hasattr(sel[0].Object.Points,"Points"):
+        if not sel[0].isDerivedFrom("Mesh::Feature"):
             return False
-        else:
-            self.mesh = sel[0].Object
+        self.mesh = sel[0]
         return True
 
 # end create points class
@@ -565,6 +575,7 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
             return (a + b) * (a + b + 1) / 2 + b
 
     def Activated(self):
+        gu.checkComponents(self.mesh.Mesh)
         modifiers = QtGui.QApplication.keyboardModifiers()
         doc = FreeCAD.ActiveDocument
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
@@ -572,6 +583,7 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
         point_size = pg.GetFloat("PointSize",4.0)
         tolerance = pg.GetFloat("WireFrameTolerance",.01)
         #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        self.mesh.ViewObject.Lighting = "One side"
         mids = []
         lines=[]
         meshfacets = self.mesh.Mesh.Facets
@@ -626,35 +638,400 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
-        sel = Gui.Selection.getSelectionEx()
+        sel = Gui.Selection.getSelection()
         if len(sel) == 0:
             return False
-        elif "Mesh.Feature" not in str(type(sel[0].Object)):
+        if not sel[0].isDerivedFrom("Mesh::Feature"):
             return False
-        else:
-            self.mesh = sel[0].Object
+        self.mesh = sel[0]
         return True
-
 # end create WireFrame class
-
 ####################################################################################
+#add or remove a point to or from a mesh
 
+class MeshRemodelRemovePointCommandClass(object):
+    """Remove a point from a mesh object"""
+    def __init__(self):
+        self.mesh = None
+        self.pt = None
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'RemovePoint.svg') ,
+            'MenuText': "Remove a point from a mesh object" ,
+            'ToolTip' : \
+"""Remove a point from a mesh object.
+Select the mesh object and a vertex, then run the command
+to remove the selected point.  This also removes all facets connected
+to that point.
+
+"""}        
+    
+    def Activated(self):
+        gu.checkComponents(self.mesh.Mesh)
+        new_mesh = self.removeFacets(self.mesh.Mesh.copy(), self.pt)
+        self.mesh.Document.openTransaction("Remove point")
+        self.mesh.Mesh = new_mesh
+        self.mesh.Document.commitTransaction()
+
+    def removeFacets(self, mesh, pt):
+        """remove the point, and all the facets containing the point
+        and return the new mesh"""
+        copy = mesh.copy()
+        topology = copy.Topology
+        # topology is a tuple ([vectorlist],[facetlist])
+        # facet list is a list of tuples
+        # each tuple of the form (pt1_idx, pt2_idx, pt3_idx)
+        idx = None #will be the index of the point in the points
+        points = mesh.Points
+        for point in points:
+            if gu.isSamePoint(pt, point.Vector, 1e-5):
+                idx = point.Index
+        facets = [tuple(sorted(f)) for f in topology[1]]
+        #print(f"facets = {facets}")
+        indices = []
+        for f_idx,facet_tuple in enumerate(facets):
+            if idx in facet_tuple:
+                indices.append(f_idx)
+        if indices:
+            copy.removeFacets(indices)
+            return copy
+        else:
+            FreeCAD.Console.PrintError("MeshRemodel: Unable to remove facets\n")
+            return mesh
+        
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getCompleteSelection()
+        if len(sel) != 2:
+            return False
+        if not hasattr(sel[0],"PickedPoints"):
+            return False
+        count = 0
+        meshcount = 0
+        self.pt = None
+        for s in sel:
+            if hasattr(s.Object,"Mesh") or s.Object.isDerivedFrom("Mesh::Feature") :
+                meshcount += 1
+                self.mesh = s.Object
+                continue
+            if hasattr(s,"PickedPoints"):
+                p = s.PickedPoints
+                for pt in s.PickedPoints:
+                    self.pt = pt
+                    count += 1
+                if len(p) == 0: #might be individual part point objects
+                    if len(s.Object.Shape.Vertexes) == 1:
+                        self.pt = s.Object.Shape.Vertexes[0].Point
+                        count += 1
+        if count == 1 and meshcount == 1:
+            return True
+        return False
+        
+################################################################################
+#move a point in a mesh object
+
+class VectorEditor(QtGui.QDialog):
+    def __init__(self, cmd, pt, normal):
+        super(VectorEditor, self).__init__()
+        self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
+        self.ptBase = pt #before moving in normal direction
+        self.pt = pt
+        self.normalDir = normal.normalize()
+        self.finished = False
+        self.cmd = cmd
+        self.Vertex = None
+        self.blockingSignals = False
+        self.setWindowTitle("MeshRemodel: Move mesh point")
+        self.setGeometry(100, 100, 300, 200)
+        self.layout = QtGui.QVBoxLayout(self)
+
+        self.label = QtGui.QLabel()
+        self.layout.addWidget(self.label)
+        self.label.setText(\
+"""Normal is the distance to move the vector in its normal direction.  This overrides
+and resets the x,y,z values back to their defaults, and then the normal movement is
+applied to that default position, which is the point's original position when the dialog
+is first opened.  The normal direction of a mesh point is outward from the mesh.
+
+A red vertex on the screen is there to show the destination.  The Ghost object will be
+removed when the dialog is closed.
+
+Note: this operation changes the mesh object topology and can lead to potential issues.
+
+Use Undo to undo the changes if desired.
+        
+""")
+
+        #create function also adds to layout
+        self.spinner_x = self.create_spinner("X:", self.pt.x)
+        self.spinner_y = self.create_spinner("Y:", self.pt.y)
+        self.spinner_z = self.create_spinner("Z:", self.pt.z)
+        self.spinner_normal = self.create_spinner("Normal:", 0.0)
+        
+        buttonbox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel, self)
+        buttonbox.accepted.connect(self.accept)
+        buttonbox.rejected.connect(self.reject)
+        self.layout.addWidget(buttonbox)
+        
+        self.doc = self.cmd.mesh.Document
+        self.Vertex = self.doc.addObject("Part::Vertex","Ghost")
+        self.Vertex.ViewObject.PointColor = (255,0,0)
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        point_size = pg.GetFloat("PointSize",4.0)
+        self.Vertex.ViewObject.PointSize = point_size
+        self.updateData(self.spinner_normal)
+        self.updateVertex()
+
+    def removeVertex(self):
+        """removes the Ghost object"""
+        if self.Vertex:
+            self.doc.removeObject(self.Vertex.Name)
+            self.Vertex = None  
+
+    def closeEvent(self, event):
+        self.finished = True
+        self.removeVertex()
+        event.accept()
+        
+    def reject(self):
+        self.finished = True
+        self.pt = self.ptBase
+        self.removeVertex()
+        super().reject()
+        
+    def accept(self):
+        self.finished = True
+        self.removeVertex()
+        super().accept()
+        
+    def create_spinner(self, label_text, val):
+        def trigger(value,spinner): return lambda value, spinner=spinner: self.spinner_value_changed(value,spinner)
+        
+        spinner = QtGui.QDoubleSpinBox(self)
+        spinner.setObjectName(f"{label_text[:-1]}") #no colon
+        spinner.setValue(val)
+        spinner.setRange(-1000,1000)
+        spinner.setSingleStep(0.1)
+
+        label = QtGui.QLabel(label_text)
+        spinner.valueChanged.connect(trigger(val, spinner))
+        layout = QtGui.QVBoxLayout()
+        layout.addWidget(label)
+        layout.addWidget(spinner)
+
+        widget = QtGui.QWidget()
+        widget.setLayout(layout)
+        self.layout.addWidget(widget)
+        return spinner
+
+    def spinner_value_changed(self, val, spinner):
+        self.updateData(spinner) #updates the value of self.pt based on spinboxes
+        self.updateVertex()
+        
+    def updateData(self, spinner):
+        """update self.pt based on spinner boxes"""
+        if self.blockingSignals:
+            return
+        self.pt = self.ptBase + self.normalDir * self.Normal
+        if "Normal" in spinner.objectName():
+            self.blockingSignals = True
+            self.X = self.pt.x
+            self.Y = self.pt.y
+            self.Z = self.pt.z
+            self.blockingSignals = False
+            
+    def updateVertex(self):
+        self.Vertex.X = self.X
+        self.Vertex.Y = self.Y
+        self.Vertex.Z = self.Z
+        
+    @property
+    def X(self):
+        return self.spinner_x.value()
+
+    @X.setter
+    def X(self,val):
+        self.spinner_x.setValue(val)
+
+    @property
+    def Y(self):
+        return self.spinner_y.value()
+
+    @Y.setter
+    def Y(self,val):
+        self.spinner_y.setValue(val)
+        
+    @property
+    def Z(self):
+        return self.spinner_z.value()
+
+    @Z.setter
+    def Z(self,val):
+        self.spinner_z.setValue(val)        
+
+    @property
+    def Normal(self):
+        return self.spinner_normal.value()
+
+    @Normal.setter
+    def Normal(self,val):
+        self.spinner_normal.setValue(val)  
+
+
+class MeshRemodelMovePointCommandClass(object):
+    """Move a point in a mesh object"""
+    def __init__(self):
+        self.mesh = None
+        self.pts = []
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'MovePoint.svg') ,
+            'MenuText': "Move a point in a mesh object" ,
+            'ToolTip' : \
+"""
+This will relocate a point in a mesh object, moving all connected
+facets with it.  Usage:
+
+Select 1 point in the points object, then click the toolbar icon.  In
+a dialog you will be able to set the new coordinates for the point.
+
+Select 2 points.  The first point is the point to move, the 2nd point
+is the destination for the first point.  Then all duplicated points will
+be removed, so this, in effect, would remove the first selected point from
+the mesh, but keep the facets that are connected to it by moving them to
+the new destination point, assuming the 2nd point is also a point in the
+mesh object.  If it's not then the point is simply moved to that location.
+
+Tip: Moving a point often results in folds on surface errors with the mesh
+analyze and repair tool.  These errors can often be resolved by converting
+the mesh to a shape in Part workbench, and applying a tiny chamfer or fillet
+to the affected edges, and then converting back to a mesh.
+"""}
+
+    def Activated(self):
+        gu.checkComponents(self.mesh.Mesh)
+        doc = self.mesh.Document
+        if len(global_picked) >= 2:
+            self.pts = global_picked 
+        mesh = self.mesh.Mesh.copy()
+        if len(self.pts) == 2:
+            destination = self.pts[1]
+        else:
+            destination = self.getDestination()
+        if gu.isSamePoint(self.pts[0], destination, 1e-5):
+            return
+        idx = self.findPoint(mesh, self.pts[0])
+        if idx == []:
+            return
+        doc.openTransaction("Move point")
+        mesh.setPoint(idx, destination)
+        mesh.removeDuplicatedPoints()
+        self.checkForDuplicateFacets(mesh)
+        self.mesh.Mesh = mesh
+        doc.commitTransaction()
+        doc.recompute()
+        
+    def checkForDuplicateFacets(self, mesh):
+        num_points = len(mesh.Points)
+        num_facets = len(mesh.Facets)
+        calculated = num_points * 2 - 4
+        if calculated < num_facets:
+            mesh.removeFoldsOnSurface()
+            FreeCAD.Console.PrintWarning("MeshRemodel: removed folds on surface\n")
+        
+    def findPoint(self, mesh, pt):
+        """find the point in the mesh, return the index of the point in
+        the points list"""
+        topology = mesh.Topology
+        # topology is a tuple ([vectorlist],[facetlist])
+        # facet list is a list of tuples
+        # each tuple of the form (pt1_idx, pt2_idx, pt3_idx)
+        indices = []
+        points = mesh.Points
+        for point in points:
+            if gu.isSamePoint(pt, point.Vector, 1e-5):
+                if not point.Index in indices:
+                    indices.append(point.Index)
+        if len(indices) == 1:
+            return indices[0]
+        elif len(indices) > 1:
+            FreeCAD.Console.PrintError("MeshRemodel: ambiguous point selection as\
+more than one point matches the search criteria within tolerance of 1e-5\n")
+            return[]
+        else:
+            FreeCAD.Console.PrintError("MeshRemodel: Unable to find point in mesh topology.\n")
+            return []
+        
+    def getDestination(self):
+        """get the destination for the point from the user"""
+        #for now, just return the origin
+        idx = self.findPoint(self.mesh.Mesh, self.pts[0])
+        if idx == None:
+            return None #calling function returns anyway if idx can't be found
+        normal = self.mesh.Mesh.getPointNormals()[idx]
+        dlg = VectorEditor(self, self.pts[0], normal)
+        dlg.show()
+        while not dlg.finished:
+            FreeCADGui.updateGui()
+
+        pt = dlg.pt
+        dlg.deleteLater()
+        return pt
+        
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getCompleteSelection()
+        if len(sel) == 0:
+            return False
+        if not hasattr(sel[0],"PickedPoints"):
+            return False
+        count = 0
+        meshcount = 0
+        self.pts = []
+        for s in sel:
+            if hasattr(s.Object,"Mesh") or s.Object.isDerivedFrom("Mesh::Feature"):
+                meshcount += 1
+                self.mesh = s.Object
+                continue
+            if hasattr(s,"PickedPoints"):
+                p = s.PickedPoints
+                for pt in s.PickedPoints:
+                    self.pts.append(pt)
+                    count += 1
+                if len(p)==0: #might be individual part point objects
+                    if len(s.Object.Shape.Vertexes)==1:
+                        self.pts.append(s.Object.Shape.Vertexes[0].Point)
+                        count += 1
+        if bool(count == 1 or count == 2) and meshcount == 1:
+            return True
+        return False       
+
+
+
+
+################################################################################
 #add a facet to a mesh
 
-class MeshRemodelAddFacetCommandClass(object):
+class MeshRemodelAddOrRemoveFacetCommandClass(object):
     """Add a facet(s) to a mesh object"""
     def __init__(self):
         self.mesh = None
         self.pts = []
         
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'AddFacet.svg') ,
-            'MenuText': "Add facet(s) to a mesh object" ,
+        return {'Pixmap'  : os.path.join( iconPath , 'AddOrRemoveFacet.svg') ,
+            'MenuText': "Add or remove facet(s) to or from a mesh object" ,
             'ToolTip' : \
 """Add facet(s) to a mesh object.  Select the mesh, select the points
 to define the facet(s), and then execute the command.
 
 Ctrl+Click = undo and reverse the order of selection (flips normals)
+Alt+Click = remove facet (only works with 3 points selected, sometimes fails)
+
+Tip when removing: Set view mode to FlatLines so you can see how the vertices
+connect to form the facets.
 
 Tip: If you have a mesh with one or more missing facets, create a points
 object, then select the 3 points on the points object that represent the
@@ -679,6 +1056,8 @@ of working on the original.
 """}
 
     def Activated(self):
+        self.mesh.ViewObject.Lighting = "One side"
+        gu.checkComponents(self.mesh.Mesh)
         doc = self.mesh.Document
         if len(global_picked) > 2:
             self.pts = global_picked 
@@ -693,6 +1072,15 @@ of working on the original.
                     if doc.UndoNames:
                         FreeCAD.Console.PrintWarning(f"MeshRemodel: not undoing {doc.UndoNames[0]}\n")
         if len(self.pts) == 3:
+            if modifiers & QtCore.Qt.AltModifier:
+                #remove facet
+                removed = self.removeFacet(mesh, self.pts)
+                doc.openTransaction("Remove facet")
+                self.mesh.Mesh = removed 
+                doc.commitTransaction()
+                doc.recompute()
+                return
+            
             if modifiers & QtCore.Qt.ControlModifier:
                 mesh.addFacet(self.pts[2],self.pts[1],self.pts[0])
             else:
@@ -715,6 +1103,33 @@ of working on the original.
             doc.commitTransaction()
         doc.recompute()
         
+    def removeFacet(self, mesh, pts):
+        """remove the facet containing the 3 points and return the new mesh"""
+        copy = mesh.copy()
+        topology = copy.Topology
+        # topology is a tuple ([vectorlist],[facetlist])
+        # facet list is a list of tuples
+        # each tuple of the form (pt1_idx, pt2_idx, pt3_idx)
+        indices = []
+        points = mesh.Points
+        for point in points:
+            for pt in pts:
+                if gu.isSamePoint(pt, point.Vector, 1e-4):
+                   if not point.Index in indices:
+                       indices.append(point.Index)
+        #print(f"indices = {indices}")
+        facet_tuple = tuple(sorted(indices))
+        #print(f"facet_tuple = {facet_tuple}")
+        facets = [tuple(sorted(f)) for f in topology[1]]
+        #print(f"facets = {facets}")
+        if facet_tuple in facets:
+            facet_idx = facets.index(facet_tuple)
+            copy.removeFacets([facet_idx])
+            return copy
+        else:
+            FreeCAD.Console.PrintError("MeshRemodel: Unable to remove facet\n")
+            return mesh
+        
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
@@ -727,7 +1142,7 @@ of working on the original.
         meshcount = 0
         self.pts = []
         for s in sel:
-            if s.Object.isDerivedFrom("Mesh::Feature"):
+            if hasattr(s.Object,"Mesh") or s.Object.isDerivedFrom("Mesh::Feature"):
                 meshcount += 1
                 self.mesh = s.Object
                 continue
@@ -743,6 +1158,217 @@ of working on the original.
         if count >= 3 and meshcount == 1:
             return True
         return False       
+
+####################################################################################
+#Expand a mesh object with a plane
+
+class MeshExpander:
+    def __init__(self, obj, mesh=None, base=FreeCAD.Vector(0,0,0), normal=FreeCAD.Vector(0,0,1)):
+        obj.Proxy = self
+        obj.addProperty("App::PropertyVector","Base","MeshExpander","Base position of the expansion plane").Base=base
+        obj.addProperty("App::PropertyVector", "Normal", "MeshExpander", "The normal vector of the expansion plane").Normal=normal
+        obj.addProperty("App::PropertyLink","SourceMesh","MeshExpander","The source mesh object").SourceMesh=mesh
+        obj.addProperty("App::PropertyFloat","Expansion","MeshExpander","Distance of the expansion in the normal direction of the plane").Expansion=5
+        obj.addProperty("App::PropertyFloat","ExpansionRev","MeshExpander","Distance of expansion in the reverse direction of the plane, typically a negative number is needed for this.").ExpansionRev=0
+        obj.addProperty("App::PropertyBool","FlipNormals","MeshExpander","Whether to flip the normals of the generated center").FlipNormals = True
+        obj.addProperty("App::PropertyBool","ShowCrossSection","MeshExpander","Whether to show the cross-section(s) at the plane, creates new document object(s) on every recompute").ShowCrossSection = False
+
+        
+    def execute(self, fp):
+        doc = fp.Document
+        source = fp.SourceMesh.Mesh.copy()
+        # leave source unchanged and always work on a copy of it
+        trimmed = source.copy() #top
+        trimmed.trimByPlane(fp.Base, fp.Normal.negative())
+        trimmedRev = source.copy() #bottom
+        trimmedRev.trimByPlane(fp.Base, fp.Normal)
+        center = Mesh.Mesh() #expanded center
+
+        if fp.Expansion != 0 or fp.ExpansionRev != 0:
+            #pb = gu.MRProgress()
+            pts1 = trimmed.Points
+            pts2 = trimmedRev.Points
+            f1 = trimmed.Facets
+            f2 = trimmedRev.Facets
+            lines1 = []# lines from facets on the plane
+            for f in f1:
+                indices = self.facetIsOnPlane(f, fp)
+                if len(indices) == 2: #facet has 2 points on the plane
+                    t1 = pts1[indices[0]]
+                    t2 = pts1[indices[1]]
+                    lines1.append(Part.LineSegment(t1.Vector, t2.Vector).toShape())
+            #now that we have cross-section made we can separate the top and bottom
+            vec = fp.Normal * fp.Expansion
+            trimmed.translate(vec.x, vec.y, vec.z)
+            rev = fp.Normal * fp.ExpansionRev
+            trimmedRev.translate(rev.x, rev.y, rev.z)
+            
+            # lines need to be sorted to ensure vertex1, vertex2, etc. are in proper order
+            # sortEdges() returns a list of lists, with all the lines joined where they belong
+
+            sorted_lines = Part.sortEdges(lines1, 1e-4)
+            wires = []
+            for srt in sorted_lines:
+                fusion = srt[0]
+                for line in srt[1:]:
+                    fusion = fusion.fuse(line)
+                if fp.ShowCrossSection:
+                    wires.append(fusion)                    
+                    section = doc.addObject("Part::Feature",f"{fp.SourceMesh.Name}_Section")
+                    section.Shape = fusion
+                mapped = []
+                for v in fusion.Vertexes:
+                    mapped.append([self.nearestMeshPoint(v.Point, trimmed),
+                                self.nearestMeshPoint(v.Point, trimmedRev)])
+                #print(f"mapped: {mapped}")
+                for cur,next in zip(mapped[:-1],mapped[1:]):
+                    p1 = trimmed.Points[cur[0]].Vector
+                    p2 = trimmedRev.Points[cur[1]].Vector
+                    p3 = trimmed.Points[next[0]].Vector
+                    p4 = trimmedRev.Points[next[1]].Vector
+                    #print(f"p1,p2,p3,p4: {p1,p2,p3,p4}")
+                    center.addFacet(p3, p2, p1)
+                    center.addFacet(p2, p3, p4)
+                p1 = trimmed.Points[mapped[-1][0]].Vector #last edge
+                p2 = trimmedRev.Points[mapped[-1][1]].Vector
+                p3 = trimmed.Points[mapped[0][0]].Vector #first edge
+                p4 = trimmedRev.Points[mapped[0][1]].Vector
+                #print(f"p1,p2,p3,p4: {p1,p2,p3,p4}")
+                center.addFacet(p3, p2, p1)
+                center.addFacet(p2, p3, p4)
+            center.removeDuplicatedPoints()
+            if fp.FlipNormals:
+                center.flipNormals()
+
+            merged = center.copy()
+            merged.addMesh(trimmed)
+            merged.addMesh(trimmedRev)
+            merged.removeDuplicatedPoints()
+            merged.mergeFacets()
+            fp.Mesh = merged
+
+                
+    def nearestMeshPoint(self, pt, mesh):
+        """find the nearest point in the mesh to pt, return that index"""
+        least = 10**20
+        index = None
+        for idx,mp in enumerate(mesh.Points):
+            dist = abs(mp.Vector.distanceToPoint(pt))
+            if dist < least:
+                least = dist
+                index = idx
+        return index
+
+    def facetIsOnPlane(self, facet, fp):
+        """check if 2 points in this facet are on the plane, if so returns a list of
+        the point indices"""
+        planar = []
+        for idx,pt in enumerate(facet.Points):
+            p = FreeCAD.Vector(pt[0], pt[1], pt[2])
+            dist = abs(p.distanceToPlane(fp.Base, fp.Normal))
+            if dist < 1e-5:
+                planar.append(facet.PointIndices[idx])
+        return planar
+        
+
+class MeshExpanderVP:
+    def __init__(self, obj):
+        obj.Proxy = self
+    
+    def attach(self, obj):
+        self.Object = obj.Object
+        
+    def updateData(self, fp, prop):
+        '''If a property of the handled feature has changed we have the chance to handle this here'''
+        # fp is the handled feature, prop is the name of the property that has changed
+        pass
+
+    def setDisplayMode(self,mode):
+        '''Map the display mode defined in attach with those defined in getDisplayModes.\
+                Since they have the same names nothing needs to be done. This method is optional'''
+        return mode
+ 
+    def claimChildren(self):
+        return [self.Object.SourceMesh]
+        
+    def onDelete(self, vobj, subelements):
+        self.Object.SourceMesh.Visibility = True
+        return True
+ 
+    def onChanged(self, vp, prop):
+        '''Here we can do something when a single property got changed'''
+        #FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
+        
+    def getIcon(self):
+        return os.path.join( iconPath , 'ExpandMesh.svg')
+    
+    def __getstate__(self):
+        '''When saving the document this object gets stored using Python's json module.\
+                Since we have some un-serializable parts here -- the Coin stuff -- we must define this method\
+                to return a tuple of all serializable objects or None.'''
+        return {"name": self.Object.Name}
+ 
+    def __setstate__(self,state):
+        '''When restoring the serialized object from document we have the chance to set some internals here.\
+                Since no data were serialized nothing needs to be done here.'''
+        self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
+        return None
+
+
+            
+class MeshRemodelExpandedMeshCommandClass(object):
+    """Expand a mesh object with a plane"""
+
+    def __init__(self):
+        self.plane = None
+        self.mesh = None
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'ExpandMesh.svg') ,
+            'MenuText': "Expand a mesh with a plane" ,
+            'ToolTip' : \
+"""Expands a mesh with a plane.  This function creates a mesh python object
+that can expand itself via its Expansion and ExpansionRev properties.  The
+expanded area will be identical to the cross-section at the intersection of
+the plane.
+
+Usage:
+Create a plane and position it where you want to put the expansion.
+Select the plane and the mesh, click the toolbar icon.  Edit the Expansion
+and ExpansionRev properties to adjust the level of expansion.
+"""}    
+
+    def Activated(self):
+        gu.checkComponents(self.mesh.Mesh)
+        base = self.plane.Shape.Surface.Position
+        normal = self.plane.Shape.Surface.Axis
+        doc = self.plane.Document
+        fp = doc.addObject("Mesh::FeaturePython","MeshExpander")
+        MeshExpander(fp, self.mesh, base, normal)
+        MeshExpanderVP(fp.ViewObject)
+        fp.ViewObject.Lighting = "One side"
+        #fp.ViewObject.Proxy = 0
+        self.mesh.Visibility = False
+        self.plane.Visibility = False
+        doc.recompute()
+        
+        
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getSelection()
+        if len(sel) != 2:
+            return False
+        self.mesh = None
+        self.plane = None
+        for s in sel:
+            self.mesh = s if s.isDerivedFrom("Mesh::Feature") else self.mesh
+            self.plane = s if s.isDerivedFrom("Part::Plane") or s.isDerivedFrom("PartDesign::Plane")\
+                          or bool(s.isDerivedFrom("Part::Feature") and len(s.Shape.Faces) == 1\
+                           and s.Shape.Face1.Surface.TypeId == "Part::GeomPlane") else self.plane
+        if not bool(self.mesh and self.plane):
+            return False
+        return True
 
 
 ####################################################################################
@@ -764,6 +1390,7 @@ creating wires using the Mesh Remodel workbench as with the Points and WireFrame
 "}
  
     def Activated(self):
+        gu.checkComponents(self.mesh.Mesh)
         import MeshPartGui, FreeCADGui
         FreeCADGui.runCommand('MeshPart_CrossSections')
         return
@@ -771,13 +1398,12 @@ creating wires using the Mesh Remodel workbench as with the Points and WireFrame
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
-        sel = Gui.Selection.getSelectionEx()
+        sel = Gui.Selection.getSelection()
         if len(sel) == 0:
             return False
-        elif "Mesh.Feature" not in str(type(sel[0].Object)):
+        if not sel[0].isDerivedFrom("Mesh::Feature"):
             return False
-        else:
-            self.mesh = sel[0].Object
+        self.mesh = sel[0]
         return True
 
 # end open mesh section class
@@ -2323,7 +2949,7 @@ no selection = xy plane at origin
             if edge.Curve.TypeId == "Part::Circle" or edge.Curve.TypeId == "Part::ArcOfCircle":
                 base,normal = edge.Curve.Center, edge.Curve.Axis
             elif edge.Curve.TypeId == "Part::GeomLine":
-                base,normal = sub.CenterOfGravity, sub.Curve.Direction
+                base,normal = edge.CenterOfGravity, edge.Curve.Direction
         elif count_edges == 2 and count_faces + count_vertices == 0:
             edge1 = self.subs[0]
             edge2 = self.subs[1]
@@ -3034,7 +3660,10 @@ def initialize():
     if FreeCAD.GuiUp:
         Gui.addCommand("MeshRemodelCreatePointsObject", MeshRemodelCreatePointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateWireFrameObject",MeshRemodelCreateWireFrameObjectCommandClass())
-        Gui.addCommand("MeshRemodelAddFacet", MeshRemodelAddFacetCommandClass())
+        Gui.addCommand("MeshRemodelRemovePoint", MeshRemodelRemovePointCommandClass())
+        Gui.addCommand("MeshRemodelAddOrRemoveFacet", MeshRemodelAddOrRemoveFacetCommandClass())
+        Gui.addCommand("MeshRemodelMovePoint", MeshRemodelMovePointCommandClass())
+        Gui.addCommand("MeshRemodelExpandedMesh",MeshRemodelExpandedMeshCommandClass())
         Gui.addCommand("MeshRemodelCreateCrossSectionsObject",MeshRemodelCreateCrossSectionsCommandClass())
         Gui.addCommand("MeshRemodelAddSelectionObserver",MeshRemodelAddSelectionObserverCommandClass())
         Gui.addCommand("MeshRemodelPartSolid",MeshRemodelPartSolidCommandClass())
