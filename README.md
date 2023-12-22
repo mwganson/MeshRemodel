@@ -83,16 +83,6 @@ This object lofts between a face and a vertex or 2 faces to each other.  It supp
 <img src="Resources/icons/CreateCrossSections.svg" alt="create cross-sections object"><br/>
 Select the mesh object in the tree, then use this command to create one or more cross-section objects.  This is just a convenience link to the Cross-sections tool in the Mesh Design workbench.  These cross-sections should not be directly used as wires, but rather as references for creating the wires within the MeshRemodel workbench.  This is because these cross-section objects will have extra points and multiple line segments where only one segment is desired.<br/>
 
-## Add Facet
-<img src="Resources/icons/AddFacet.svg" alt = "add facet"><br/>
-This command works on the selected mesh object by adding facet(s) to it.  To use it you must first create a point object from the mesh.  Then select the mesh and 3 or more points from the points object.  These points define the facet to add.  If 3 points are selected the facet (triangle) defined by those 3 points gets added to the mesh.  If 4 or more points are selected, then multiple facets are created and added.  The first point selected is the anchor point.  It is common to all of the facets that get created.  The facets created are:<br/>
-* (anchor, pt1, pt2)
-* (anchor, pt2, pt3)
-* (anchor, pt4, pt5)
-* (anchor, pt6, pt7)
-* and so on...<br/>
-If Ctrl is pressed, then the normals of the facets are reversed.  Expected usage is to select the desired points, run the command, and while everything is still selected press Ctrl+Click to run the command again and reverse the normals.  The way this works is the command runs undo to remove the facet, then adds it as (pt2, pt1, anchor) in the reverse direction for all of the points in the selection.  In other words, click the icon to make the facet, then Ctrl+Click the icon again to undo and add the facet again with the opposite normal direction.
-
 ## Create Coplanar Points Object
 <img src="Resources/icons/CreateCoplanar.svg" alt = "create coplanar"><br/>
 Select 3 (non-colinear) points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  You can recreate the profile inside the sketch using those external links and the sketcher tools or directly in the 3d view using the MeshRemodel tools.  The Coplanar Points Object (CPO) is now a feature python object.<br/>
