@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2023.12.20"
-__version__ = "1.9.7"
-version = 1.97
+__date__    = "2023.12.22"
+__version__ = "1.9.8"
+version = 1.98
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -1019,26 +1019,34 @@ class MeshRemodelAddOrRemoveFacetCommandClass(object):
     def __init__(self):
         self.mesh = None
         self.pts = []
+        self.edges = []
         
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'AddOrRemoveFacet.svg') ,
             'MenuText': "Add or remove facet(s) to or from a mesh object" ,
             'ToolTip' : \
-"""Add facet(s) to a mesh object.  Select the mesh, select the points
-to define the facet(s), and then execute the command.
+"""Add or remove facet(s) to or from a mesh object.  Select the mesh, select the
+points to define the facet(s), and then execute the command.  You can select an 
+edge of a WireFrame object in lieu of selecting the end points of that edge or 2 
+adjacent edges instead of 3 points.
 
-Ctrl+Click = undo and reverse the order of selection (flips normals)
+Click = insert facet
+Ctrl+Click = insert facet with flipped normal
 Alt+Click = remove facet (only works with 3 points selected, sometimes fails)
 
+Tip: Do not add a flipped normal directly over another facet as this will result
+in a defective mesh.  Remove the flipped facet first, with Alt+Click, then add
+it back with Ctrl+Click.
+
 Tip when removing: Set view mode to FlatLines so you can see how the vertices
-connect to form the facets.
+connect to form the facets or use a WireFrame object instead of a points object.
 
 Tip: If you have a mesh with one or more missing facets, create a points
 object, then select the 3 points on the points object that represent the
 missing facet, along with the mesh object to add the facet to the mesh.
 
-If you notice the normal is flipped, undo and redo with Ctrl+Click on the 
-toolbar icon.
+If you notice the normal is flipped, remove it with Alt+Click (or Undo),
+and then add it back with Ctrl+Click.
 
 If you have multiple facets to make you can select first the anchor point,
 which will be common to all the facets, then the remaining points that
@@ -1063,14 +1071,6 @@ of working on the original.
             self.pts = global_picked 
         modifiers = QtGui.QApplication.keyboardModifiers()
         mesh = self.mesh.Mesh.copy()
-        if modifiers & QtCore.Qt.ControlModifier:
-            if doc.UndoNames:
-                if doc.UndoNames[0] == "Add facet" or doc.UndoNames[0] == "Add facets":
-                    doc.undo()
-                    mesh = self.mesh.Mesh.copy()
-                else:
-                    if doc.UndoNames:
-                        FreeCAD.Console.PrintWarning(f"MeshRemodel: not undoing {doc.UndoNames[0]}\n")
         if len(self.pts) == 3:
             if modifiers & QtCore.Qt.AltModifier:
                 #remove facet
@@ -1141,12 +1141,20 @@ of working on the original.
         count = 0
         meshcount = 0
         self.pts = []
+        self.edges = []
         for s in sel:
             if hasattr(s.Object,"Mesh") or s.Object.isDerivedFrom("Mesh::Feature"):
                 meshcount += 1
                 self.mesh = s.Object
                 continue
-            if hasattr(s,"PickedPoints"):
+            if len(s.SubElementNames) == 1 and "Edge" in s.SubElementNames[0]:
+                edge = s.Object.getSubObject(s.SubElementNames[0])
+                self.edges.append(edge)
+                for v in edge.Vertexes:
+                    if not gu.hasPoint(v.Point, self.pts, 1e-4):
+                        self.pts.append(v.Point)
+                        count += 1
+            elif hasattr(s,"PickedPoints"):
                 p = s.PickedPoints
                 for pt in s.PickedPoints:
                     self.pts.append(pt)
