@@ -27,8 +27,8 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2023.12.23"
-__version__ = "1.9.9"
-version = 1.99
+__version__ = "1.9.10"
+#version = 1.910
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -585,11 +585,6 @@ class PointsObject:
             for m in meshpts:
                 p = Part.Point(m.Vector)
                 pts.append(p.toShape())
-        elif hasattr(fp.Source,"Points") and hasattr(fp.Source.Points,"Points"): #points cloud
-            meshpts = self.mesh.Points.Points
-            for m in meshpts:
-                p = Part.Point(m)
-                pts.append(p.toShape())
         #print(f"pts = {pts}")        
         fp.Shape = Part.makeCompound(pts)
         fp.ViewObject.PointSize = fp.PointSize
@@ -617,7 +612,25 @@ class PointsObject:
         Gui.Selection.clearSelection()
         Gui.Selection.addSelection(fp.Source)
         Gui.runCommand("Mesh_Evaluation", 0)
-            
+        
+    def harmonizeNormals(self, fp):
+        """harmonize normals of source object"""
+        copy = fp.Source.Mesh.copy()
+        copy.rebuildNeighbourHood()
+        copy.fixIndices()
+        copy.harmonizeNormals()
+        fp.Document.openTransaction("Harmonize normals")
+        fp.Source.Mesh = copy
+        fp.Document.commitTransaction()
+        
+    def flipNormals(self, fp):
+        """flip the normals of the source mesh object"""
+        copy = fp.Source.Mesh.copy()
+        copy.flipNormals()
+        fp.Document.openTransaction("Flip normals")
+        fp.Source.Mesh = copy
+        fp.Document.commitTransaction()
+        
 
 class PointsObjectVP:
     """view provider for PointsObject object"""
@@ -634,10 +647,14 @@ class PointsObjectVP:
         return [self.Object.Source]
         
     def setupContextMenu(self, vobj, menu):
-        refresh_action = menu.addAction("Recompute points object")
+        refresh_action = menu.addAction(f"Recompute {vobj.Object.Label}")
         refresh_action.triggered.connect(lambda: vobj.Object.Proxy.refresh(vobj.Object))
         evaluate_action = menu.addAction(f"Evaluate {vobj.Object.Source.Label} for defects")
         evaluate_action.triggered.connect(lambda: vobj.Object.Proxy.evaluate(vobj.Object))
+        harmonize_action = menu.addAction(f"Harmonize Normals")
+        harmonize_action.triggered.connect(lambda: vobj.Object.Proxy.harmonizeNormals(vobj.Object))
+        flip_action = menu.addAction(f"Flip Normals")
+        flip_action.triggered.connect(lambda: vobj.Object.Proxy.flipNormals(vobj.Object))
 
     def onDelete(self, vobj, subelements):
         vobj.Object.Source.ViewObject.DisplayMode = vobj.Object.OriginalDisplayMode
@@ -691,8 +708,33 @@ with the normal side outward when adding new facets to a mesh object.
 """}
  
     def Activated(self):
-        gu.checkComponents(self.mesh.Mesh)
         doc = self.mesh.Document
+        if hasattr(self.mesh,"Mesh"): #might be a points workbench object
+            gu.checkComponents(self.mesh.Mesh)
+        elif hasattr(self.mesh,"Points") and hasattr(self.mesh.Points,"Points"):
+            #for a points cloud we just create the old non-parametric object
+            meshpts = self.mesh.Points.Points
+            pts = []
+            for m in meshpts:
+                p = Part.Point(m)
+                pts.append(p.toShape())
+            doc.openTransaction("Create points object")
+            ptsobj = doc.addObject("Part::Feature","PointsObject")
+            ptsobj.Shape = Part.Compound(pts)
+            pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+            point_size = pg.GetFloat("PointSize",4.0)
+            ptsobj.ViewObject.PointSize = point_size
+            self.mesh.ViewObject.Visibility = False
+            doc.commitTransaction()
+            #create new empty mesh
+            doc.openTransaction("Make empty mesh")
+            meshobj = doc.addObject("Mesh::Feature", self.mesh.Label)
+            meshobj.Mesh = Mesh.Mesh()
+            meshobj.ViewObject.DisplayMode = "Flat Lines"
+            meshobj.ViewObject.Lighting = "One side"
+            doc.commitTransaction()
+            return
+
         doc.openTransaction("Create points object")
         fp = doc.addObject("Part::FeaturePython","PointsObject")
         PointsObject(fp, self.mesh)
@@ -707,7 +749,7 @@ with the normal side outward when adding new facets to a mesh object.
         sel = Gui.Selection.getSelection()
         if len(sel) == 0:
             return False
-        if not sel[0].isDerivedFrom("Mesh::Feature"):
+        if not bool(sel[0].isDerivedFrom("Mesh::Feature") or sel[0].isDerivedFrom("Points::Feature")):
             return False
         self.mesh = sel[0]
         return True
@@ -762,12 +804,7 @@ class WireFrameObjectVP(PointsObjectVP):
     def getIcon(self):
         return os.path.join( iconPath , 'CreateWireFrameObject.svg')
     
-    def setupContextMenu(self, vobj, menu):
-        refresh_action = menu.addAction("Recompute WireFrame object")
-        refresh_action.triggered.connect(lambda: vobj.Object.Proxy.refresh(vobj.Object))
-        evaluate_action = menu.addAction(f"Evaluate {vobj.Object.Source.Label} for defects")
-        evaluate_action.triggered.connect(lambda: vobj.Object.Proxy.evaluate(vobj.Object))
-        
+   
 class MeshRemodelCreateWireFrameObjectCommandClass(object):
     """Create WireFrame Object command"""
 
@@ -1301,7 +1338,8 @@ trying to remove facets you have just added, use Ctrl+Z to Undo the operation.
                             self.pts.append(v.Point)
                             count += 1
             if s.Object.isDerivedFrom("Part::FeaturePython") and \
-                    bool("PointsObject" in s.Object.Name or "WireFrameObject" in s.Object.Name):
+                    bool("PointsObject" in s.Object.Name or "WireFrameObject"\
+                    in s.Object.Name) or s.Object.isDerivedFrom("Mesh::Feature"):
                 meshcount = 1
                 self.mesh = s.Object if hasattr(s.Object,"Mesh") else s.Object.Source
         if bool(count >= 3) and meshcount == 1:
