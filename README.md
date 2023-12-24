@@ -232,6 +232,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2023.12.23 (v1.9.10) -- fix bug in add facet where selecting a mesh wasn't enabling the command, add new empty mesh when creating points object from point cloud, so user can construct a mesh from it
 * 2023.12.23 (v1.9.9) -- make points object and wireframe object both parametric using Part::FeaturePython objects.
 * 2023.12.22 (v1.9.8) -- support edge selection for adding/removing facets, simplify process by removing Ctrl+Click as a means of undoing and redoing.  Now it just redoes with the facet flipped.  Existing facet must be removed with Undo or with Alt+Click.
 * 2023.12.22 (v1.9.7) -- add more mesh object functions: add / remove facet, remove point, move point, expand mesh
