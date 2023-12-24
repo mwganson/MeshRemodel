@@ -26,9 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2023.12.23"
-__version__ = "1.9.10"
-#version = 1.910
+__date__    = "2023.12.24"
+__version__ = "1.9.11"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -856,7 +855,43 @@ defects.
         self.mesh = sel[0]
         return True
 # end create WireFrame class
-####################################################################################
+################################################################################
+
+#create a simple copy of a mesh object
+class MeshRemodelMeshSimpleCopyCommandClass(object):
+    """creates a simple copy of a mesh object"""
+    
+    def __init__(self):
+        self.mesh = None
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'MeshSimpleCopy.svg'),
+            'MenuText': "Create a simple copy of a mesh object" ,
+            'ToolTip' : \
+"""Create a simple copy of a mesh object.
+"""}
+
+    def Activated(self):
+        doc = self.mesh.Document
+        doc.openTransaction("Mesh simple copy")
+        duplicate = doc.addObject("Mesh::Feature",self.mesh.Label)
+        duplicate.Mesh = self.mesh.Mesh.copy()
+        doc.commitTransaction()
+
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getSelection()
+        if len(sel) == 0:
+            return False
+        if not sel[0].isDerivedFrom("Mesh::Feature"):
+            return False
+        self.mesh = sel[0]
+        return True    
+
+
+
+################################################################################
 #add or remove a point to or from a mesh
 
 class MeshRemodelRemovePointCommandClass(object):
@@ -3847,6 +3882,7 @@ def initialize():
     if FreeCAD.GuiUp:
         Gui.addCommand("MeshRemodelCreatePointsObject", MeshRemodelCreatePointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateWireFrameObject",MeshRemodelCreateWireFrameObjectCommandClass())
+        Gui.addCommand("MeshRemodelMeshSimpleCopy", MeshRemodelMeshSimpleCopyCommandClass())
         Gui.addCommand("MeshRemodelRemovePoint", MeshRemodelRemovePointCommandClass())
         Gui.addCommand("MeshRemodelAddOrRemoveFacet", MeshRemodelAddOrRemoveFacetCommandClass())
         Gui.addCommand("MeshRemodelMovePoint", MeshRemodelMovePointCommandClass())

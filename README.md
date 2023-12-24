@@ -62,6 +62,10 @@ In the image above the mesh object has been expanded.  Note how the edges are di
 Note: The oppositive function (collapsing a mesh) is not supported.<br/>
 There is a boolean property named ShowCrossSection.  If this is set to true, then on each recompute you get a new object in the tree, which is the cross-section of the mesh at the location of the plane, again, the plane is treated as an infinite object.  Cross-sections can be useful for remodeling a mesh, so this a side-effect feature that you might want to keep in mind is available.
 
+## Mesh simple copy
+<img src="Resources/icons/MeshSimpleCopy.svg" alt="Mesh simple copy"><br/>
+Select a mesh and run this command to make a simple non-parametric copy of it.  Sometimes a non-parametric copy is needed when you are working with a parametric mesh object, such as the MeshExpander object or one of the Mesh primitives in the Mesh workbench, such as the Cube or the Cylinder.  It is also a good idea to make a copy of a mesh and work on the copy rather than the original.  That way if things don't go well you can always make another copy of he original and begin again from that starting point.<br/>
+
 ## SubObjectLoft
 <img src="Resources/icons/SubObjectLoft.svg" alt="SubObjectLoft icon"><br/>
 Select 2 subobjects in the 3d view, then run this command to loft between those subobjects.  Uses the new SubObjectLoft object for some selection types, the new ParametricLine type for some, and Part::Loft for others.<br/>
@@ -232,6 +236,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2023.12.24 (v1.9.11) -- add make mesh simple copy command
 * 2023.12.23 (v1.9.10) -- fix bug in add facet where selecting a mesh wasn't enabling the command, add new empty mesh when creating points object from point cloud, so user can construct a mesh from it
 * 2023.12.23 (v1.9.9) -- make points object and wireframe object both parametric using Part::FeaturePython objects.
 * 2023.12.22 (v1.9.8) -- support edge selection for adding/removing facets, simplify process by removing Ctrl+Click as a means of undoing and redoing.  Now it just redoes with the facet flipped.  Existing facet must be removed with Undo or with Alt+Click.

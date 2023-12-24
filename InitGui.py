@@ -65,6 +65,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelRemovePoint",
                     "MeshRemodelAddOrRemoveFacet",
                     "MeshRemodelExpandedMesh",
+                    "MeshRemodelMeshSimpleCopy",
                     "MeshRemodelCreateCoplanarPointsObject",
                     "MeshRemodelAddSelectionObserver",
                     "MeshRemodelPartSolid",
