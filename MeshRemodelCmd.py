@@ -26,9 +26,9 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2023.12.22"
-__version__ = "1.9.8"
-version = 1.98
+__date__    = "2023.12.23"
+__version__ = "1.9.9"
+version = 1.99
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -124,6 +124,23 @@ class MeshRemodelGeomUtils(object):
             
     #### end progress bar class
     
+    def findPointInMesh(self, mesh, pt):
+        """find the point in the mesh, return the index of the point in
+        the points list"""
+        topology = mesh.Topology
+        # topology is a tuple ([vectorlist],[facetlist])
+        # facet list is a list of tuples
+        # each tuple of the form (pt1_idx, pt2_idx, pt3_idx)
+        indices = []
+        points = mesh.Points
+        for point in points:
+            if gu.isSamePoint(pt, point.Vector, 1e-5):
+                if not point.Index in indices:
+                    indices.append(point.Index)
+        if len(indices) == 1:
+            return indices[0]
+        return []
+        
     def checkComponents(self,mesh):
         """check for multiple components in a mesh and warn user"""
         if mesh.countComponents() > 1:
@@ -164,12 +181,31 @@ component objects before attempting modifications.\n")
             if self.isSamePoint(pt,l,tol):
                 return True
         return False
+        
+    def hasLine(self, line, lis, tol=1e-6):
+        """hasLine(self, line, lis, tol=1e-6)"""
+        for l in lis:
+            if self.isSameLine(line, l, tol):
+                return True
+        return False
 
     def isSamePoint(self,A,B,tol):
         """isSamePoint(A,B,tol)"""
         dis = self.dist(A,B)
         if dis < tol:
             return True
+        return False
+        
+    def isSameLine(self, A, B, tol=1e-6):
+        """isSameLine(self, A, B, tol)"""
+        if abs(A.Length - B.Length) > tol:
+            return False
+        if self.isSamePoint(A.Vertex1.Point, B.Vertex1.Point, tol):
+            if self.isSamePoint(A.Vertex2.Point, B.Vertex2.Point, tol):
+                return True
+        if self.isSamePoint(A.Vertex1.Point, B.Vertex2.Point, tol):
+            if self.isSamePoint(A.Vertex2.Point, B.Vertex1.Point, tol):
+                return True
         return False
 
     def midpoint(self, A, B):
@@ -482,6 +518,148 @@ Enter new sketch radius precision", prec, -1,12,1,flags=windowFlags)
 ####################################################################################
 # Create the Mesh Remodel Points Object
 
+class PointsObject:
+    """Part::FeaturePython object to serve as proxy for mesh object so we can have
+    selectable points to work with"""
+    def __init__(self, obj, meshObj=None, className="PointsObject"):
+        obj.Proxy = self
+        obj.addProperty("App::PropertyLink","Source",className,"Source mesh document object").Source = meshObj
+        obj.addProperty("App::PropertyString", "OriginalDisplayMode",className,\
+                "Used to restore mesh to original display mode upon deleting points object").OriginalDisplayMode=\
+                meshObj.ViewObject.DisplayMode if meshObj else "Shaded"
+        obj.addProperty("App::PropertyBool", "OriginalSelectable", className, \
+                "Used to restore mesh to original Selectable status after deleting points object")\
+                .OriginalSelectable = meshObj.ViewObject.Selectable if meshObj else True
+        obj.setEditorMode("OriginalDisplayMode", 2) #hidden
+        obj.setEditorMode("OriginalSelectable", 2)
+        obj.addProperty("App::PropertyBool","FlatLines",className,\
+                        "Whether to show mesh object in Flat Lines mode").FlatLines = True
+        obj.addProperty("App::PropertyBool","OneSideLighting",className,\
+                        "Whether to set mesh object Lighting to 'One side'").OneSideLighting = True
+        obj.addProperty("App::PropertyFloat","PointSize", className,\
+                    "Size of the points in pixels, changing also changes value in settings"\
+                    ).PointSize=self.PointSize
+        obj.addProperty("App::PropertyInteger","Transparency",className,\
+                "Transparency of Source object").Transparency = 25
+        obj.addProperty("App::PropertyBool", "Selectable", className, \
+                "Toggle to false to make the mesh object non-selectable").Selectable = False
+
+    @property
+    def PointSize(self):
+        """manage parameter"""
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        point_size = pg.GetFloat("PointSize",4.0)
+        return point_size
+    
+    @PointSize.setter
+    def PointSize(self, psize):
+        """manager parameter"""
+        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        pg.SetFloat("PointSize", psize)
+        
+    def onChanged(self, fp, prop):
+        if prop == "OneSideLighting" and fp.Source != None:
+            if fp.OneSideLighting:
+                fp.Source.ViewObject.Lighting = "One side"
+            else:
+                fp.Source.ViewObject.Lighting = "Two side"
+        elif prop == "FlatLines" and fp.Source != None:
+            if fp.FlatLines:
+                fp.Source.ViewObject.DisplayMode = "Flat Lines"
+            else:
+                fp.Source.ViewObject.DisplayMode = "Shaded"
+        elif prop == "PointSize":
+            fp.ViewObject.PointSize = fp.PointSize
+            self.PointSize = fp.PointSize
+        elif prop == "Selectable":
+            fp.Source.ViewObject.Selectable = fp.Selectable
+            
+    def execute(self, fp):
+        if not fp.Source:
+            fp.Shape = Part.Shape()
+            return
+        doc = fp.Document
+        pts=[]
+        if hasattr(fp.Source,"Mesh"):
+            meshpts =fp.Source.Mesh.Points
+            for m in meshpts:
+                p = Part.Point(m.Vector)
+                pts.append(p.toShape())
+        elif hasattr(fp.Source,"Points") and hasattr(fp.Source.Points,"Points"): #points cloud
+            meshpts = self.mesh.Points.Points
+            for m in meshpts:
+                p = Part.Point(m)
+                pts.append(p.toShape())
+        #print(f"pts = {pts}")        
+        fp.Shape = Part.makeCompound(pts)
+        fp.ViewObject.PointSize = fp.PointSize
+        fp.Source.ViewObject.Transparency = fp.Transparency
+        
+    def refresh(self, fp):
+        """when the mesh changes we don't always get the usual touched notification,
+        such as when a point is moved or a facet is added.  This is good because if
+        a point is accidentally removed when removing facets the point structure will
+        still be there in the points object proxy, at least until the user manually
+        refreshes via this function
+        """
+        if not fp.Source:
+            return
+        fp.Source.touch()
+        fp.Document.openTransaction("Recompute points object")
+        fp.Document.recompute()
+        fp.Document.commitTransaction()
+        
+    def evaluate(self, fp):
+        """evaluate the Source object in mesh workbench"""
+        curWB = Gui.activeWorkbench().name()
+        Gui.activateWorkbench("MeshWorkbench")
+        Gui.activateWorkbench(curWB)
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(fp.Source)
+        Gui.runCommand("Mesh_Evaluation", 0)
+            
+
+class PointsObjectVP:
+    """view provider for PointsObject object"""
+    def __init__(self, vobj):
+        vobj.Proxy = self
+    
+    def getIcon(self):
+        return os.path.join( iconPath , 'CreatePointsObject.svg')
+        
+    def attach(self, vobj):
+        self.Object = vobj.Object
+        
+    def claimChildren(self):
+        return [self.Object.Source]
+        
+    def setupContextMenu(self, vobj, menu):
+        refresh_action = menu.addAction("Recompute points object")
+        refresh_action.triggered.connect(lambda: vobj.Object.Proxy.refresh(vobj.Object))
+        evaluate_action = menu.addAction(f"Evaluate {vobj.Object.Source.Label} for defects")
+        evaluate_action.triggered.connect(lambda: vobj.Object.Proxy.evaluate(vobj.Object))
+
+    def onDelete(self, vobj, subelements):
+        vobj.Object.Source.ViewObject.DisplayMode = vobj.Object.OriginalDisplayMode
+        vobj.Object.Source.ViewObject.Selectable = vobj.Object.OriginalSelectable
+        return True
+        
+    def setEdit(self, vobj, modNum):
+        pass
+
+    def __getstate__(self):
+        '''When saving the document this object gets stored using Python's json module.\
+                Since we have some un-serializable parts here -- the Coin stuff -- we must define this method\
+                to return a tuple of all serializable objects or None.'''
+        return {"name": self.Object.Name}
+ 
+    def __setstate__(self,state):
+        '''When restoring the serialized object from document we have the chance to set some internals here.\
+                Since no data were serialized nothing needs to be done here.'''
+        self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
+        return None
+
+
 class MeshRemodelCreatePointsObjectCommandClass(object):
     """Create Points Object command"""
 
@@ -491,43 +669,36 @@ class MeshRemodelCreatePointsObjectCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreatePointsObject.svg') ,
             'MenuText': "Create points &object" ,
-            'ToolTip' : "Create the points object from selected Mesh or Points cloud object\n\
-(Ctrl + Click to make mesh partially transparent and non-selectable.\n\
-Non-selectability can be reversed in the mesh object's view tab in the property view.)\n\
-"}
+            'ToolTip' : 
+"""Create a parametric PointsObject linked to the selected mesh object.  The points
+object serves as a proxy for the mesh object.  We can easily select the points of
+the points object whereas selecting directly the points of a mesh object is not 
+supported in FreeCAD.  See also the WireFrame object, which serves a similar role,
+but that also has selectable edges that can be used in conjunction with the add or 
+remove facet tool.
+
+The advantage of the points object over the wireframe object is it is much faster
+to recompute when working with complex meshes with many points and facets.  Also,
+the way the WireFrame selection of edges works is the 2 vertices of the edge are
+added to the points list kept in memory, but the order the vertices are added is
+undefined, meaning you have less control over the order of selection for the vertices
+when using the wireframe edge selection for adding multiple facets in one go.  For
+that operation it is highly recommended to select the vertices.
+
+Tip: Select the vertices in counter-clockwise fashion to get the facet oriented
+with the normal side outward when adding new facets to a mesh object.
+
+"""}
  
     def Activated(self):
         gu.checkComponents(self.mesh.Mesh)
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        doc = FreeCAD.ActiveDocument
-        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
-        point_size = pg.GetFloat("PointSize",4.0)
-        QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        doc = self.mesh.Document
         doc.openTransaction("Create points object")
-
-        pts=[]
-        if hasattr(self.mesh,"Mesh"):
-            meshpts = self.mesh.Mesh.Points
-            for m in meshpts:
-                p = Part.Point(m.Vector)
-                pts.append(p.toShape())
-        elif hasattr(self.mesh,"Points") and hasattr(self.mesh.Points,"Points"): #points cloud
-            meshpts = self.mesh.Points.Points
-            for m in meshpts:
-                p = Part.Point(m)
-                pts.append(p.toShape())
-
-        Part.show(Part.makeCompound(pts),"MR_Points")
-        doc.ActiveObject.ViewObject.PointSize = point_size
-        doc.recompute()
-        if modifiers == QtCore.Qt.ControlModifier:
-            self.mesh.ViewObject.Transparency = 75
-            self.mesh.ViewObject.Selectable = False
-        self.mesh.ViewObject.DisplayMode = "Flat Lines"
-        self.mesh.ViewObject.Lighting = "One side"
+        fp = doc.addObject("Part::FeaturePython","PointsObject")
+        PointsObject(fp, self.mesh)
+        PointsObjectVP(fp.ViewObject)
         doc.commitTransaction()
         doc.recompute()
-        QtGui.QApplication.restoreOverrideCursor()
         return
 
     def IsActive(self):
@@ -545,6 +716,58 @@ Non-selectability can be reversed in the mesh object's view tab in the property 
 ####################################################################################
 # Create the Mesh Remodel WireFrame Object
 
+class WireFrameObject(PointsObject):
+    def __init__(self, obj, meshObj, className):
+        super(WireFrameObject, self).__init__(obj, meshObj, className)
+        obj.FlatLines = False
+        
+    def execute(self, fp):
+        if not fp.Source:
+            return
+        mesh = fp.Source.Mesh.copy()
+        lines = []
+        for facet in mesh.Facets:
+            pt1 = FreeCAD.Vector(facet.Points[0])
+            pt2 = FreeCAD.Vector(facet.Points[1])
+            pt3 = FreeCAD.Vector(facet.Points[2])
+            try:
+                line1 = Part.LineSegment(pt1, pt2).toShape()
+                line2 = Part.LineSegment(pt2, pt3).toShape()
+                line3 = Part.LineSegment(pt3, pt1).toShape()
+                lines.extend([line1, line2, line3])
+            except:
+                pass
+            # this works, but takes too long, and if we multiFuse
+            # then that resolves the self-intersections, anyway
+            # if not gu.hasLine(line1, lines, 1e-6):
+            #     lines.append(line1)
+            # if not gu.hasLine(line2, lines, 1e-6):
+            #     lines.append(line2)
+            # if not gu.hasLine(line3, lines, 1e-6):
+            #     lines.append(line3)
+        if len(lines) > 1 and len(lines) < 10000:    
+            fp.Shape = lines[0].multiFuse(lines[1:])
+        elif len(lines) > 1 and len(lines) > 10000:
+            FreeCAD.Console.PrintWarning(\
+"""Compounding WireFrame rather than fusing since there are more than 10,000 edges.
+""")
+            fp.Shape = Part.Compound(lines)
+        else:
+            fp.Shape = Part.Shape()
+        
+class WireFrameObjectVP(PointsObjectVP):
+    def __init__(self, vobj):
+        super(WireFrameObjectVP, self).__init__(vobj)
+            
+    def getIcon(self):
+        return os.path.join( iconPath , 'CreateWireFrameObject.svg')
+    
+    def setupContextMenu(self, vobj, menu):
+        refresh_action = menu.addAction("Recompute WireFrame object")
+        refresh_action.triggered.connect(lambda: vobj.Object.Proxy.refresh(vobj.Object))
+        evaluate_action = menu.addAction(f"Evaluate {vobj.Object.Source.Label} for defects")
+        evaluate_action.triggered.connect(lambda: vobj.Object.Proxy.evaluate(vobj.Object))
+        
 class MeshRemodelCreateWireFrameObjectCommandClass(object):
     """Create WireFrame Object command"""
 
@@ -556,85 +779,35 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         self.bCanceled = False
 
     def GetResources(self):
-
-
         return {'Pixmap'  : os.path.join( iconPath , 'CreateWireFrameObject.svg') ,
             'MenuText': "Create Wire&Frame object" ,
-            'ToolTip' : fixTip("Create the WireFrame object\n\
-(Ctrl + Click to make mesh partially transparent and non-selectable.\n\
-Non-selectability can be reversed in the mesh object's view tab in the property view.)\n")}
+            'ToolTip' : \
+"""Create a parametric WireFrame object.  The wireframe will be bound to the mesh
+object and can be used as a proxy for the mesh object's edges and vertices, which
+can be selected for use with the various mesh editing tools in MeshRemodel:
 
-    def makeId(self,a,b):
-        """makeId(a,b)
-           make a unique id from 2 integers using the Cantor Pairing Function
-           see https://en.wikipedia.org/wiki/Pairing_function#Cantor_pairing_function
-        """
-        if a >= b:
-            return (a + b) * (a + b + 1) / 2 + a
-        else:
-            return (a + b) * (a + b + 1) / 2 + b
+Add or remove facet(s)
+Move point
+Remove point
 
+Note that the wire frame object does not automatically recompute when changes are
+made to the underlying mesh object.  You can do a manual recompute via the wire frame
+object's context menu.  Recomputing can take a long time depending on the complexity
+of the mesh and it can also be useful to have the points and edges available after
+removing them from the mesh object in order to add them back as a means of curing
+defects.
+"""}
     def Activated(self):
         gu.checkComponents(self.mesh.Mesh)
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        doc = FreeCAD.ActiveDocument
-        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
-        line_width = pg.GetFloat("LineWidth",5.0)
-        point_size = pg.GetFloat("PointSize",4.0)
-        tolerance = pg.GetFloat("WireFrameTolerance",.01)
-        #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
-        self.mesh.ViewObject.Lighting = "One side"
-        mids = []
-        lines=[]
-        meshfacets = self.mesh.Mesh.Facets
-        total = len(meshfacets)
-        pb = gu.MRProgress()
-        pb.makeProgressBar(total,"Cancel","Cancel Wireframe generation")
-
-        idMap = {}
-        for f in meshfacets:
-            try:
-                pts = f.Points
-                (id0,id1,id2) = f.PointIndices
-                if gu.isSamePoint(pts[0], pts[1], tolerance) or gu.isSamePoint(pts[0],pts[2],tolerance) or gu.isSamePoint(pts[1],pts[2],tolerance):
-                    continue #otherwise we get an exception, so skip this line
-                id = self.makeId(id0,id1)
-                if not idMap.get(id):
-                    l = Part.makeLine(pts[0],pts[1])
-                    lines.append(l)
-                    idMap[id] = id
-                id = self.makeId(id0,id2)
-                if not idMap.get(id):
-                    l = Part.makeLine(pts[0],pts[2])
-                    lines.append(l)
-                    idMap[id] = id
-                id = self.makeId(id2,id1)
-                if not idMap.get(id):
-                    l = Part.makeLine(pts[2],pts[1])
-                    lines.append(l)
-                    idMap[id] = id
-            except:
-                FreeCAD.Console.PrintError("Exception creating wireframe.  Typically this is caused by defective mesh object.\n")
-                pb.killProgressBar()
-            if pb.isCanceled():
-                FreeCAD.Console.PrintWarning("MeshRemodel: WireFrame creation canceled.  WireFrame may be incomplete.\n")
-                break
-                return
-        pb.killProgressBar()
-
+        doc = self.mesh.Document
         doc.openTransaction("Create WireFrame object")
-        Part.show(Part.makeCompound(lines),"MR_WireFrame")
-        doc.ActiveObject.ViewObject.PointSize = point_size
-        doc.ActiveObject.ViewObject.LineWidth = line_width
-        if modifiers == QtCore.Qt.ControlModifier:
-            self.mesh.ViewObject.Transparency = 75
-            self.mesh.ViewObject.Selectable = False
-        doc.recompute()
+        fp = doc.addObject("Part::FeaturePython","WireFrameObject")
+        WireFrameObject(fp, self.mesh,"WireFrameObject")
+        WireFrameObjectVP(fp.ViewObject)
         doc.commitTransaction()
         doc.recompute()
-        #QtGui.QApplication.restoreOverrideCursor()
         return
-
+        
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
@@ -667,7 +840,6 @@ to that point.
 """}        
     
     def Activated(self):
-        gu.checkComponents(self.mesh.Mesh)
         new_mesh = self.removeFacets(self.mesh.Mesh.copy(), self.pt)
         self.mesh.Document.openTransaction("Remove point")
         self.mesh.Mesh = new_mesh
@@ -703,28 +875,26 @@ to that point.
         if not FreeCAD.ActiveDocument:
             return False
         sel = Gui.Selection.getCompleteSelection()
-        if len(sel) != 2:
-            return False
-        if not hasattr(sel[0],"PickedPoints"):
+        if len(sel) > 2:
             return False
         count = 0
         meshcount = 0
         self.pt = None
         for s in sel:
             if hasattr(s.Object,"Mesh") or s.Object.isDerivedFrom("Mesh::Feature") :
-                meshcount += 1
+                meshcount = 1
                 self.mesh = s.Object
-                continue
-            if hasattr(s,"PickedPoints"):
-                p = s.PickedPoints
-                for pt in s.PickedPoints:
-                    self.pt = pt
-                    count += 1
-                if len(p) == 0: #might be individual part point objects
-                    if len(s.Object.Shape.Vertexes) == 1:
-                        self.pt = s.Object.Shape.Vertexes[0].Point
-                        count += 1
-        if count == 1 and meshcount == 1:
+            if s.Object.isDerivedFrom("Part::FeaturePython") and \
+                    bool("PointsObject" in s.Object.Name or "WireFrameObject" in s.Object.Name):
+                self.mesh = s.Object.Source if s.Object.Source else self.mesh
+                if s.Object.Source:
+                    meshcount = 1
+            if s.SubElementNames and "Vertex" in s.SubElementNames[0]:
+                sub = s.Object.getSubObject(s.SubElementNames[0])
+                self.pt = sub.Point
+                count += 1
+                
+        if count == 1 and meshcount == 1 and gu.findPointInMesh(self.mesh.Mesh, self.pt):
             return True
         return False
         
@@ -910,7 +1080,6 @@ to the affected edges, and then converting back to a mesh.
 """}
 
     def Activated(self):
-        gu.checkComponents(self.mesh.Mesh)
         doc = self.mesh.Document
         if len(global_picked) >= 2:
             self.pts = global_picked 
@@ -921,7 +1090,7 @@ to the affected edges, and then converting back to a mesh.
             destination = self.getDestination()
         if gu.isSamePoint(self.pts[0], destination, 1e-5):
             return
-        idx = self.findPoint(mesh, self.pts[0])
+        idx = gu.findPointInMesh(mesh, self.pts[0])
         if idx == []:
             return
         doc.openTransaction("Move point")
@@ -940,33 +1109,10 @@ to the affected edges, and then converting back to a mesh.
             mesh.removeFoldsOnSurface()
             FreeCAD.Console.PrintWarning("MeshRemodel: removed folds on surface\n")
         
-    def findPoint(self, mesh, pt):
-        """find the point in the mesh, return the index of the point in
-        the points list"""
-        topology = mesh.Topology
-        # topology is a tuple ([vectorlist],[facetlist])
-        # facet list is a list of tuples
-        # each tuple of the form (pt1_idx, pt2_idx, pt3_idx)
-        indices = []
-        points = mesh.Points
-        for point in points:
-            if gu.isSamePoint(pt, point.Vector, 1e-5):
-                if not point.Index in indices:
-                    indices.append(point.Index)
-        if len(indices) == 1:
-            return indices[0]
-        elif len(indices) > 1:
-            FreeCAD.Console.PrintError("MeshRemodel: ambiguous point selection as\
-more than one point matches the search criteria within tolerance of 1e-5\n")
-            return[]
-        else:
-            FreeCAD.Console.PrintError("MeshRemodel: Unable to find point in mesh topology.\n")
-            return []
-        
     def getDestination(self):
         """get the destination for the point from the user"""
         #for now, just return the origin
-        idx = self.findPoint(self.mesh.Mesh, self.pts[0])
+        idx = gu.findPointInMesh(self.mesh.Mesh, self.pts[0])
         if idx == None:
             return None #calling function returns anyway if idx can't be found
         normal = self.mesh.Mesh.getPointNormals()[idx]
@@ -983,32 +1129,27 @@ more than one point matches the search criteria within tolerance of 1e-5\n")
         if not FreeCAD.ActiveDocument:
             return False
         sel = Gui.Selection.getCompleteSelection()
-        if len(sel) == 0:
-            return False
-        if not hasattr(sel[0],"PickedPoints"):
+        if len(sel) == 0 or len(sel) > 3:
             return False
         count = 0
         meshcount = 0
         self.pts = []
         for s in sel:
-            if hasattr(s.Object,"Mesh") or s.Object.isDerivedFrom("Mesh::Feature"):
-                meshcount += 1
-                self.mesh = s.Object
-                continue
-            if hasattr(s,"PickedPoints"):
-                p = s.PickedPoints
-                for pt in s.PickedPoints:
-                    self.pts.append(pt)
+            if s.SubElementNames and s.SubElementNames[0]:
+                sub = s.Object.getSubObject(s.SubElementNames[0])
+                if "Vertex" in s.SubElementNames[0]:
+                    self.pts.append(sub.Point)
                     count += 1
-                if len(p)==0: #might be individual part point objects
-                    if len(s.Object.Shape.Vertexes)==1:
-                        self.pts.append(s.Object.Shape.Vertexes[0].Point)
-                        count += 1
+                if "Edge" in s.SubElementNames[0]:
+                    return False
+            if s.Object.isDerivedFrom("Part::FeaturePython") and \
+                    bool("PointsObject" in s.Object.Name or "WireFrameObject" in s.Object.Name):
+                meshcount = 1
+                self.mesh = s.Object if hasattr(s.Object,"Mesh") else s.Object.Source
         if bool(count == 1 or count == 2) and meshcount == 1:
-            return True
-        return False       
-
-
+            if gu.findPointInMesh(self.mesh.Mesh, self.pts[0]):
+                return True
+        return False
 
 
 ################################################################################
@@ -1019,8 +1160,7 @@ class MeshRemodelAddOrRemoveFacetCommandClass(object):
     def __init__(self):
         self.mesh = None
         self.pts = []
-        self.edges = []
-        
+
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'AddOrRemoveFacet.svg') ,
             'MenuText': "Add or remove facet(s) to or from a mesh object" ,
@@ -1065,7 +1205,6 @@ of working on the original.
 
     def Activated(self):
         self.mesh.ViewObject.Lighting = "One side"
-        gu.checkComponents(self.mesh.Mesh)
         doc = self.mesh.Document
         if len(global_picked) > 2:
             self.pts = global_picked 
@@ -1083,11 +1222,18 @@ of working on the original.
             
             if modifiers & QtCore.Qt.ControlModifier:
                 mesh.addFacet(self.pts[2],self.pts[1],self.pts[0])
+                print(f"MeshRemodel: facet added: {self.pts[2], self.pts[1], self.pts[0]}")
             else:
                 mesh.addFacet(self.pts[0],self.pts[1],self.pts[2])
+                print(f"MeshRemodel: facet added: {self.pts[0], self.pts[1], self.pts[2]}")
             doc.openTransaction("Add facet")
             self.mesh.Mesh = mesh
             doc.commitTransaction()
+        elif QtCore.Qt.AltModifier & modifiers:
+            FreeCAD.Console.PrintError(\
+"""MeshRemodel: Not supported removing more than 1 facet at a time.  If you are
+trying to remove facets you have just added, use Ctrl+Z to Undo the operation.
+""")
         # when more than 3 points are selected we make facets of all of them
         # and add all the facets.  First selected point becomes the anchor
         # point, then we go 1,2,3; 1,3,4; 1;4,5 and so on
@@ -1096,8 +1242,10 @@ of working on the original.
             for cur,next in zip(self.pts[1:-1], self.pts[2:]):
                 if modifiers & QtCore.Qt.ControlModifier:
                     mesh.addFacet(next, cur, anchor)
+                    print(f"MeshRemodel: facet added: {next, cur, anchor}")
                 else:
                     mesh.addFacet(anchor, cur, next)
+                    print(f"MeshRemodel: facet added: {anchor, cur, next}")
             doc.openTransaction("Add facets")
             self.mesh.Mesh = mesh
             doc.commitTransaction()
@@ -1124,7 +1272,9 @@ of working on the original.
         #print(f"facets = {facets}")
         if facet_tuple in facets:
             facet_idx = facets.index(facet_tuple)
+            print(f"MeshRemodel: removing facet: {copy.Facets[facet_idx]}")
             copy.removeFacets([facet_idx])
+
             return copy
         else:
             FreeCAD.Console.PrintError("MeshRemodel: Unable to remove facet\n")
@@ -1134,38 +1284,29 @@ of working on the original.
         if not FreeCAD.ActiveDocument:
             return False
         sel = Gui.Selection.getCompleteSelection()
-        if len(sel) == 0:
-            return False
-        if not hasattr(sel[0],"PickedPoints"):
+        if len(sel) < 2:
             return False
         count = 0
         meshcount = 0
         self.pts = []
-        self.edges = []
         for s in sel:
-            if hasattr(s.Object,"Mesh") or s.Object.isDerivedFrom("Mesh::Feature"):
-                meshcount += 1
-                self.mesh = s.Object
-                continue
-            if len(s.SubElementNames) == 1 and "Edge" in s.SubElementNames[0]:
-                edge = s.Object.getSubObject(s.SubElementNames[0])
-                self.edges.append(edge)
-                for v in edge.Vertexes:
-                    if not gu.hasPoint(v.Point, self.pts, 1e-4):
-                        self.pts.append(v.Point)
-                        count += 1
-            elif hasattr(s,"PickedPoints"):
-                p = s.PickedPoints
-                for pt in s.PickedPoints:
-                    self.pts.append(pt)
+            if s.SubElementNames and s.SubElementNames[0]:
+                sub = s.Object.getSubObject(s.SubElementNames[0])
+                if "Vertex" in s.SubElementNames[0]:
+                    self.pts.append(sub.Point)
                     count += 1
-                if len(p)==0: #might be individual part point objects
-                    if len(s.Object.Shape.Vertexes)==1:
-                        self.pts.append(s.Object.Shape.Vertexes[0].Point)
-                        count += 1
-        if count >= 3 and meshcount == 1:
+                if "Edge" in s.SubElementNames[0]:
+                    for v in sub.Vertexes:
+                        if not gu.hasPoint(v.Point, self.pts, 1e-5):
+                            self.pts.append(v.Point)
+                            count += 1
+            if s.Object.isDerivedFrom("Part::FeaturePython") and \
+                    bool("PointsObject" in s.Object.Name or "WireFrameObject" in s.Object.Name):
+                meshcount = 1
+                self.mesh = s.Object if hasattr(s.Object,"Mesh") else s.Object.Source
+        if bool(count >= 3) and meshcount == 1:
             return True
-        return False       
+        return False
 
 ####################################################################################
 #Expand a mesh object with a plane

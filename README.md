@@ -19,6 +19,8 @@ Use this workbench to aid in remodeling imported mesh objects.  The preferred wo
 ## Create Points Object (mesh objects)
 <img src="Resources/icons/CreatePointsObject.svg" alt="create points object"><br/>
 Select the mesh object in the tree, then use this command to create a points object containing all the vertices of the selected mesh object.  The points object is a compound consisting of Part Point (vertex) objects, one per vertex in the selected mesh.  The purpose of this object is to provide selectable points in the 3d view.  We can use these selectable points with the other tools in the workbench to create the lines, circles, arcs, and polygons needed to remodel the mesh.  These can also be used in repairing meshes in conjunction with the remove point, move point, and add or remove facet tools.<br/>
+See also the Create WireFrame object, which can be used for the same purpose.  Which to use is up to you, but I recommend using this Points object because it is much, much faster to recompute.  Also, when adding facets to the mesh object, which is going to be the most common usage of the tool, you need to select points instead of edges anyway in order to better control the order of selection of the points, which is critical to the process.  Edge selection, although a bit easier than vertex selection doesn't work as well for adding multiple consecutive facets.<br/>
+**Tip: I have found when selecting the vertices to add a facet that if I select them in counter-clockwise fashion the facets created are more likely to have the proper normal orientation.**
 <br/>
 If you hold Ctrl key down while invoking this command the mesh object will be made partially transparent and non-selectable in the 3d view.  You can still select it in the tree view, but it will not appear to be selected in the 3d view and on mouse over you will not see it change to pre-select color.  This will make it easier to see the MR_Points object.  These settings can be changed in the mesh object's view tab in the property view.  Even without Ctrl the mesh will be set to DisplayMode = "Flat Lines", so you can see how the points connect to make up the facets, and the Lighting property is set to "One side" so you can see if there are any flipped normals.
 <br/>
@@ -26,9 +28,8 @@ Update: As of v1.82 you can now also create a points object from a Points cloud 
 <br/>
 ## Create WireFrame Object (mesh objects)
 <img src="Resources/icons/CreateWireFrameObject.svg" alt="create wireframe object"><br/>
-Select the mesh object in the tree, then use this command to create a wireframe object containing all the edges of the selected mesh object.  The wireframe object is a compound consisting of Part Line objects, one per edge in the selected mesh.  The purpose of this object is to provide selectable edges in the 3d view.  We can use these selectable points with the other tools in the workbench to create the lines and polygons needed to remodel the mesh or to make some repairs to the mesh object.<br/>
-<br/>
-If you hold Ctrl key down while invoking this command the mesh object will be made partially transparent and non-selectable in the 3d view.  You can still select it in the tree view, but it will not appear to be selected in the 3d view and on mouse over you will not see it change to pre-select color.  This will make it easier to see the MR_WireFrame object.  These settings can be changed in the mesh object's view tab in the property view.
+Creates a parametric object based on Part::FeaturePython class from the selected mesh object.  The lines and vertices
+of this object serve as a proxy for the lines and vertices of the mesh object, which are not selectable individually in FreeCAD.  You select the edges and vertices of the proxy object and MeshRemodel will translate those selections into selections of the mesh object for the purposes of the various mesh repair tools available in MeshRemodel, including the move point too, the remove point too, and the add/remove facet tool.  See also the Create Points Object command.<br/>
 <br/>
 ## Move Point (mesh objects)
 <img src="Resources/icons/MovePoint.svg" alt="Move a point in a mesh object"><br/>
@@ -231,6 +232,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2023.12.23 (v1.9.9) -- make points object and wireframe object both parametric using Part::FeaturePython objects.
 * 2023.12.22 (v1.9.8) -- support edge selection for adding/removing facets, simplify process by removing Ctrl+Click as a means of undoing and redoing.  Now it just redoes with the facet flipped.  Existing facet must be removed with Undo or with Alt+Click.
 * 2023.12.22 (v1.9.7) -- add more mesh object functions: add / remove facet, remove point, move point, expand mesh
 * 2023.12.19 (v1.9.6) -- add Add facet(s) command, add FlattenToPlane boolean to coplanar points object, update SubObjectLoft icon
