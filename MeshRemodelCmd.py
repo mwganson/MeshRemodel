@@ -27,7 +27,7 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2023.12.24"
-__version__ = "1.9.11"
+__version__ = "1.9.12"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -123,6 +123,27 @@ class MeshRemodelGeomUtils(object):
             
     #### end progress bar class
     
+    def getFacetsFromFacetIndices(self, facet_indices, mesh):
+        """getFacetsFromFacetIndices(self, facet_indices, mesh)"""
+        return [mesh.Facets[idx] for idx in facet_indices]
+
+    def getFacetIndicesFromPointIndices(self, point_indices, mesh):
+        """getFacetIndicesFromPointINdices(self, point_indices, mesh)
+        return the facet indices given the point indices and the mesh"""
+        return [facet.Index for facet in mesh.Facets \
+                if self.facetIsInList(facet, point_indices)]
+    
+    def getPointIndicesInMesh(self, pts, mesh):
+        """gets the point indices of the points in the mesh"""
+        return [self.findPointInMesh(mesh, pt) for pt in pts]
+
+    def facetIsInList(self, facet, point_indices):
+        """all 3 of the facet's points must be in the point_indices"""
+        for idx in facet.PointIndices:
+            if not idx in point_indices:
+                return False
+        return True
+
     def findPointInMesh(self, mesh, pt):
         """find the point in the mesh, return the index of the point in
         the points list"""
@@ -866,30 +887,131 @@ class MeshRemodelMeshSimpleCopyCommandClass(object):
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'MeshSimpleCopy.svg'),
-            'MenuText': "Create a simple copy of a mesh object" ,
+            'MenuText': "Create a simple copy of a mesh object or a new empty mesh" ,
             'ToolTip' : \
-"""Create a simple copy of a mesh object.
+"""Create a simple copy of a mesh object.  If no mesh is selected, then a new
+empty mesh object is created.
 """}
 
     def Activated(self):
-        doc = self.mesh.Document
-        doc.openTransaction("Mesh simple copy")
-        duplicate = doc.addObject("Mesh::Feature",self.mesh.Label)
-        duplicate.Mesh = self.mesh.Mesh.copy()
-        doc.commitTransaction()
+        doc = self.mesh.Document if self.mesh else FreeCAD.ActiveDocument
+        if self.mesh:
+            doc.openTransaction("Mesh simple copy")
+            duplicate = doc.addObject("Mesh::Feature",self.mesh.Label)
+            duplicate.Mesh = self.mesh.Mesh.copy()
+            doc.commitTransaction()
+        else:
+            doc.openTransaction("Make new empty mesh")
+            duplicate = doc.addObject("Mesh::Feature","Mesh")
+            duplicate.Mesh = Mesh.Mesh()
+            doc.commitTransaction() 
 
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
             return False
+        self.mesh = None
         sel = Gui.Selection.getSelection()
-        if len(sel) == 0:
+        self.mesh = sel[0] if len(sel) == 1 else None
+        if self.mesh and not self.mesh.isDerivedFrom("Mesh::Feature"):
             return False
-        if not sel[0].isDerivedFrom("Mesh::Feature"):
-            return False
-        self.mesh = sel[0]
         return True    
 
+################################################################################
 
+#duplicate selected facets
+
+class MeshRemodelDuplicateSelectedFacetsCommandClass(object):
+    """duplicate selected facets"""
+    def __init__(self):
+        self.mesh1 = None
+        self.mesh2 = None
+        self.pts = []
+        
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'DuplicateSelectedFacets.svg'),
+            'MenuText': "Duplicated selected facets" ,
+            'ToolTip' : \
+"""Duplicate selected facets.
+Usage: Select 1st the source mesh, then select 2nd the destination mesh.  Finally,
+select the facets (by edge or vertex) to be duplicated into the destination mesh.
+You can create an empty mesh object to put the duplicates into with the Create 
+simple copy tool, which creates an empty mesh when nothing is selected.  Facet 
+selections are done on the associated PointsObject or WireFrameObject, representing 
+the source mesh.  Box selection (Shift+E) is supported for WireFrameObject types
+using edge selection.  (Press Ctrl while using the mouse to do the box selection 
+after pressing Shift+E to get into box selection mode.)
+"""}
+
+    def Activated(self):
+        doc = self.mesh1.Document
+        point_indices = gu.getPointIndicesInMesh(self.pts, self.mesh1.Mesh)
+        #print (f"point_indices: {point_indices}")
+        facet_indices = gu.getFacetIndicesFromPointIndices(point_indices, self.mesh1.Mesh)
+        #print(f"facet_indices: {facet_indices}")
+        facets = gu.getFacetsFromFacetIndices(facet_indices, self.mesh1.Mesh)
+        #print(f"facets = {facets}")
+        copy = self.mesh2.Mesh.copy()
+        copy.addFacets(facets)
+        print(f"Source: {self.mesh1.Label} -> Destination: {self.mesh2.Label} \
+{len(facets)} facets duplicated.")
+        doc.openTransaction("Duplicate facets")
+        self.mesh2.Mesh = copy
+        self.mesh2.ViewObject.DisplayMode = "Flat Lines"
+        self.mesh2.ViewObject.Lighting = "One side"
+        doc.commitTransaction()
+       
+    # def facetIsInList(self, facet, point_indices):
+    #     """all 3 of the facet's points must be in the point_indices"""
+    #     for idx in facet.PointIndices:
+    #         if not idx in point_indices:
+    #             return False
+    #     return True
+
+    def getMesh(self, s):
+        """get the mesh object from the selection object, can be a direct selection
+        or a Points object or WireFrame object, return None if not a mesh"""
+        if s.Object.isDerivedFrom("Part::FeaturePython") and \
+                bool("PointsObject" in s.Object.Name or "WireFrameObject"\
+                in s.Object.Name):
+            return s.Object.Source
+        if s.Object.isDerivedFrom("Mesh::Feature"):
+            return s.Object
+        return None
+
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getCompleteSelection()
+
+        count = 0
+        self.mesh1 = None
+        self.mesh2 = None
+        self.pts = []
+        for idx,s in enumerate(sel):
+            #usage: select from mesh first, then select destination mesh, then select
+            #points/edges to duplicate from sourc to destination
+            if idx == 0:
+                self.mesh1 = self.getMesh(s)
+            if idx == 1:
+                self.mesh2 = self.getMesh(s)
+            if idx == 2 and not bool(self.mesh1 and self.mesh2) or self.mesh1 == self.mesh2:
+                return False
+            if s.SubElementNames and s.SubElementNames[0]:
+                sub = s.Object.getSubObject(s.SubElementNames[0])
+                if "Vertex" in s.SubElementNames[0]:
+                    self.pts.append(sub.Point)
+                    count += 1
+                if "Edge" in s.SubElementNames[0]:
+                    for v in sub.Vertexes:
+                        if not gu.hasPoint(v.Point, self.pts, 1e-5):
+                            self.pts.append(v.Point)
+                            count += 1
+                if "Face" in s.SubElementNames[0]:
+                    return False
+
+        if count >= 3:
+            return True
+        return False
 
 ################################################################################
 #add or remove a point to or from a mesh
@@ -1075,13 +1197,16 @@ Use Undo to undo the changes if desired.
         """update self.pt based on spinner boxes"""
         if self.blockingSignals:
             return
-        self.pt = self.ptBase + self.normalDir * self.Normal
+        
         if "Normal" in spinner.objectName():
+            self.pt = self.ptBase + self.normalDir * self.Normal
             self.blockingSignals = True
             self.X = self.pt.x
             self.Y = self.pt.y
             self.Z = self.pt.z
             self.blockingSignals = False
+        self.pt = FreeCAD.Vector(self.X, self.Y, self.Z)
+
             
     def updateVertex(self):
         self.Vertex.X = self.X
@@ -1219,7 +1344,7 @@ to the affected edges, and then converting back to a mesh.
                 meshcount = 1
                 self.mesh = s.Object if hasattr(s.Object,"Mesh") else s.Object.Source
         if bool(count == 1 or count == 2) and meshcount == 1:
-            if gu.findPointInMesh(self.mesh.Mesh, self.pts[0]):
+            if gu.findPointInMesh(self.mesh.Mesh, self.pts[0]) != []:
                 return True
         return False
 
@@ -1238,20 +1363,17 @@ class MeshRemodelAddOrRemoveFacetCommandClass(object):
             'MenuText': "Add or remove facet(s) to or from a mesh object" ,
             'ToolTip' : \
 """Add or remove facet(s) to or from a mesh object.  Select the mesh, select the
-points to define the facet(s), and then execute the command.  You can select an 
+points or edges to define the facet(s), and then execute the command.  You can select an 
 edge of a WireFrame object in lieu of selecting the end points of that edge or 2 
-adjacent edges instead of 3 points.
+adjacent edges instead of 3 points or all 3 edges that define the facet.
 
 Click = insert facet
 Ctrl+Click = insert facet with flipped normal
-Alt+Click = remove facet (only works with 3 points selected, sometimes fails)
+Alt+Click = remove facet(s)
 
 Tip: Do not add a flipped normal directly over another facet as this will result
 in a defective mesh.  Remove the flipped facet first, with Alt+Click, then add
 it back with Ctrl+Click.
-
-Tip when removing: Set view mode to FlatLines so you can see how the vertices
-connect to form the facets or use a WireFrame object instead of a points object.
 
 Tip: If you have a mesh with one or more missing facets, create a points
 object, then select the 3 points on the points object that represent the
@@ -1268,7 +1390,8 @@ anchor, pt2, pt3
 anchor, pt3, pt4
 anchor, pt4, pt5...
 
-Care should be taken to ensure the facets do not intersect previous facets.
+Care should be taken to ensure the facets do not intersect previous facets.  Make
+the anchor point the that has clear line of sight to the most nearby points.
 
 Note: This changes the mesh object, but you can use Undo to undo the
 change if it is not successful or work on a duplicate of the mesh instead
@@ -1302,10 +1425,15 @@ of working on the original.
             self.mesh.Mesh = mesh
             doc.commitTransaction()
         elif QtCore.Qt.AltModifier & modifiers:
-            FreeCAD.Console.PrintError(\
-"""MeshRemodel: Not supported removing more than 1 facet at a time.  If you are
-trying to remove facets you have just added, use Ctrl+Z to Undo the operation.
-""")
+            #remove multiple facets
+            point_indices = gu.getPointIndicesInMesh(self.pts, mesh)
+            facet_indices = gu.getFacetIndicesFromPointIndices(point_indices, mesh)
+            mesh.removeFacets(facet_indices)
+            print(f"Removing {len(facet_indices)} facets")
+            doc.openTransaction("Remove facets")
+            self.mesh.Mesh = mesh
+            doc.commitTransaction()
+            return
         # when more than 3 points are selected we make facets of all of them
         # and add all the facets.  First selected point becomes the anchor
         # point, then we go 1,2,3; 1,3,4; 1;4,5 and so on
@@ -3883,6 +4011,7 @@ def initialize():
         Gui.addCommand("MeshRemodelCreatePointsObject", MeshRemodelCreatePointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateWireFrameObject",MeshRemodelCreateWireFrameObjectCommandClass())
         Gui.addCommand("MeshRemodelMeshSimpleCopy", MeshRemodelMeshSimpleCopyCommandClass())
+        Gui.addCommand("MeshRemodelDuplicateSelectedFacets", MeshRemodelDuplicateSelectedFacetsCommandClass())
         Gui.addCommand("MeshRemodelRemovePoint", MeshRemodelRemovePointCommandClass())
         Gui.addCommand("MeshRemodelAddOrRemoveFacet", MeshRemodelAddOrRemoveFacetCommandClass())
         Gui.addCommand("MeshRemodelMovePoint", MeshRemodelMovePointCommandClass())
