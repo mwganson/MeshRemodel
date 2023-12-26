@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2023.12.24"
-__version__ = "1.9.12"
+__date__    = "2023.12.25"
+__version__ = "1.9.13"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -1001,13 +1001,11 @@ after pressing Shift+E to get into box selection mode.)
                 if "Vertex" in s.SubElementNames[0]:
                     self.pts.append(sub.Point)
                     count += 1
-                if "Edge" in s.SubElementNames[0]:
+                if "Edge" in s.SubElementNames[0] or "Face" in s.SubElementNames[0]:
                     for v in sub.Vertexes:
                         if not gu.hasPoint(v.Point, self.pts, 1e-5):
                             self.pts.append(v.Point)
                             count += 1
-                if "Face" in s.SubElementNames[0]:
-                    return False
 
         if count >= 3:
             return True
@@ -1495,7 +1493,7 @@ of working on the original.
                 if "Vertex" in s.SubElementNames[0]:
                     self.pts.append(sub.Point)
                     count += 1
-                if "Edge" in s.SubElementNames[0]:
+                if "Edge" in s.SubElementNames[0] or "Face" in s.SubElementNames[0]:
                     for v in sub.Vertexes:
                         if not gu.hasPoint(v.Point, self.pts, 1e-5):
                             self.pts.append(v.Point)
