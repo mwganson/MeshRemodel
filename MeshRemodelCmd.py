@@ -27,7 +27,7 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2023.12.27"
-__version__ = "1.9.15"
+__version__ = "1.9.16"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -180,6 +180,9 @@ component objects before attempting modifications.\n")
         """return base,normal of plane defined by trio, list of Vector"""
         trio = np.array([np.array(v.Point) for v in trio[:3]])
         normal = np.cross(trio[1] - trio[0], trio[2] - trio[0])
+        if not any(normal): #all 0's
+            return (None,None)
+        divisor = np.linalg.norm(normal)
         normal /= np.linalg.norm(normal) #normalize
         norm = FreeCAD.Vector(normal[0], normal[1], normal[2])
         return trio[0], norm
@@ -2033,6 +2036,9 @@ class CoplanarPoints:
         for vertName in fp.Trio[0][1]:
             trio.append(fp.Trio[0][0].Shape.Vertexes[int(vertName[6:])-1])
         base,normal = gu.getBaseAndNormal(trio)
+        if base == None and normal == None:
+            FreeCAD.Console.PrintError("MeshRemodel: Unable to find base/normal\n")
+            return
         if fp.Tolerance == 0:
             tolerance = float("inf")
         else:
@@ -2043,6 +2049,9 @@ class CoplanarPoints:
         coplanar = [Part.Vertex(v) for v in trio] + coplanar
         if hasattr(fp, "FlattenToPlane") and fp.FlattenToPlane:
             base,normal = gu.getBaseAndNormal(coplanar[:3])
+            if base == None and normal == None:
+                FreeCAD.Console.PrintError("MeshRemodel: Unable to find base/normal\n")
+                return
             coplanar = [Part.Vertex(gu.projectVectorToPlane(v.Point, base, normal)) for v in coplanar]
         self.inhibitRecomputes = True
         fp.Points = [v.Point for v in coplanar]
@@ -2673,9 +2682,8 @@ Ctrl+Shift+Click = enter custom angle in dialog
                     pts.append(sub2.Vertex2.Point)
                 if len(pts) != 3:
                     return False
-                try:
-                    base,normal = gu.getBaseAndNormal([Part.Vertex(p) for p in pts])
-                except:
+                base,normal = gu.getBaseAndNormal([Part.Vertex(p) for p in pts])
+                if base == None and normal == None:
                     return False
                 self.normal = normal
                 base = sub1.Curve.intersect(sub2.Curve)[0]
@@ -2694,9 +2702,8 @@ Ctrl+Shift+Click = enter custom angle in dialog
             if "Vertex" in sel[0].SubElementNames[0] and "Vertex" in sel[1].SubElementNames[0]\
                     and "Vertex" in sel[2].SubElementNames[0]:
                 verts = [s.Object.getSubObject(s.SubElementNames[0]) for s in sel]
-                try:
-                    base,normal = gu.getBaseAndNormal(verts)
-                except:
+                base,normal = gu.getBaseAndNormal(verts)
+                if base == None and normal == None:
                     return False
                 self.normal = normal
                 self.center = verts[1].Point
