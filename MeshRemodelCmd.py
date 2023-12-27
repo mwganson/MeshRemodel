@@ -27,7 +27,7 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2023.12.27"
-__version__ = "1.9.16"
+__version__ = "1.9.17"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -888,6 +888,63 @@ defects.
 # end create WireFrame class
 ################################################################################
 
+#MeshBoundaryWires
+class MeshRemodelMeshBoundaryWiresCommandClass(object):
+    def __init__(self):
+        self.mesh = None
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'MeshBoundaryWires.svg'),
+            'MenuText': "Makes boundary wire objects from meshes with holes in them" ,
+            'ToolTip' : \
+"""Makes boundary wire objects from meshes with holes in them.  The wires produced
+are not parametric and might or might not be planar.  A mesh without any holes,
+meaning no missing facets, will not produce any wires.
+
+This tool can be used to detect holes that might not be easily visible upon brief
+inspection.  Can also aid in diagnosing otherwise difficult to find problem areas,
+such as 2 points in very close proximity that are causing self-intersections.
+
+If you have trimmed a mesh with a plane in Mesh workbench, then this can help to 
+fill the hole that was created by that process.
+
+If a planar wire can be produced, then a mesh face will also be created from it 
+and added as a new document object.  You can merge the face with the mesh in the
+Mesh workbench.  After merging use the analyze, evaluate, and repair tool to remove
+the duplicated points and to check for any additional defects that might exist.
+"""} 
+
+    def Activated(self):
+        copy = self.mesh.Mesh.copy()
+        wires = MeshPart.wireFromMesh(copy)
+        FreeCAD.Console.PrintMessage(f"MeshRemodel: {len(wires)} wires created\n")
+        doc = self.mesh.Document
+        if not wires:
+            return
+        doc.openTransaction("Mesh boundary wires")
+        for wire in wires:
+            obj = doc.addObject("Part::Feature", f"{self.mesh.Label}_BoundaryWire")
+            obj.Shape = wire
+            plane = wire.findPlane()
+            if plane:
+                face = Part.makeFace(wire,"Part::FaceMakerBullseye")
+                mface = MeshPart.meshFromShape(face, 0.25, 50)
+                mobj = doc.addObject("Mesh::Feature",f"{self.mesh.Label}_MeshFace")
+                mobj.Mesh = mface
+        doc.commitTransaction()
+
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        self.mesh = None
+        sel = Gui.Selection.getSelection()
+        self.mesh = sel[0] if len(sel) == 1 else None
+        if self.mesh and self.mesh.isDerivedFrom("Mesh::Feature"):
+            return True
+        return False
+
+################################################################################
+
 #create a simple copy of a mesh object
 class MeshRemodelMeshSimpleCopyCommandClass(object):
     """creates a simple copy of a mesh object"""
@@ -1325,7 +1382,6 @@ to the affected edges, and then converting back to a mesh.
         dlg.show()
         while not dlg.finished:
             FreeCADGui.updateGui()
-
         pt = dlg.pt
         dlg.deleteLater()
         return pt
@@ -4208,6 +4264,7 @@ def initialize():
     if FreeCAD.GuiUp:
         Gui.addCommand("MeshRemodelCreatePointsObject", MeshRemodelCreatePointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateWireFrameObject",MeshRemodelCreateWireFrameObjectCommandClass())
+        Gui.addCommand("MeshRemodelMeshBoundaryWires",MeshRemodelMeshBoundaryWiresCommandClass())
         Gui.addCommand("MeshRemodelMeshSimpleCopy", MeshRemodelMeshSimpleCopyCommandClass())
         Gui.addCommand("MeshRemodelDuplicateSelectedFacets", MeshRemodelDuplicateSelectedFacetsCommandClass())
         Gui.addCommand("MeshRemodelRemovePoint", MeshRemodelRemovePointCommandClass())

@@ -31,6 +31,10 @@ Update: As of v1.82 you can now also create a points object from a Points cloud 
 Creates a parametric object based on Part::FeaturePython class from the selected mesh object.  The lines and vertices
 of this object serve as a proxy for the lines and vertices of the mesh object, which are not selectable individually in FreeCAD.  You select the edges and vertices of the proxy object and MeshRemodel will translate those selections into selections of the mesh object for the purposes of the various mesh repair tools available in MeshRemodel, including the move point too, the remove point too, and the add/remove facet tool.  See also the Create Points Object command.<br/>
 <br/>
+## Mesh Boundary Wires (mesh objects)
+<img src="Resources/icons/MeshBoundaryWires.svg" alt="mesh boundary wires"><br/>
+Creates wires from the holes in a mesh.  If a wire is planar, then a meshed face is also produced.  This meshed face may be merged with the original mesh in the Mesh workbench to fill in the hole left after a mesh is trimmed with a plane in that workbench.  The mesh will need to repaired after this merger because at the very least there will be some duplicated points that must be removed.<br/>
+This function is a good diagnostic tool to help find holes in a mesh that might not be evident upon a brief examination.  It can also show defects that are difficult to find, such as where 2 points are very close to each other and the mesh has tiny facets that need to be fixed.
 ## Move Point (mesh objects)
 <img src="Resources/icons/MovePoint.svg" alt="Move a point in a mesh object"><br/>
 This tool works on mesh objects.  You need to create a points object or a wireframe object from the mesh first in order to have selectable points to work with.  Select the mesh object and a point from the points object to be moved, then click the toolbar icon.  You will get a dialog in which you can set the new coordinates for the point.  The changes the mesh object, but you can use Undo to undo the changes.<br/>
@@ -278,6 +282,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2023.12.27 (v1.9.17) -- add mesh boundary wires command
 * 2023.12.27 (v1.9.16) -- more work on same bug as previous revision
 * 2023.12.27 (v1.9.15) -- fix a bug where error messages were being sent if user selected some subobjects
 * 2023.12.25 (v1.9.14) -- add rotate object command, add multiple vertex selection for move axial command
