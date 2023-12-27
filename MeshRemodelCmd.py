@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2023.12.26"
-__version__ = "1.9.14"
+__date__    = "2023.12.27"
+__version__ = "1.9.15"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -2673,7 +2673,10 @@ Ctrl+Shift+Click = enter custom angle in dialog
                     pts.append(sub2.Vertex2.Point)
                 if len(pts) != 3:
                     return False
-                base,normal = gu.getBaseAndNormal([Part.Vertex(p) for p in pts])
+                try:
+                    base,normal = gu.getBaseAndNormal([Part.Vertex(p) for p in pts])
+                except:
+                    return False
                 self.normal = normal
                 base = sub1.Curve.intersect(sub2.Curve)[0]
                 self.center = FreeCAD.Vector(base.X, base.Y, base.Z)
@@ -2691,7 +2694,10 @@ Ctrl+Shift+Click = enter custom angle in dialog
             if "Vertex" in sel[0].SubElementNames[0] and "Vertex" in sel[1].SubElementNames[0]\
                     and "Vertex" in sel[2].SubElementNames[0]:
                 verts = [s.Object.getSubObject(s.SubElementNames[0]) for s in sel]
-                base,normal = gu.getBaseAndNormal(verts)
+                try:
+                    base,normal = gu.getBaseAndNormal(verts)
+                except:
+                    return False
                 self.normal = normal
                 self.center = verts[1].Point
                 dir1 = verts[0].Point - verts[1].Point
