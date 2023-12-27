@@ -215,7 +215,7 @@ In the case of 3 vertices or 2 lines, the angle will be the angle needed to rota
 
 **Note: Sometimes the rotation might go in an unexpected direction.  When that happens use Ctrl+Z = Undo to undo the move, and then repeat the move with Alt+Click so it goes in the opposite direction.**
 
-<img src="Resources/media/rotate_object_scr1.png" alt=""rotate object screenshot 1"><br/>
+<img src="Resources/media/rotate_object_scr1.png" alt="rotate object screenshot 1"><br/>
 In the above screenshot the 3 vertex selection technique is shown.  Note the order of selection and the result after clicking the toolbar icon.<br/>
 
 ## Move Axial
