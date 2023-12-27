@@ -191,9 +191,48 @@ New for version 1.9.0.  This function can create a wire from connected edges and
 <br/>
 If Alt+Click is used when executing the command, then the current camera view is used to determine the normal of the plane.  Otherwise the function searches for a circle, and the first circle found will define the normal (and the base) of the plane.  If not circles are found, then the algorithm uses 3 key points to try to make a plane from 3 points.  Key points are the ends of line segments, the ends of arcs, the ends of bsplines, the ends of ellipses, the edge vertices on circles, etc.  The first point, the last point, and a point in the center of the key points list are used to form the plane, so the order of selection can play a role in defining the plane, too.  Best way to define the plane is to position the camera, for example by using the Top view, and then Alt+Click on the toolbar icon.  This forces everything to be on the xy plane or at least parallel to it.  Note: when using Alt+Click all circles are converted to bsplines, otherwise the circles are kept as circles/arcs.  Ellipses are always converted to bsplines.  Line segments are always kept as line segments.<br/>
 
+## Rotate Object
+<img src="Resources/icons/RotateObject.svg" alt = "rotate object"><br/>
+Rotate an object in place based on a selected subobject of that object.  For example, select the round face of a cylinder and click the toolbar icon to rotate the cylinder about the center of that face with the axis of the rotation being the normal direction of that face.  Select a vertical seam of the cylinder to rotate the object about that seam.  Select an edge of a cube to rotate it about that edge.  Select the face of a cube to rotate it about its center.<br/>
+<br/>
+Subobject selection options:
+* 1 face = rotate about the center of that face using the normal of the face as the axis
+* 1 edge = rotate about that edge using its direction as the normal and its position as the center of the rotation.
+* 2 vertices = treat them the same as the edge selection imagining them to be the end points of the edge
+* 3 vertices = rotation axis the normal of the plane defined by the 3 points, center or rotation is 2nd point
+* 2 lines on the same plane = treat it the same as the 3 points selected, intersection of lines is the rotation center.
+
+Angle moved:
+* Click = 1 degree
+* Ctrl+Click = 0.1 degree
+* Shift+Click = 15 degrees
+* Alt+Click = -1 degree
+* Alt+Ctrl+Click = -0.1 degree
+* Alt+Shift+Click = -15 degrees
+* Ctrl+Shift+Click = input custom angle into a dialog
+
+In the case of 3 vertices or 2 lines, the angle will be the angle needed to rotate the first selected point's object such that the 1st point is now in alignment with the 3rd point, all 3 points now being colinear if the movement didn't move the other 2 points.
+
+**Note: Sometimes the rotation might go in an unexpected direction.  When that happens use Ctrl+Z = Undo to undo the move, and then repeat the move with Alt+Click so it goes in the opposite direction.**
+
+<img src="Resources/media/rotate_object_scr1.png" alt=""rotate object screenshot 1"><br/>
+In the above screenshot the 3 vertex selection technique is shown.  Note the order of selection and the result after clicking the toolbar icon.<br/>
+
 ## Move Axial
 <img src="Resources/icons/MoveAxial.svg" alt = "move axial"><br/>
-Move an object in the axial direction of the selected subobject.  Movements are done by editing the selected object's Placement property.  Distance to be moved is either 0.1 mm, 1 mm, or 10 mm, depending on if you Ctrl+Click (0.01 mm), Click (1.0 mm) or Shift+Click (10.0 mm) on the toolbar icon.  Direction can be reversed by holding down the Alt key while clicking on the toolbar icon.  Direction is determined by the type of subobject selected.  If it's a circle or an arc, or a planar face, then the direction is the normal direction of that object.  If it's a straight line edge, then the direction is the direction of that edge.  For non-planar surfaces, such as the surface of a cylinder, the direction is the normal at the center of that face's surface.  I added this feature because often we need to move a face or a wire to avoid so-called coplanar issues that FreeCAD often has involving boolean operations.<br/>
+Move an object in the axial direction of the selected subobject(s).  If one subobject is selected, then the parent object of the subobject will be the object that moves.  For example, select the edge of a cube and click the toolbar icon to move the cube along the axis defined by the edge, in other words, in the same direction as the edge.  Select a face of the cube to move the cube in the normal direction of that face.  Select a vertex of the cube, and then select another vertex of the cube or a vertex of another object to put the first selected vertex at the same location as the 2nd vertex.  For example, select the front top right vertex of a cube, and then select the front left vertex of another cube, and then click the icon.  Now the first cube has moved and the selected vertices are now coincident.<br/>
+
+If only one subobject is selected, then the object moves as follows:
+
+Click = 1 mm
+Ctrl+Click = 0.1 mm
+Shift+Click = 10 mm
+Alt+Click = -1 mm
+Alt+Ctrl+Click = -0.1 mm
+Alt+Shift+Click = -10 mm
+Ctrl+Shift+Click = enter a custom distance in a dialog.
+
+Think of Ctrl as giving you more fine control of the movement and Shift as shifting into a higher gear.  Think of Alt as an alternate route.  Combining Ctrl and Shift gives the custom dialog.
 
 ## Create Sketch
 <img src="Resources/icons/CreateSketch.svg" alt = "create sketch"><br/>

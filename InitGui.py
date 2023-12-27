@@ -80,6 +80,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelCreateCircle",
                     "MeshRemodelCreateArc",
                     "MeshRemodelCreateWire",
+                    "MeshRemodelRotateObject",
                     "MeshRemodelMoveAxial",
                     "MeshRemodelDraftUpgrade",
                     "MeshRemodelCreateSketch",

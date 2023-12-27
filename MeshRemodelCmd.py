@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2023.12.25"
-__version__ = "1.9.13"
+__date__    = "2023.12.26"
+__version__ = "1.9.14"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -123,6 +123,13 @@ class MeshRemodelGeomUtils(object):
             
     #### end progress bar class
     
+
+    def getFloatFromUser(self, title, msg, value, min=-float("inf"), max=float("inf"), flags=None, step=0.1):
+        """Open a dialog and get a floating point value from the user"""
+        val,ok = QtGui.QInputDialog.getDouble(FreeCADGui.getMainWindow(), title, 
+                msg, value, min, max, 8,FreeCADGui.getMainWindow().windowFlags(), step)
+        return val if ok else None
+
     def getFacetsFromFacetIndices(self, facet_indices, mesh):
         """getFacetsFromFacetIndices(self, facet_indices, mesh)"""
         return [mesh.Facets[idx] for idx in facet_indices]
@@ -2571,9 +2578,166 @@ class MeshRemodelFlattenDraftBSplineCommandClass(object):
         return True
 
 # end create BSpline class
+################################################################################
 
+# rotate an object in place
+class MeshRemodelRotateObjectCommandClass(object):
+    """Rotate object about a given axis"""
+    
+    def __init__(self):
+        self.obj = None
+        self.normal = None
+        self.center = None
+        self.angle = None
+        
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'RotateObject.svg') ,
+            'MenuText': "Rotate object" ,
+            'ToolTip' : \
+"""Rotate an object about a selected subobject
+(Edits object's Placement property)
+If subobject is a face, axis is normal to that face at center of gravity
+If subobject is a line segment, axis is the line
 
-###################################################################
+Multiple Subobject selection support:
+
+2 lines on the same plane
+2 vertices
+3 vertices
+
+In the case of 2 lines the axis of rotation will be the plane defined by the 2
+lines and the center of the rotation will be the intersection of the 2 lines.
+The angle will be the angle between the lines, or use Ctrl+Shift+Click to enter
+your own custom angle.
+
+In the case of 2 vertices the axis is the direction from one to the other, and the 
+center of the rotation is the first point.
+
+If 3 vertices, then the axis is the normal of the plane defined by those 3 points, 
+assuming they are not collinear.  The center of the rotation is the middle point 
+that was selected, and the object moved is the object to which the first selected
+vertex belongs.  The default angle to be moved will be the angle between the points
+such that after the move the 3 points will now be colinear.  Use Ctrl+Shift+Click
+to enter into a dialog your own custom angle along the defined plane.
+
+Click = rotate 1 degree
+Ctrl+Click = rotate 0.1 degree
+Shift+Click = rotate 15 degrees
+Alt+Click = rotate in opposite direction
+Ctrl+Shift+Click = enter custom angle in dialog
+"""}
+            
+    def Activated(self):
+        #FreeCAD.Console.PrintMessage(f"obj: {self.obj.Label}, normal: {self.normal}\n")
+        angle = self.angle if self.angle != None else 1
+        modifiers = QtGui.QApplication.keyboardModifiers()
+        if modifiers & QtCore.Qt.ControlModifier:
+            angle *= 0.1
+        if modifiers & QtCore.Qt.ShiftModifier:
+            angle *= 15.0
+        if modifiers & QtCore.Qt.AltModifier:
+            angle *= -1.0
+        if modifiers & QtCore.Qt.ControlModifier and modifiers & QtCore.Qt.ShiftModifier:
+            angle = self.angle if self.angle != None else 1
+            angle = gu.getFloatFromUser("Rotate", "Enter value for angle:", value=angle, step=0.1)
+            if angle == None:
+                return #user cancel
+        doc = self.obj.Document
+        doc.openTransaction("Rotate object")
+        plm = self.obj.Placement
+        plm.rotate(self.center, self.normal, angle, True)
+        self.obj.Placement = plm
+
+        doc.commitTransaction()
+        
+    def IsActive(self):
+        self.obj = None
+        self.normal = None
+        self.center = None
+        self.angle = None
+        sel = FreeCADGui.Selection.getCompleteSelection()
+        if len(sel) == 0 or len(sel) > 3:
+            return False
+        if len(sel) == 2:
+            pts = []
+            if "Edge" in sel[0].SubElementNames[0] and "Edge" in sel[1].SubElementNames[0]:
+                sub1 = sel[0].Object.getSubObject(sel[0].SubElementNames[0])
+                sub2 = sel[1].Object.getSubObject(sel[1].SubElementNames[0])
+                if not gu.hasPoint(sub1.Vertex1.Point, pts, 1e-6):
+                    pts.append(sub1.Vertex1.Point)
+                if not gu.hasPoint(sub1.Vertex2.Point, pts, 1e-6):
+                    pts.append(sub1.Vertex2.Point)
+                if not gu.hasPoint(sub2.Vertex1.Point, pts, 1e-6):
+                    pts.append(sub2.Vertex1.Point)
+                if not gu.hasPoint(sub2.Vertex2.Point, pts, 1e-6):
+                    pts.append(sub2.Vertex2.Point)
+                if len(pts) != 3:
+                    return False
+                base,normal = gu.getBaseAndNormal([Part.Vertex(p) for p in pts])
+                self.normal = normal
+                base = sub1.Curve.intersect(sub2.Curve)[0]
+                self.center = FreeCAD.Vector(base.X, base.Y, base.Z)
+                self.obj = sel[0].Object
+                self.angle = math.degrees(sub2.Curve.Direction.getAngle(sub1.Curve.Direction))
+                return True
+            elif "Vertex" in sel[0].SubElementNames[0] and "Vertex" in sel[1].SubElementNames[0]:
+                sub1 = sel[0].Object.getSubObject(sel[0].SubElementNames[0])
+                sub2 = sel[1].Object.getSubObject(sel[1].SubElementNames[0])
+                self.normal = sub1.Point - sub2.Point
+                self.center = sub1.Point
+                self.obj = sel[0].Object
+                return True
+        elif len(sel) == 3:
+            if "Vertex" in sel[0].SubElementNames[0] and "Vertex" in sel[1].SubElementNames[0]\
+                    and "Vertex" in sel[2].SubElementNames[0]:
+                verts = [s.Object.getSubObject(s.SubElementNames[0]) for s in sel]
+                base,normal = gu.getBaseAndNormal(verts)
+                self.normal = normal
+                self.center = verts[1].Point
+                dir1 = verts[0].Point - verts[1].Point
+                dir2 = verts[2].Point - verts[1].Point
+                self.angle = math.degrees(dir2.getAngle(dir1))
+                self.obj = sel[0].Object
+                return True
+        
+        self.obj = sel[0].Object
+        if not hasattr(self.obj, "Shape"):
+            return False
+        sub = sel[0].SubObjects[0]
+        if hasattr(sub,"Curve"):
+            if sub.Curve.TypeId == "Part::GeomLine":
+                self.normal = sub.Curve.Direction
+                self.center = sub.CenterOfGravity
+                return True
+            if sub.Curve.TypeId == "Part::GeomCircle":
+                self.normal = sub.Curve.Axis
+                self.center = sub.CenterOfGravity
+                return True
+                
+        if hasattr(sub,"Surface"):
+            if not sub.Surface.isPlanar():
+                cog = sub.CenterOfGravity
+                pr = sub.ParameterRange
+                u = (pr[0] + pr[1]) / 2.0
+                v = (pr[2] + pr[3]) / 2.0
+                self.normal = sub.valueAt(u,v) - cog
+                self.center = sub.CenterOfGravity
+                return True
+        shp = sub if sub else self.obj.Shape
+        try:
+            self.normal = shp.normalAt(0,0)
+            self.center = shp.CenterOfGravity
+            return True
+        except:
+            try:
+                self.normal = shp.normalAt(0)
+                self.center = shp.CenterOfGravity
+                return True
+            except:
+                return False
+            return False
+
+################################################################################
 
 # Move an object in the axial direction
 class MeshRemodelMoveAxialCommandClass(object):
@@ -2582,25 +2746,35 @@ class MeshRemodelMoveAxialCommandClass(object):
     def __init__(self):
         self.obj = None
         self.normal = None
+        self.distance = None
         
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'MoveAxial.svg') ,
             'MenuText': "Move A&xial" ,
-            'ToolTip' : fixTip("\
-Move an object in the axial (normal) direction of selected subobject\n\
-(Edits object's Placement property)\n\
-If subobject is a planar face, direction is normal to that face\n\
-If subobject is a non planar face, direction is normal to the face center\n\
-If subobject is a line segment, direction is the direction of the line\n\
-\n\
-Click = move 1 mm\n\
-Ctrl+Click = move 0.1 mm\n\
-Shift+Click = move 10 mm\n\
-Alt+Click = move in opposite direction\n")}
+            'ToolTip' :\
+"""
+Move an object in the axial (normal) direction of selected subobject(s)
+(Edits object's Placement property)
+If subobject is a planar face, direction is normal to that face
+If subobject is a non planar face, direction is normal to the face center
+If subobject is a line segment, direction is the direction of the line
+
+2 subobjects support:
+
+If 2 vertices are selected the direction is the direction from the first to the 
+second and the distance will be the distance between the 2 points.  The first
+selected vertex belongs to the object that will be moved if the vertices are from
+separate objects.
+
+Click = move 1 mm
+Ctrl+Click = move 0.1 mm
+Shift+Click = move 10 mm
+Alt+Click = move in opposite direction
+Ctrl+Shift+Click = enter custom distance in dialog"""}
             
     def Activated(self):
         #FreeCAD.Console.PrintMessage(f"obj: {self.obj.Label}, normal: {self.normal}\n")
-        distance = 1
+        distance = 1 if self.distance == None else self.distance
         modifiers = QtGui.QApplication.keyboardModifiers()
         if modifiers & QtCore.Qt.ControlModifier:
             distance *= 0.1
@@ -2608,19 +2782,32 @@ Alt+Click = move in opposite direction\n")}
             distance *= 10.0
         if modifiers & QtCore.Qt.AltModifier:
             distance *= -1.0
+        if modifiers & QtCore.Qt.ControlModifier and modifiers & QtCore.Qt.ShiftModifier:
+            distance = self.distance if self.distance != None else 1
+            distance = gu.getFloatFromUser("Move Axial", "Enter value for distance:", value=distance, step=0.1)
+            if distance == None:
+                return #user cancel
         doc = self.obj.Document
         doc.openTransaction("MR_Move")
         self.obj.Placement = FreeCAD.Placement(self.obj.Placement.Base 
-                        + self.normal * distance, self.obj.Placement.Rotation)
+                        + self.normal.normalize() * distance, self.obj.Placement.Rotation)
         doc.commitTransaction()
         
     def IsActive(self):
-        sel = FreeCADGui.Selection.getSelectionEx()
-        if len(sel) != 1:
+        sel = FreeCADGui.Selection.getCompleteSelection()
+        self.distance = None
+        if len(sel) > 2 or len(sel) == 0:
             return False
         self.obj = sel[0].Object
         if not hasattr(self.obj, "Shape"):
             return False
+        if len(sel) == 2:
+            if "Vertex" in sel[0].SubElementNames[0] and "Vertex" in sel[1].SubElementNames[0]:
+                self.normal = sel[1].SubObjects[0].Point - sel[0].SubObjects[0].Point
+                self.distance = sel[1].SubObjects[0].Point.distanceToPoint(sel[0].SubObjects[0].Point)
+                self.obj = sel[0].Object
+                return True
+                
         sub = sel[0].SubObjects[0]
         if hasattr(sub,"Curve"):
             if sub.Curve.TypeId == "Part::GeomLine":
@@ -4029,6 +4216,7 @@ def initialize():
         Gui.addCommand("MeshRemodelCreateArc", MeshRemodelCreateArcCommandClass())
         Gui.addCommand("MeshRemodelCreateWire", MeshRemodelCreateWireCommandClass())
         Gui.addCommand("MeshRemodelMoveAxial", MeshRemodelMoveAxialCommandClass())
+        Gui.addCommand("MeshRemodelRotateObject", MeshRemodelRotateObjectCommandClass())
         Gui.addCommand("MeshRemodelDraftUpgrade", MeshRemodelDraftUpgradeCommandClass())
         Gui.addCommand("MeshRemodelCreateSketch", MeshRemodelCreateSketchCommandClass())
         Gui.addCommand("MeshRemodelMergeSketches", MeshRemodelMergeSketchesCommandClass())
