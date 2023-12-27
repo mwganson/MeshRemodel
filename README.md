@@ -278,6 +278,9 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2023.12.27 (v1.9.15) -- fix a bug where error messages were being sent if user selected some subobjects
+* 2023.12.25 (v1.9.14) -- add rotate object command, add multiple vertex selection for move axial command
+* 2023.12.25 (v1.9.13) -- support face selection for add/remove facet and duplicate facet functions
 * 2023.12.24 (v1.9.12) -- add support for removing multiple facets with Alt+Click on the add/remove facet toolbar icon, add new feature: duplicate facets, fix bug in move point.
 * 2023.12.24 (v1.9.11) -- add make mesh simple copy command
 * 2023.12.23 (v1.9.10) -- fix bug in add facet where selecting a mesh wasn't enabling the command, add new empty mesh when creating points object from point cloud, so user can construct a mesh from it
