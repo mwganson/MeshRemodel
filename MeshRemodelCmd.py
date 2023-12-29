@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2023.12.27"
-__version__ = "1.9.17"
+__date__    = "2023.12.28"
+__version__ = "1.9.18"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -2660,36 +2660,21 @@ class MeshRemodelRotateObjectCommandClass(object):
             'MenuText': "Rotate object" ,
             'ToolTip' : \
 """Rotate an object about a selected subobject
-(Edits object's Placement property)
-If subobject is a face, axis is normal to that face at center of gravity
-If subobject is a line segment, axis is the line
-
-Multiple Subobject selection support:
-
-2 lines on the same plane
-2 vertices
-3 vertices
-
-In the case of 2 lines the axis of rotation will be the plane defined by the 2
-lines and the center of the rotation will be the intersection of the 2 lines.
-The angle will be the angle between the lines, or use Ctrl+Shift+Click to enter
-your own custom angle.
-
-In the case of 2 vertices the axis is the direction from one to the other, and the 
-center of the rotation is the first point.
-
-If 3 vertices, then the axis is the normal of the plane defined by those 3 points, 
-assuming they are not collinear.  The center of the rotation is the middle point 
-that was selected, and the object moved is the object to which the first selected
-vertex belongs.  The default angle to be moved will be the angle between the points
-such that after the move the 3 points will now be colinear.  Use Ctrl+Shift+Click
-to enter into a dialog your own custom angle along the defined plane.
 
 Click = rotate 1 degree
 Ctrl+Click = rotate 0.1 degree
 Shift+Click = rotate 15 degrees
 Alt+Click = rotate in opposite direction
 Ctrl+Shift+Click = enter custom angle in dialog
+
+Supported selections:
+
+Planar face or circle edge: axis = normal
+Line segment edge: axis =  line direction
+2 vertices: axis = direction from one to the other
+3 vertices: axis = 3 point plane, center = 2nd point, angle = 1st to 3rd point
+2 faces/circles: axis,angle = axis,angle needed to bring them into coplanarity, 
+if they are already planar, then Ctrl+Shift+Click, enter 180 degrees to flip.
 """}
             
     def Activated(self):
@@ -2725,9 +2710,28 @@ Ctrl+Shift+Click = enter custom angle in dialog
             return False
         if len(sel) == 2:
             pts = []
-            if "Edge" in sel[0].SubElementNames[0] and "Edge" in sel[1].SubElementNames[0]:
+            if bool("Edge" in sel[0].SubElementNames[0] or "Face" in sel[0].SubElementNames[0]) \
+                    and bool("Edge" in sel[1].SubElementNames[0] or "Face" in sel[1].SubElementNames[0]):
                 sub1 = sel[0].Object.getSubObject(sel[0].SubElementNames[0])
                 sub2 = sel[1].Object.getSubObject(sel[1].SubElementNames[0])
+                if hasattr(sub1,"Surface") or \
+                        bool(hasattr(sub1,"Curve") and sub1.Curve.TypeId == "Part::GeomCircle"):
+                    self.center = sub1.CenterOfGravity
+                    axis = sub1.Curve.Axis if hasattr(sub1,"Curve") else sub1.Surface.Axis
+                    if hasattr(sub2,"Surface") or \
+                            bool(hasattr(sub2,"Curve") and sub2.Curve.TypeId == "Part::GeomCircle"):
+                        axis2 = sub2.Curve.Axis if hasattr(sub2,"Curve") else sub2.Surface.Axis
+                        self.normal = axis.cross(axis2)
+                        try:
+                            self.angle = math.degrees(math.acos(axis.dot(axis2)))
+                        except:
+                            #same normal, so let's tweak slightly to allow for flipping 180 degrees
+                            axis.x = axis.x + 1e-5
+                            axis.y = axis.y - 1e-5
+                            axis.z = axis.z + 1e-5
+                            self.angle = math.degrees(math.acos(axis.dot(axis2)))
+                        self.obj = sel[0].Object
+                        return True
                 if not gu.hasPoint(sub1.Vertex1.Point, pts, 1e-6):
                     pts.append(sub1.Vertex1.Point)
                 if not gu.hasPoint(sub1.Vertex2.Point, pts, 1e-6):
@@ -2736,17 +2740,19 @@ Ctrl+Shift+Click = enter custom angle in dialog
                     pts.append(sub2.Vertex1.Point)
                 if not gu.hasPoint(sub2.Vertex2.Point, pts, 1e-6):
                     pts.append(sub2.Vertex2.Point)
-                if len(pts) != 3:
-                    return False
-                base,normal = gu.getBaseAndNormal([Part.Vertex(p) for p in pts])
-                if base == None and normal == None:
-                    return False
-                self.normal = normal
-                base = sub1.Curve.intersect(sub2.Curve)[0]
-                self.center = FreeCAD.Vector(base.X, base.Y, base.Z)
-                self.obj = sel[0].Object
-                self.angle = math.degrees(sub2.Curve.Direction.getAngle(sub1.Curve.Direction))
-                return True
+                if len(pts) == 3:
+                    base,normal = gu.getBaseAndNormal([Part.Vertex(p) for p in pts])
+                    if normal == None:
+                        if hasattr(sub1,"Curve") and hasattr(sub1.Curve,"XAxis"):
+                            normal = sub1.Curve.XAxis
+                        else:
+                            return False
+                    self.normal = normal
+                    base = sub1.Curve.intersect(sub2.Curve)[0]
+                    self.center = FreeCAD.Vector(base.X, base.Y, base.Z)
+                    self.obj = sel[0].Object
+                    self.angle = math.degrees(sub1.Curve.Direction.getAngle(sub2.Curve.Direction))
+                    return True
             elif "Vertex" in sel[0].SubElementNames[0] and "Vertex" in sel[1].SubElementNames[0]:
                 sub1 = sel[0].Object.getSubObject(sel[0].SubElementNames[0])
                 sub2 = sel[1].Object.getSubObject(sel[1].SubElementNames[0])
@@ -2759,7 +2765,7 @@ Ctrl+Shift+Click = enter custom angle in dialog
                     and "Vertex" in sel[2].SubElementNames[0]:
                 verts = [s.Object.getSubObject(s.SubElementNames[0]) for s in sel]
                 base,normal = gu.getBaseAndNormal(verts)
-                if base == None and normal == None:
+                if normal == None:
                     return False
                 self.normal = normal
                 self.center = verts[1].Point
@@ -2768,43 +2774,62 @@ Ctrl+Shift+Click = enter custom angle in dialog
                 self.angle = math.degrees(dir2.getAngle(dir1))
                 self.obj = sel[0].Object
                 return True
-        
-        self.obj = sel[0].Object
-        if not hasattr(self.obj, "Shape"):
-            return False
-        sub = sel[0].SubObjects[0]
-        if hasattr(sub,"Curve"):
-            if sub.Curve.TypeId == "Part::GeomLine":
-                self.normal = sub.Curve.Direction
-                self.center = sub.CenterOfGravity
+            elif bool("Edge" in sel[0].SubElementNames[0] or "Face" in sel[0].SubElementNames[0]) \
+                    and "Vertex" in sel[1].SubElementNames[0] and "Vertex" in sel[2].SubElementNames[0]:
+                sub1 = sel[0].Object.getSubObject(sel[0].SubElementNames[0])
+                if hasattr(sub1,"Curve") and sub1.Curve.TypeId == "Part::GeomCircle":
+                    self.normal = sub1.Curve.Axis
+                    self.center = sub1.Curve.Center
+                elif hasattr(sub1,"Curve") and sub1.Curve.TypeId == "Part::GeomLine":
+                    self.normal = sub1.Curve.Direction
+                    self.center = sub1.Vertex1.Point
+                elif hasattr(sub1,"Surface") and sub1.Surface.TypeId == "Part::GeomPlane":
+                    self.normal = sub1.Surface.Axis
+                    self.center = sub1.CenterOfGravity
+                sub2 = sel[1].Object.getSubObject(sel[1].SubElementNames[0])
+                sub3 = sel[2].Object.getSubObject(sel[2].SubElementNames[0])
+                self.obj = sel[0].Object
+                dir1 = sub1.CenterOfGravity - sub2.Point
+                dir2 = sub1.CenterOfGravity - sub3.Point
+                self.angle = math.degrees(dir2.getAngle(dir1))
                 return True
-            if sub.Curve.TypeId == "Part::GeomCircle":
-                self.normal = sub.Curve.Axis
-                self.center = sub.CenterOfGravity
-                return True
+        elif len(sel) == 1:        
+            self.obj = sel[0].Object
+            if not hasattr(self.obj, "Shape"):
+                return False
+            sub = sel[0].SubObjects[0]
+            if hasattr(sub,"Curve"):
+                if sub.Curve.TypeId == "Part::GeomLine":
+                    self.normal = sub.Curve.Direction
+                    self.center = sub.CenterOfGravity
+                    return True
+                if sub.Curve.TypeId == "Part::GeomCircle":
+                    self.normal = sub.Curve.Axis
+                    self.center = sub.CenterOfGravity
+                    return True
                 
-        if hasattr(sub,"Surface"):
-            if not sub.Surface.isPlanar():
-                cog = sub.CenterOfGravity
-                pr = sub.ParameterRange
-                u = (pr[0] + pr[1]) / 2.0
-                v = (pr[2] + pr[3]) / 2.0
-                self.normal = sub.valueAt(u,v) - cog
-                self.center = sub.CenterOfGravity
-                return True
-        shp = sub if sub else self.obj.Shape
-        try:
-            self.normal = shp.normalAt(0,0)
-            self.center = shp.CenterOfGravity
-            return True
-        except:
+            if hasattr(sub,"Surface"):
+                if not sub.Surface.isPlanar():
+                    cog = sub.CenterOfGravity
+                    pr = sub.ParameterRange
+                    u = (pr[0] + pr[1]) / 2.0
+                    v = (pr[2] + pr[3]) / 2.0
+                    self.normal = sub.valueAt(u,v) - cog
+                    self.center = sub.CenterOfGravity
+                    return True
+            shp = sub if sub else self.obj.Shape
             try:
-                self.normal = shp.normalAt(0)
+                self.normal = shp.normalAt(0,0)
                 self.center = shp.CenterOfGravity
                 return True
             except:
+                try:
+                    self.normal = shp.normalAt(0)
+                    self.center = shp.CenterOfGravity
+                    return True
+                except:
+                    return False
                 return False
-            return False
 
 ################################################################################
 
@@ -2834,6 +2859,8 @@ If 2 vertices are selected the direction is the direction from the first to the
 second and the distance will be the distance between the 2 points.  The first
 selected vertex belongs to the object that will be moved if the vertices are from
 separate objects.
+
+2 faces/circles: direction/distance = center to center.
 
 Click = move 1 mm
 Ctrl+Click = move 0.1 mm
@@ -2871,9 +2898,14 @@ Ctrl+Shift+Click = enter custom distance in dialog"""}
         if not hasattr(self.obj, "Shape"):
             return False
         if len(sel) == 2:
-            if "Vertex" in sel[0].SubElementNames[0] and "Vertex" in sel[1].SubElementNames[0]:
-                self.normal = sel[1].SubObjects[0].Point - sel[0].SubObjects[0].Point
-                self.distance = sel[1].SubObjects[0].Point.distanceToPoint(sel[0].SubObjects[0].Point)
+            subs = []
+            centers = []
+            for s in sel:
+                subs.append(s.Object.getSubObject(s.SubElementNames[0]))
+                centers.append(subs[-1].CenterOfGravity)
+            if len(subs) == 2:
+                self.normal = centers[1] - centers[0]
+                self.distance = centers[1].distanceToPoint(centers[0])
                 self.obj = sel[0].Object
                 return True
                 
@@ -2886,6 +2918,10 @@ Ctrl+Shift+Click = enter custom distance in dialog"""}
                 self.normal = sub.Curve.Axis
                 return True
                 
+        if hasattr(sub,"Point"):
+            self.normal = sub.CenterOfGravity - sel[0].Object.Shape.CenterOfGravity
+            return True
+        
         if hasattr(sub,"Surface"):
             if not sub.Surface.isPlanar():
                 cog = sub.CenterOfGravity
@@ -2905,6 +2941,7 @@ Ctrl+Shift+Click = enter custom distance in dialog"""}
             except:
                 return False
             return False
+        return False
 
 # end Move Axial command class
 ###################################################################

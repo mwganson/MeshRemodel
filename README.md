@@ -205,6 +205,7 @@ Subobject selection options:
 * 2 vertices = treat them the same as the edge selection imagining them to be the end points of the edge
 * 3 vertices = rotation axis the normal of the plane defined by the 3 points, center or rotation is 2nd point
 * 2 lines on the same plane = treat it the same as the 3 points selected, intersection of lines is the rotation center.
+* 2 faces/circles = rotate first object so that face or circle is aligned with the other face or circle.  Use Ctrl+Shift+Click, then enter 180 degrees to flip the object 180 degrees.
 
 Angle moved:
 * Click = 1 degree
@@ -236,7 +237,9 @@ Alt+Ctrl+Click = -0.1 mm
 Alt+Shift+Click = -10 mm
 Ctrl+Shift+Click = enter a custom distance in a dialog.
 
-Think of Ctrl as giving you more fine control of the movement and Shift as shifting into a higher gear.  Think of Alt as an alternate route.  Combining Ctrl and Shift gives the custom dialog.
+Think of Ctrl as giving you more fine control of the movement and Shift as shifting into a higher gear.  Think of Alt as an alternate route.  Combining Ctrl and Shift gives the custom dialog.<br/>
+
+Face/Circle selection supported, in which case the direction and distance is center to center.  If a face/circle is first subobject, and 2 vertices are selected, then the angle will be that needed to rotate the vertices into alignment if they are on the same plane as the face/circle.<br/>
 
 ## Create Sketch
 <img src="Resources/icons/CreateSketch.svg" alt = "create sketch"><br/>
@@ -282,6 +285,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2023.12.28 (v1.9.18) -- some improvements to move axial and rotate object functions.
 * 2023.12.27 (v1.9.17) -- add mesh boundary wires command
 * 2023.12.27 (v1.9.16) -- more work on same bug as previous revision
 * 2023.12.27 (v1.9.15) -- fix a bug where error messages were being sent if user selected some subobjects
