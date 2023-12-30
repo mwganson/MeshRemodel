@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2023.12.28"
-__version__ = "1.9.18"
+__date__    = "2023.12.29"
+__version__ = "1.9.19"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -602,7 +602,8 @@ class PointsObject:
             fp.ViewObject.PointSize = fp.PointSize
             self.PointSize = fp.PointSize
         elif prop == "Selectable":
-            fp.Source.ViewObject.Selectable = fp.Selectable
+            if hasattr(fp,"Source"):
+                fp.Source.ViewObject.Selectable = fp.Selectable
             
     def execute(self, fp):
         if not fp.Source:
@@ -1086,23 +1087,66 @@ class MeshRemodelRemovePointCommandClass(object):
     def __init__(self):
         self.mesh = None
         self.pt = None
+        self.edge = None
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'RemovePoint.svg') ,
-            'MenuText': "Remove a point from a mesh object" ,
+            'MenuText': "Remove a point from (or add a point to) a mesh object" ,
             'ToolTip' : \
-"""Remove a point from a mesh object.
+"""Remove a point from (or add a point to) a mesh object.
 Select the mesh object and a vertex, then run the command
 to remove the selected point.  This also removes all facets connected
 to that point.
 
+Alt+Click = add a new point to the mesh at the picked point on the selected
+edge of a facet.  Edge must be selected from a WireFrame object.  New point will 
+go at the picked point location (location on edge where the mouse pointer was when
+the edge was selected).  There must be at least one facet containing that edge.
 """}        
     
     def Activated(self):
-        new_mesh = self.removeFacets(self.mesh.Mesh.copy(), self.pt)
-        self.mesh.Document.openTransaction("Remove point")
-        self.mesh.Mesh = new_mesh
-        self.mesh.Document.commitTransaction()
+        modifiers = QtGui.QApplication.keyboardModifiers()
+        if modifiers & QtCore.Qt.AltModifier:
+            if self.edge:
+                pts = [v.Point for v in self.edge.Vertexes]
+                pt_indices = gu.getPointIndicesInMesh(pts, self.mesh.Mesh)
+                facet_indices = []
+                for facet in self.mesh.Mesh.Facets:
+                    count = 0
+                    for ptIdx in pt_indices:
+                        if ptIdx in facet.PointIndices:
+                            count += 1
+                    if count == 2:
+                        facet_indices.append(facet.Index)
+                    if len(facet_indices) == 2:
+                        break
+                if not bool(len(facet_indices) == 1 or len(facet_indices) == 2):
+                    FreeCAD.Console.PrintError(\
+f"""MeshRemodel Error: Facet not found in {self.mesh.Label}. Select an edge from
+ the wireframe object.  The facet(s) will be in the middle of that edge where the
+ new point is added.""")
+                    return
+                facets = gu.getFacetsFromFacetIndices(facet_indices, self.mesh.Mesh)
+                copy = self.mesh.Mesh.copy()
+                for facet in facets:
+                    mid = self.mid
+                    pt3_index = [idx for idx in facet.PointIndices if not idx in pt_indices][0]
+                    pt3 = copy.Points[pt3_index].Vector
+                    copy.splitFacet(facet.Index, mid, pt3)
+                self.mesh.Document.openTransaction("Add point")
+                self.mesh.Mesh = copy
+                self.mesh.touch()
+                self.mesh.Document.recompute()
+                self.mesh.Document.commitTransaction()
+        else:
+            if self.pt:
+                new_mesh = self.removeFacets(self.mesh.Mesh.copy(), self.pt)
+                self.mesh.Document.openTransaction("Remove point")
+                self.mesh.Mesh = new_mesh
+                self.mesh.Document.commitTransaction()
+            else:
+                FreeCAD.Console.PrintError("MeshRemodel: No point selected to remove.\n")
+            
 
     def removeFacets(self, mesh, pt):
         """remove the point, and all the facets containing the point
@@ -1137,8 +1181,11 @@ to that point.
         if len(sel) > 2:
             return False
         count = 0
+        edgecount = 0
         meshcount = 0
+        self.edge = None
         self.pt = None
+        self.mid = None
         for s in sel:
             if hasattr(s.Object,"Mesh") or s.Object.isDerivedFrom("Mesh::Feature") :
                 meshcount = 1
@@ -1152,8 +1199,18 @@ to that point.
                 sub = s.Object.getSubObject(s.SubElementNames[0])
                 self.pt = sub.Point
                 count += 1
+            if s.SubElementNames and "Edge" in s.SubElementNames[0]:
+                sub = s.Object.getSubObject(s.SubElementNames[0])
+                self.edge = sub
+                edgecount += 1
+                self.mid = s.PickedPoints[0]
                 
         if count == 1 and meshcount == 1 and gu.findPointInMesh(self.mesh.Mesh, self.pt):
+            return True
+        elif count == 0 and meshcount == 1 and edgecount == 1 and self.edge \
+                and len(self.edge.Vertexes) == 2 \
+                and gu.findPointInMesh(self.mesh.Mesh, self.edge.Vertex1.Point) != []\
+                and gu.findPointInMesh(self.mesh.Mesh, self.edge.Vertex2.Point) != []:
             return True
         return False
         

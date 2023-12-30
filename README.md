@@ -43,8 +43,9 @@ Notice in the above screenshot there is a red dot on the screen.  This shows the
 In addition to selecting a point and moving it via the dialog, you can also select 2 points.  The first point selected is the point to be moved, and the second point is the destination.  In this manner you can merge the 2 points together.<br/>
 ## Remove Point (mesh objects)
 <img src="Resources/icons/RemovePoint.svg" alt="Remove a point"><br/>
-With this tool you can remove a point from a mesh.  When the point is removed all of the facets connecting to it are also removed.  Not to worry, it's fairly simple to add facets back to replace the ones that get removed by using the add facet tool, described below.  If you don't want to lose the facets it might be possible to move the point to another point in the mesh instead.  This will preserve the facets and bind them to the other point.<br/>
-Note: to perform the opposite procedure (add a point) you do this by adding a new facet.  The point to be added is a picked point you have selected that is not already part of the mesh when you add the new facet.  Use the create point object command to add a new point to select or use a vertex of another object, such as a cube.<br/>
+With this tool you can remove a point from (or add a new point to) a mesh.  When the point is removed all of the facets connecting to it are also removed.  Not to worry, it's fairly simple to add facets back to replace the ones that get removed by using the add facet tool, described below.  If you don't want to lose the facets it might be possible to move the point to another point in the mesh instead.  This will preserve the facets and bind them to the other point.<br/>
+To add a point you must first select an edge that already contains 2 points in the mesh.  Then use Alt+Click to add the new point.  This splits the facets that share the edge, creating 2 new facets at the picked point on the edge.<br/>
+Another way to add a new point is by adding a new facet with the add facet tool.  The point to be added is a picked point you have selected that is not already part of the mesh when you add the new facet.  Use the create point object command to add a new point to select or use a vertex of another object, such as a cube.<br/>
 ## Add or remove facet(s) (mesh objects)
 <img src="Resources/icons/AddOrRemoveFacet.svg" alt="add or remove facet(s)"><br/>
 This is a great tool for repairing defective mesh objects, perhaps eliminating the need for remodeling them in many cases.  Usage: first create either a points object or a wireframe object from the mesh object.  With that done, select the 3 points that define the new facet (or 2 edges that contain all 3 points) and click the toolbar icon to add it to the mesh.  This operation changes the mesh topology directly, so it could be a good idea to first duplicate the mesh object and work on the duplicate instead of the original.  That way you can always go back to that original object state if things don't work out as planned.<br/>
@@ -285,6 +286,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2023.12.29 (v1.9.19) -- add the option to add a point to the mesh with the remove point command
 * 2023.12.28 (v1.9.18) -- some improvements to move axial and rotate object functions.
 * 2023.12.27 (v1.9.17) -- add mesh boundary wires command
 * 2023.12.27 (v1.9.16) -- more work on same bug as previous revision
