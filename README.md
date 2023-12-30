@@ -250,6 +250,13 @@ Think of Ctrl as giving you more fine control of the movement and Shift as shift
 
 Face/Circle selection supported, in which case the direction and distance is center to center.  If a face/circle is first subobject, and 2 vertices are selected, then the angle will be that needed to rotate the vertices into alignment if they are on the same plane as the face/circle.<br/>
 
+## Go back selection
+<img src="Resource/icons/GoBackSelection.svg" alt="Go back selection"><br/>
+Goes back to a previous selection state.  This function works by parsing the selection history kept in the python console as comments.  Therefore, clearing the console would clear the history.<br/>
+Example usage:<br/>
+Select some edges, then click in empty 3d space to clear the selection.  Now select some faces, and then clear them by clicking somewhere in open 3d space.  Click the toolbar icon to return to the faces selected.  Ctrl+Click to return to the edges selected.  You can go back as many as 4 states using various modifier keys: Ctrl, Shift, and Alt.  These are interchangeable as each modifier adds 1 to the number of selection states to go back to.  Ctrl+Alt+Shift+Click returns to the selection state 4 states back.<br/>
+Note: multiple consecutive clicks of the toolbar icon does not return to successive previous selection states.  You must use the modifier keys to return to a previous state earlier than the last state.<br/>
+
 ## Create Sketch
 <img src="Resources/icons/CreateSketch.svg" alt = "create sketch"><br/>
 Creates a sketch, optionally attached to 3 points on a plane if 3 points are selected.  This does not create any links to external geometry.  See Create coplanar points command if you want to automatically import all coplanar points that lie on this same plane.<br/>
@@ -294,6 +301,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2023.12.30 (v1.9.21) -- add go back selection command
 * 2023.12.30 (v1.9.20) -- add mesh offset
 * 2023.12.29 (v1.9.19) -- add the option to add a point to the mesh with the remove point command
 * 2023.12.28 (v1.9.18) -- some improvements to move axial and rotate object functions.

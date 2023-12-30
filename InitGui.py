@@ -84,6 +84,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelCreateWire",
                     "MeshRemodelRotateObject",
                     "MeshRemodelMoveAxial",
+                    "MeshRemodelGoBackSelection",
                     "MeshRemodelDraftUpgrade",
                     "MeshRemodelCreateSketch",
                     "MeshRemodelMergeSketches",

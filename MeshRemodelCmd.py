@@ -27,7 +27,7 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2023.12.30"
-__version__ = "1.9.20"
+__version__ = "1.9.21"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -3127,7 +3127,109 @@ Ctrl+Shift+Click = enter custom distance in dialog"""}
         return False
 
 # end Move Axial command class
-###################################################################
+################################################################################
+
+# go back selection
+class MeshRemodelGoBackSelectionCommandClass(object):
+    """Provide a means of returning to previous selection states"""
+    def __init__(self):
+        self.num_lines_to_remove = 0
+        self.pc = None
+    
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'GoBackSelection.svg') ,
+            'MenuText': "Go back selection" ,
+            'ToolTip' :\
+"""
+Return to the previous selection state.
+
+The function makes use of the commented Gui.Selection lines from the python 
+console.  Each time a selection changes it gets recorded as a comment in the
+python console.  This function parses that history and uses that to return to
+the previous selection state.
+
+Supports going back to as many as 4 previous selections with modifier keys.
+Each modifier adds 1 to the selection count.  Example:
+
+Click = go back to last selection state
+Ctrl+Click = go back 2 states
+Alt+Click = go back 2 states
+Shift+Click = go back 2 states
+Ctrl+Shift+Click = go back 3 states
+Ctrl+Alt+Shift+Click = go back 4 states
+
+"""}
+
+    def Activated(self):
+        mw = Gui.getMainWindow()
+        self.pc = mw.findChild(QtGui.QPlainTextEdit,"Python console")
+        txt = self.pc.toPlainText()
+        txtLines = txt.split('\n')
+        lines = [line[6:] for line in txtLines \
+                if line.startswith(">>> # Gui.Selection")]
+        blocks = self.make_blocks(lines)
+        #print(f"len(blocks): {len(blocks)}, blocks = {blocks}")
+        if not blocks:
+            FreeCAD.Console.PrintError("MeshRemodel: Not enough selection history\n")
+            return
+        which = 1
+        modifiers = QtGui.QApplication.keyboardModifiers()
+        if modifiers & QtCore.Qt.ControlModifier:
+            which += 1
+        if modifiers & QtCore.Qt.AltModifier:
+            which += 1
+        if modifiers & QtCore.Qt.ShiftModifier:
+            which += 1
+        if len(blocks) >= which:
+            cmd = "\n".join(blocks[which-1])
+            self.num_lines_to_remove = len(blocks[which-1])*2+3
+            Gui.Selection.clearSelection()
+            Gui.doCommand(cmd)
+            timer = QtCore.QTimer()
+            timer.singleShot(250, self.remove_lines)
+        else:
+            FreeCAD.Console.PrintError("MeshRemodel: Not enough selection history\n")
+        
+    def remove_lines(self):
+        n = self.num_lines_to_remove
+        #print(f"removing {n} lines from {self.pc}")
+        text_to_keep = self.pc.toPlainText().splitlines()[:-n]
+        self.pc.clear()
+        self.pc.setPlainText('\n'.join(text_to_keep))
+        cursor = self.pc.textCursor()
+        cursor.movePosition(cursor.End)
+        self.pc.setTextCursor(cursor)
+
+        
+    def make_blocks(self, lines):
+        """convert the lines into blocks of selections in between the clear selection calls"""
+        result = []
+        current_block = []
+
+        bSkipping = False #skip MeshRemodelGoBackSelection blocks
+        for item in reversed(lines):
+            if item.startswith("Gui.Selection.clearSelection("):
+                if current_block:
+                    rev = reversed(current_block)
+                    cb = [b for b in rev]
+                    result.append(cb)
+                    current_block = []
+            else:
+                if not item in current_block:
+                    current_block.append(item)
+
+        if current_block:
+            if not result or bool(current_block != result[-1]):
+                result.append(current_block)
+        # remove duplicates
+        result = [lst for i, lst in enumerate(result) if lst not in result[:i]]
+        return result
+
+    def IsActive(self):
+        if FreeCAD.ActiveDocument:
+            return True
+        return False
+################################################################################
 #SubObjectLoft
 
 class ParametricLine:
@@ -4508,6 +4610,7 @@ def initialize():
         Gui.addCommand("MeshRemodelCreateWire", MeshRemodelCreateWireCommandClass())
         Gui.addCommand("MeshRemodelMoveAxial", MeshRemodelMoveAxialCommandClass())
         Gui.addCommand("MeshRemodelRotateObject", MeshRemodelRotateObjectCommandClass())
+        Gui.addCommand("MeshRemodelGoBackSelection", MeshRemodelGoBackSelectionCommandClass())
         Gui.addCommand("MeshRemodelDraftUpgrade", MeshRemodelDraftUpgradeCommandClass())
         Gui.addCommand("MeshRemodelCreateSketch", MeshRemodelCreateSketchCommandClass())
         Gui.addCommand("MeshRemodelMergeSketches", MeshRemodelMergeSketchesCommandClass())
