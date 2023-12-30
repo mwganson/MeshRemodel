@@ -74,6 +74,14 @@ Select a mesh and run this command to make a simple non-parametric copy of it.  
 This operation will also create a new empty mesh if nothing is selected to duplicate.  This can be useful if you are
 going to be duplicating facets from one mesh to another.<br/>
 
+## MeshOffset
+<img src="Resources/icons/MeshOffset.svg" alt="Mesh offset"><br/>
+Offset a mesh by moving it's points along their normals by the specified distance in the Offset property.  Offset is a floating point property that gets interpreted as mm.  This might not always work as expected and can cause defects in the mesh, so it's a good idea to run mesh evaluate and repair on the results.  But it can also in some cases cure some defects in the mesh.  In particular I have found it can cure some folds on surface errors.<br/>
+
+If the source mesh is a non-solid mesh, meaning only a single wall, then you can set the Merge Source property to True and it will merge the orignal source mesh with the offset.  This will still leave a gap that will need to be filled manually using the add facet tool.  Since this is a parametric object that will recompute itself it is a good idea to make a simple copy of it and work on the copy instead of working to repair this object directly.  Otherwise it might recompute and undo all of your repairs.<br/>
+
+The ZMin and ZMax properties are provided by the python API, but I am not sure exactly what they do.  There are 2 offset functions available for mesh objects: mesh.offset() and mesh.offsetSpecial(), the latter of which accepts the additional ZMin and ZMax arguments.  If you set these to 0.0 (the default) then the normal mesh.offset() function is used.<br/>
+
 ## SubObjectLoft
 <img src="Resources/icons/SubObjectLoft.svg" alt="SubObjectLoft icon"><br/>
 Select 2 subobjects in the 3d view, then run this command to loft between those subobjects.  Uses the new SubObjectLoft object for some selection types, the new ParametricLine type for some, and Part::Loft for others.<br/>
@@ -286,6 +294,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2023.12.30 (v1.9.20) -- add mesh offset
 * 2023.12.29 (v1.9.19) -- add the option to add a point to the mesh with the remove point command
 * 2023.12.28 (v1.9.18) -- some improvements to move axial and rotate object functions.
 * 2023.12.27 (v1.9.17) -- add mesh boundary wires command

@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2023.12.29"
-__version__ = "1.9.19"
+__date__    = "2023.12.30"
+__version__ = "1.9.20"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -983,6 +983,132 @@ empty mesh object is created.
         if self.mesh and not self.mesh.isDerivedFrom("Mesh::Feature"):
             return False
         return True    
+
+################################################################################
+
+#offset mesh
+
+class OffsetMesh:
+    """offset a mesh by moving its points along their normals"""
+    def __init__(self, obj, meshobj=None):
+        obj.Proxy = self
+        obj.addProperty("App::PropertyLink","Source","OffsetMesh","Source mesh object").Source=meshobj
+        obj.addProperty("App::PropertyFloat","Offset","OffsetMesh", \
+                "Amount of offset, can be negative value").Offset=2.0
+        obj.addProperty("App::PropertyFloat","ZMin","OffsetMesh", \
+                "Not really sure what this does yet, it's an option offered by the API").ZMin = 0.0
+        obj.addProperty("App::PropertyFloat","ZMax","OffsetMesh",\
+                "Not really sure what this does yet, it's an option offered by the API").ZMax = 0.0
+        obj.addProperty("App::PropertyBool","MergeSource","OffsetMesh",\
+                "If true, merge the original source mesh with the offset one.").MergeSource = False
+        obj.addProperty("App::PropertyBool","FlipNormals","OffsetMesh",\
+                "Flip normals if true, done before the offset").FlipNormals = False
+        obj.addProperty("App::PropertyBool","HarmonizeNormals","OffsetMesh",\
+                "Harmonize normals if true, done before the offset").HarmonizeNormals = False
+        
+    def execute(self, fp):
+        if not fp.Source:
+            return
+        copy = fp.Source.Mesh.copy()
+        if fp.FlipNormals:
+            copy.flipNormals()
+        if fp.HarmonizeNormals:
+            copy.harmonizeNormals()
+        if fp.Offset != 0.0 and bool(fp.ZMin or fp.ZMax):
+            copy.offsetSpecial(fp.Offset, fp.ZMin, fp.ZMax)
+        elif fp.Offset != 0.0:
+            copy.offset(fp.Offset)
+        if fp.MergeSource:
+            copy.addMesh(fp.Source.Mesh.copy())
+        fp.Mesh = copy
+
+class OffsetMeshVP:        
+    def __init__(self, obj):
+        obj.Proxy = self
+    
+    def attach(self, obj):
+        self.Object = obj.Object
+        
+    def updateData(self, fp, prop):
+        '''If a property of the handled feature has changed we have the chance to handle this here'''
+        # fp is the handled feature, prop is the name of the property that has changed
+        pass
+
+    def setDisplayMode(self,mode):
+        '''Map the display mode defined in attach with those defined in getDisplayModes.\
+                Since they have the same names nothing needs to be done. This method is optional'''
+        return mode
+ 
+    def claimChildren(self):
+        return [self.Object.Source]
+        
+    def onDelete(self, vobj, subelements):
+        self.Object.Source.Visibility = True
+        return True
+ 
+    def onChanged(self, vp, prop):
+        '''Here we can do something when a single property got changed'''
+        #FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
+        
+    def getIcon(self):
+        return os.path.join( iconPath , 'OffsetMesh.svg')
+    
+    def __getstate__(self):
+        '''When saving the document this object gets stored using Python's json module.\
+                Since we have some un-serializable parts here -- the Coin stuff -- we must define this method\
+                to return a tuple of all serializable objects or None.'''
+        return {"name": self.Object.Name}
+ 
+    def __setstate__(self,state):
+        '''When restoring the serialized object from document we have the chance to set some internals here.\
+                Since no data were serialized nothing needs to be done here.'''
+        self.Object = FreeCAD.ActiveDocument.getObject(state["name"])
+        return None
+
+
+class MeshRemodelOffsetMeshCommandClass(object):
+    """offset a mesh"""
+    def __init__(self):
+        self.mesh = None
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'OffsetMesh.svg'),
+            'MenuText': "Offset a mesh" ,
+            'ToolTip' : \
+"""Offset a mesh
+Offsetting a mesh involves simply moving its points out on their normals (or in 
+if the offset is a negative value).  It doesn't always work as expected, but can
+at times cure some issues with a mesh, and sometimes it works.
+
+Offset: the amount of offset (in mm)
+ZMin: Not sure what this does.  It is an option provided by the API.
+ZMax: Not sure what this does.  It is an option provided by the API.
+"""}    
+
+
+    def Activated(self):
+        doc = self.mesh.Document
+        doc.openTransaction("Offset Mesh")
+        fp = doc.addObject("Mesh::FeaturePython","OffsetMesh")
+        OffsetMesh(fp, self.mesh)
+        OffsetMeshVP(fp.ViewObject)
+        self.mesh.ViewObject.Visibility = False
+        doc.commitTransaction()
+        doc.recompute()
+
+
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getSelection()
+        if len(sel) != 1:
+            return False
+        self.mesh = sel[0] if sel[0].isDerivedFrom("Mesh::Feature") else None
+        if not self.mesh:
+            return False
+        return True
+
+
 
 ################################################################################
 
@@ -4360,6 +4486,7 @@ def initialize():
         Gui.addCommand("MeshRemodelCreateWireFrameObject",MeshRemodelCreateWireFrameObjectCommandClass())
         Gui.addCommand("MeshRemodelMeshBoundaryWires",MeshRemodelMeshBoundaryWiresCommandClass())
         Gui.addCommand("MeshRemodelMeshSimpleCopy", MeshRemodelMeshSimpleCopyCommandClass())
+        Gui.addCommand("MeshRemodelOffsetMesh", MeshRemodelOffsetMeshCommandClass())
         Gui.addCommand("MeshRemodelDuplicateSelectedFacets", MeshRemodelDuplicateSelectedFacetsCommandClass())
         Gui.addCommand("MeshRemodelRemovePoint", MeshRemodelRemovePointCommandClass())
         Gui.addCommand("MeshRemodelAddOrRemoveFacet", MeshRemodelAddOrRemoveFacetCommandClass())

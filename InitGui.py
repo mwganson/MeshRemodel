@@ -67,6 +67,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelAddOrRemoveFacet",
                     "MeshRemodelExpandedMesh",
                     "MeshRemodelMeshSimpleCopy",
+                    "MeshRemodelOffsetMesh",
                     "MeshRemodelDuplicateSelectedFacets",
                     "MeshRemodelCreateCoplanarPointsObject",
                     "MeshRemodelAddSelectionObserver",
