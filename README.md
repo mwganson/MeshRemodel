@@ -301,6 +301,8 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2024.01.08 (v1.9.22) -- add a warning when moving or rotating part design features that the body should be what is being moved or rotated instead of the feature, along with a suggestion to put the body's view tab display mode body property temporarily into Tip mode instead of Through until the action is completed.  Add this to tooltips, too.
+* 2024.01.08 (v1.9.22) -- fix a small bug in rotate object where if a circle arc edge is selected we use the center of the circle rather than the center of gravity of the arc edge for the center of rotation.  (Use the face if the center of gravity of the face is desired as the center of rotation.)
 * 2023.12.30 (v1.9.21) -- add go back selection command
 * 2023.12.30 (v1.9.20) -- add mesh offset
 * 2023.12.29 (v1.9.19) -- add the option to add a point to the mesh with the remove point command

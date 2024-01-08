@@ -2858,6 +2858,12 @@ Line segment edge: axis =  line direction
 3 vertices: axis = 3 point plane, center = 2nd point, angle = 1st to 3rd point
 2 faces/circles: axis,angle = axis,angle needed to bring them into coplanarity, 
 if they are already planar, then Ctrl+Shift+Click, enter 180 degrees to flip.
+
+If you are working in Part Design and wish to rotate a Part Design Feature, such
+as a Pad or Pocket, then usually the underlying sketch is what should be rotated,
+but if it is attached, then the attachment will override the rotation on recompute.
+To move the entire body, set the Body's View tab DisplayModeBody property to Tip
+temporarily, and then back to Through after completing the rotation.
 """}
             
     def Activated(self):
@@ -2880,6 +2886,16 @@ if they are already planar, then Ctrl+Shift+Click, enter 180 degrees to flip.
         plm = self.obj.Placement
         plm.rotate(self.center, self.normal, angle, True)
         self.obj.Placement = plm
+        
+        if self.obj.isDerivedFrom("PartDesign::Feature"):
+            if self.obj._Body:
+                if self.obj._Body.ViewObject.DisplayModeBody != "Tip":
+                    FreeCAD.Console.PrintWarning(\
+f"""MeshRemodel Rotate Object: {self.obj.Label} is a Part Design feature and its
+View tab DisplayModeBody is not in Tip mode.  Did you want to rotate the body or
+the feature?  Feature placement is usually defined by sketch placement or other
+attachment.
+""")
 
         doc.commitTransaction()
         
@@ -2899,7 +2915,7 @@ if they are already planar, then Ctrl+Shift+Click, enter 180 degrees to flip.
                 sub2 = sel[1].Object.getSubObject(sel[1].SubElementNames[0])
                 if hasattr(sub1,"Surface") or \
                         bool(hasattr(sub1,"Curve") and sub1.Curve.TypeId == "Part::GeomCircle"):
-                    self.center = sub1.CenterOfGravity
+                    self.center = sub1.Curve.Center
                     axis = sub1.Curve.Axis if hasattr(sub1,"Curve") else sub1.Surface.Axis
                     if hasattr(sub2,"Surface") or \
                             bool(hasattr(sub2,"Curve") and sub2.Curve.TypeId == "Part::GeomCircle"):
@@ -2988,7 +3004,7 @@ if they are already planar, then Ctrl+Shift+Click, enter 180 degrees to flip.
                     return True
                 if sub.Curve.TypeId == "Part::GeomCircle":
                     self.normal = sub.Curve.Axis
-                    self.center = sub.CenterOfGravity
+                    self.center = sub.Curve.Center
                     return True
                 
             if hasattr(sub,"Surface"):
@@ -3049,7 +3065,14 @@ Click = move 1 mm
 Ctrl+Click = move 0.1 mm
 Shift+Click = move 10 mm
 Alt+Click = move in opposite direction
-Ctrl+Shift+Click = enter custom distance in dialog"""}
+Ctrl+Shift+Click = enter custom distance in dialog
+
+If you are working in Part Design and wish to move a Part Design Feature, such
+as a Pad or Pocket, then usually the underlying sketch is what should be rotated,
+but if it is attached, then the attachment will override the move on recompute.
+To move the entire body, set the Body's View tab DisplayModeBody property to Tip
+temporarily, and then back to Through after completing the move.
+"""}
             
     def Activated(self):
         #FreeCAD.Console.PrintMessage(f"obj: {self.obj.Label}, normal: {self.normal}\n")
@@ -3070,6 +3093,16 @@ Ctrl+Shift+Click = enter custom distance in dialog"""}
         doc.openTransaction("MR_Move")
         self.obj.Placement = FreeCAD.Placement(self.obj.Placement.Base 
                         + self.normal.normalize() * distance, self.obj.Placement.Rotation)
+        if self.obj.isDerivedFrom("PartDesign::Feature"):
+            if self.obj._Body:
+                if self.obj._Body.ViewObject.DisplayModeBody != "Tip":
+                    FreeCAD.Console.PrintWarning(\
+f"""MeshRemodel Move Axial: {self.obj.Label} is a Part Design feature and its
+View tab DisplayModeBody is not in Tip mode.  Did you want to move the body or
+the feature?  Feature placement is usually defined by sketch placement or other
+attachment.
+""")
+
         doc.commitTransaction()
         
     def IsActive(self):
