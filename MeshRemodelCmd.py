@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2023.12.30"
-__version__ = "1.9.21"
+__date__    = "2024.04.16"
+__version__ = "1.9.23"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -2275,7 +2275,7 @@ class CoplanarPoints:
         for vertName in fp.Trio[0][1]:
             trio.append(fp.Trio[0][0].Shape.Vertexes[int(vertName[6:])-1])
         base,normal = gu.getBaseAndNormal(trio)
-        if base == None and normal == None:
+        if base is None and normal is None:
             FreeCAD.Console.PrintError("MeshRemodel: Unable to find base/normal\n")
             return
         if fp.Tolerance == 0:
@@ -2288,7 +2288,7 @@ class CoplanarPoints:
         coplanar = [Part.Vertex(v) for v in trio] + coplanar
         if hasattr(fp, "FlattenToPlane") and fp.FlattenToPlane:
             base,normal = gu.getBaseAndNormal(coplanar[:3])
-            if base == None and normal == None:
+            if base is None and normal is None:
                 FreeCAD.Console.PrintError("MeshRemodel: Unable to find base/normal\n")
                 return
             coplanar = [Part.Vertex(gu.projectVectorToPlane(v.Point, base, normal)) for v in coplanar]
@@ -2941,7 +2941,7 @@ attachment.
                     pts.append(sub2.Vertex2.Point)
                 if len(pts) == 3:
                     base,normal = gu.getBaseAndNormal([Part.Vertex(p) for p in pts])
-                    if normal == None:
+                    if normal is None:
                         if hasattr(sub1,"Curve") and hasattr(sub1.Curve,"XAxis"):
                             normal = sub1.Curve.XAxis
                         else:
@@ -2964,7 +2964,7 @@ attachment.
                     and "Vertex" in sel[2].SubElementNames[0]:
                 verts = [s.Object.getSubObject(s.SubElementNames[0]) for s in sel]
                 base,normal = gu.getBaseAndNormal(verts)
-                if normal == None:
+                if normal is None:
                     return False
                 self.normal = normal
                 self.center = verts[1].Point
