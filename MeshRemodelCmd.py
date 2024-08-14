@@ -3163,6 +3163,46 @@ attachment.
 # end Move Axial command class
 ################################################################################
 
+class BlockSelectorDialog(QtGui.QDialog):
+    def __init__(self, blocks, parent=None):
+        def trigger(idx): 
+            return lambda: self.on_block_selected(idx)
+        super(BlockSelectorDialog, self).__init__(parent)
+        self.blocks = blocks
+        self.selected_index = None
+
+        self.setWindowTitle('Go back to a previous selection')
+        self.setWindowFlags(QtCore.Qt.Dialog | QtCore.Qt.WindowCloseButtonHint)
+        self.setModal(True)
+
+        layout = QtGui.QVBoxLayout()
+
+        # Create a scroll area
+        scroll_area = QtGui.QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_content = QtGui.QWidget()
+        scroll_layout = QtGui.QVBoxLayout(scroll_content)
+        scroll_layout.addWidget(QtGui.QLabel("Tooltip for each button shows the selection objects\nDeleted objects will not appear."))
+
+        # Create buttons for each block
+        for i, block in enumerate(blocks):
+            button = QtGui.QPushButton(f'Block {i + 1}')
+            tooltip_text = "\n".join(block)
+            button.setToolTip(tooltip_text)
+            button.clicked.connect(trigger(i+1))
+            scroll_layout.addWidget(button)
+
+        scroll_content.setLayout(scroll_layout)
+        scroll_area.setWidget(scroll_content)
+
+        layout.addWidget(scroll_area)
+        self.setLayout(layout)
+
+    def on_block_selected(self, index):
+        self.selected_index = index
+        self.accept()  # Close the dialog and set the result to Accepted
+
+
 # go back selection
 class MeshRemodelGoBackSelectionCommandClass(object):
     """Provide a means of returning to previous selection states"""
@@ -3182,15 +3222,10 @@ console.  Each time a selection changes it gets recorded as a comment in the
 python console.  This function parses that history and uses that to return to
 the previous selection state.
 
-Supports going back to as many as 4 previous selections with modifier keys.
-Each modifier adds 1 to the selection count.  Example:
-
-Click = go back to last selection state
-Ctrl+Click = go back 2 states
-Alt+Click = go back 2 states
-Shift+Click = go back 2 states
-Ctrl+Shift+Click = go back 3 states
-Ctrl+Alt+Shift+Click = go back 4 states
+In the dialog you will find a column of buttons labeled Block 1, Block 2, etc.
+Each button has a tooltip that will display the selection commands that will be
+invoked when the button is clicked.  Only the selections made previously in
+documents with the same name as the current active document will be available.
 
 """}
 
@@ -3202,21 +3237,17 @@ Ctrl+Alt+Shift+Click = go back 4 states
         lines = [line[6:] for line in txtLines \
                 if line.startswith(">>> # Gui.Selection")]
         blocks = self.make_blocks(lines)
-        #print(f"len(blocks): {len(blocks)}, blocks = {blocks}")
+        blocks = self.filter_blocks(blocks, FreeCAD.ActiveDocument.Name)
         if not blocks:
             FreeCAD.Console.PrintError("MeshRemodel: Not enough selection history\n")
             return
-        which = 1
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        if modifiers & QtCore.Qt.ControlModifier:
-            which += 1
-        if modifiers & QtCore.Qt.AltModifier:
-            which += 1
-        if modifiers & QtCore.Qt.ShiftModifier:
-            which += 1
+        which = self.ask_user_which_block(blocks)
+        if which == -1:
+            return
+
         if len(blocks) >= which:
             cmd = "\n".join(blocks[which-1])
-            self.num_lines_to_remove = len(blocks[which-1])*2+3
+            self.num_lines_to_remove = len(blocks[which -1])*2+2
             Gui.Selection.clearSelection()
             Gui.doCommand(cmd)
             timer = QtCore.QTimer()
@@ -3225,8 +3256,8 @@ Ctrl+Alt+Shift+Click = go back 4 states
             FreeCAD.Console.PrintError("MeshRemodel: Not enough selection history\n")
         
     def remove_lines(self):
+        """remove the new selection lines we just added when we selected the items in the block"""
         n = self.num_lines_to_remove
-        #print(f"removing {n} lines from {self.pc}")
         text_to_keep = self.pc.toPlainText().splitlines()[:-n]
         self.pc.clear()
         self.pc.setPlainText('\n'.join(text_to_keep))
@@ -3234,7 +3265,55 @@ Ctrl+Alt+Shift+Click = go back 4 states
         cursor.movePosition(cursor.End)
         self.pc.setTextCursor(cursor)
 
+    def ask_user_which_block(self, blocks):
+        """ask user which block to go back to in a dialog, return index into blocks"""
+
+        dialog = BlockSelectorDialog(blocks)
+        result = dialog.exec_()
         
+        if result == QtGui.QDialog.Accepted:
+            print(f"returning {dialog.selected_index}")
+            return dialog.selected_index
+        else:
+            return -1
+            
+    def filter_blocks(self, blocks, doc_name):
+        """we only want the blocks that reference the current active document 
+        and that reference existing objects, not deleted ones
+        """
+        filtered = []
+        for block in blocks:
+            if any(doc_name in s for s in block):
+                filtered.append(block)
+                
+        filtered2 = []       
+        for block in filtered:
+            filtered_block = []
+            for s in block:
+                if doc_name in s:
+                    # Extract the object name, assuming it is the argument following the document name
+                    parts = s.split(',')
+                    if len(parts) > 1:
+                        obj_name = parts[1].strip().strip("'")
+                        if self.ifExists(doc_name, obj_name):
+                            filtered_block.append(s)
+                else:
+                    filtered_block.append(s)
+    
+            if filtered_block:
+                filtered2.append(filtered_block)
+        
+        return filtered2
+
+    def ifExists(self, doc_name, obj_name):
+        """check if object still exists"""
+        doc = FreeCAD.getDocument(doc_name)
+        obj = doc.getObject(obj_name)
+        if obj:
+            return True
+        else:
+            return False
+
     def make_blocks(self, lines):
         """convert the lines into blocks of selections in between the clear selection calls"""
         result = []

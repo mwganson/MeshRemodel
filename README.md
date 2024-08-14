@@ -281,8 +281,9 @@ Face/Circle selection supported, in which case the direction and distance is cen
 <img src="Resource/icons/GoBackSelection.svg" alt="Go back selection"><br/>
 Goes back to a previous selection state.  This function works by parsing the selection history kept in the python console as comments.  Therefore, clearing the console would clear the history.<br/>
 Example usage:<br/>
-Select some edges, then click in empty 3d space to clear the selection.  Now select some faces, and then clear them by clicking somewhere in open 3d space.  Click the toolbar icon to return to the faces selected.  Ctrl+Click to return to the edges selected.  You can go back as many as 4 states using various modifier keys: Ctrl, Shift, and Alt.  These are interchangeable as each modifier adds 1 to the number of selection states to go back to.  Ctrl+Alt+Shift+Click returns to the selection state 4 states back.<br/>
-Note: multiple consecutive clicks of the toolbar icon does not return to successive previous selection states.  You must use the modifier keys to return to a previous state earlier than the last state.<br/>
+Select some edges, then click in empty 3d space to clear the selection.  Now select some faces, and then clear them by clicking somewhere in open 3d space.  Click the toolbar icon to bring up the selection dialog.  The dialog features a column of buttons labeled Block 1, Block 2, etc.  The tooltip for each button will show the Gui selection commands that will be run in order to reselect those objects and subobjects. Note that the buttons are only for the active document, based on the name of the document, and the selection commands within each block are only for objects that exist in the current active document.  The active document is based on the name of the document, so if you have Unnamed documents, then there could be some confusion or if the name of one document is a substring of the name of another, example Unnamed and Unnamed2 or Container and Lid_For_Container.  An object that was deleted that was part of the selection previously will not appear in the selection block, but if you undo the deletion and try again it will appear back in the selection block.<br/>
+<br/>
+Note that previously modifier keys were used to determine the number of selections to go back to, but this proved to be too confusing in practice, so the dialog was created.
 
 ## Create Sketch
 <img src="Resources/icons/CreateSketch.svg" alt = "create sketch"><br/>
@@ -328,6 +329,8 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2024.08.14 (1.10.1) -- add dialog for go back selection feature
+* 2024.08.13 (1.10.0) -- add grid surface object
 * 2024.04.16 (1.9.23) -- change == to is when checking for None  (Thanks, Ed Williams)
 * 2024.01.08 (v1.9.22) -- add a warning when moving or rotating part design features that the body should be what is being moved or rotated instead of the feature, along with a suggestion to put the body's view tab display mode body property temporarily into Tip mode instead of Through until the action is completed.  Add this to tooltips, too.
 * 2024.01.08 (v1.9.22) -- fix a small bug in rotate object where if a circle arc edge is selected we use the center of the circle rather than the center of gravity of the arc edge for the center of rotation.  (Use the face if the center of gravity of the face is desired as the center of rotation.)
