@@ -73,6 +73,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelAddSelectionObserver",
                     "MeshRemodelPartSolid",
                     "MeshRemodelSubObjectLoft",
+                    "MeshRemodelCreateGridSurface",
                     "MeshRemodelCreatePointObject",
                     "MeshRemodelCreateLine",
                     "MeshRemodelCreatePolygon",

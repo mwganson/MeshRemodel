@@ -98,6 +98,33 @@ This is a parametric line object.  Select 2 vertices, and then run the SubObject
 ### SubObjectLoft Object
 This object lofts between a face and a vertex or 2 faces to each other.  It supports faces with inner wires where Part::Loft fails, but it does not support more than 2 sections, unlike Part::Loft, which supports any number of sections.  When the loft is between a face and a vertex a scaled copy of the face is made, which is positioned at the location of the vertex and pointed towards the original face, and then the loft is made between those 2 faces.  There are 2 hidden properties that are shown when a vertex is one of the subobjects: VertexFaceScale and VertexFaceRotation.  The scale option controls the scale factor.  The rotation property controls the rotation of the scaled face.  This can be used where you want to loft a face to a scaled and rotated copy of itself.  Here, the rotation property acts much like an attachment offset property, with the Z axis always being the face normal.  You can use the rotation to better control the seamlines of the loft to prevent some twisting.
 
+## Create GridSurface Object
+<img src="Resources/icons/CreateGridSurface.svg" alt="create grid surface object"><br/>
+Creates a GridSurface object.  Along with the Grid Surface object are created individual Part::Vertex objects, each assigned to a row and column in a grid.  The vertices serve as points for creating the GridSurface object shape, which can be a surface or a series of bspline edges or polyline wires.  As the individual vertices are moved the GridSurface object automatically recomputes its shape.  If the Output property is set to Surface, then the surface that is created can be done in a couple different ways: lofting the edges/wires and by directly interpolating the points into a surface.  Lofting generally works better and is the default.  An even better surface can usually be had by setting the Output to Gordon Surface Template, and then creating a Gordon Surface using the Curves workbench Gordon Surface tool with the Grid Surface object as the source.
+
+### Dimensions property group
+Count Columns and Count Rows properties determine the number of columns and rows the grid will have.  You can use these to add more rows or columns or remove the last row or column without impacting any changes you might have made to existing vertices in the grid unless you remove them by reducing the number.  The XInterval and YInterval properties will cause the grid to be rebuilt, overwriting any changes already made to individual vertex objects, but this can be undone using Ctrl+Z undo.  Moral: Decide on the desired intervals before doing too much work on the grid.
+
+### Grid Surface property group
+Column Mode is false by default.  The default is row mode, meaning the edges used for the loft or for the Gordon template will be rows of edges formed from the points in each row.  In Column Mode the edges are formed from the points in each column.
+
+Method property has options: Interpolate points, Lofted Edges, or Lofted Edges Ruled.  Note that in column mode the edges are columns, and in row mode they are rows.  Interpolate points makes the surface internally as a Part.BSplineSurface object.  In the Loft modes instead the edges are lofted to form the surface.  This gives a bit more control and is the default.
+
+Output defines whether the GridSurface object shape is a surface, edges, or a Gordon template.  The Gordon template can be the source for a Gordon Surface created in the Curves workbench addon.  Edges mode is mostly useful to help visualize how the surface is generated with the loft.  In some cases you might need to switch from row mode to column mode for better results.
+
+Post Wire Edges and Pre Wire Edges.  When working in Loft mode the edges of other objects may be used to form part of the Loft.  This allows to connect the GridSurface object to other objects in a manner that should generally succeed.  Select the property, open the property editor with the [...] button, and select in the 3D view the edges to use.  The Pre Wire Edges are connected to row 0 (or column 0 in column mode) and the Post Wire Edges are connected to the last row or column.
+
+Reversed can be used to flip the normal of the surface, if desired.
+
+### Vertices property group
+Grid Visibility allows to toggle all the Part::Vertex objects visibility in one go.  This is also accessible via the context menu for the GridSurface object.
+Point Size allows to set the Point Size of all the Part::Vertex objects in one go.
+Vertices is the list of Vertex objects used in the grid.  Note that it is possible to delete one or more of these without wrecking the GridSurface object, but it also might get broken.  Each Part::Vertex is given 2 new properties: Row and Column in a Grid Surface property group.  These are used to track the position of each Vertex in the group.  This affects how the vertices are all connected in the proper order when making the edges.
+
+### Context menu
+In the context menu you manipulate a number of the above described properties.  You can also select multiple vertices by row or column, allowing manipulation of the entire row or column in one go.  You would do this by editing their X, Y, and Z properties.  But do not edit their placements while a group of them are selected or else they will all end up in the same coordinate.  Note that the Part::Vertex objects can also be attached to other vertices.  They can also be moved using the MeshRemodel Move Axial tool by first selecting the vertex to be moved, then the new vertex location, and then clicking the Move axial toolbar icon.  This is quick and easy, but not parametric in the even the target vertex moves.
+
+
 ## Create Cross-Sections Object
 <img src="Resources/icons/CreateCrossSections.svg" alt="create cross-sections object"><br/>
 Select the mesh object in the tree, then use this command to create one or more cross-section objects.  This is just a convenience link to the Cross-sections tool in the Mesh Design workbench.  These cross-sections should not be directly used as wires, but rather as references for creating the wires within the MeshRemodel workbench.  This is because these cross-section objects will have extra points and multiple line segments where only one segment is desired.<br/>

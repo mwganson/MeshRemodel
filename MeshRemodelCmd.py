@@ -26,14 +26,15 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.04.16"
-__version__ = "1.9.23"
+__date__    = "2024.08.13"
+__version__ = "1.10.0"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
 import Draft, DraftGeomUtils, DraftVecUtils, Mesh, MeshPart
 import time
 import numpy as np
+import shiboken2 as shiboken
 
 
 if FreeCAD.GuiUp:
@@ -3579,6 +3580,482 @@ Alt+Click = reverses references to reverse object for all but SubObjectLofts
 
 # end subobject loft command class
 ###################################################################
+
+
+class GridSurface:
+    def __init__(self, obj):
+        obj.Proxy = self
+
+        grp = "Dimensions"
+        obj.addProperty("App::PropertyLength","YInterval",grp,"Length in Y direction, triggers grid rebuild").YInterval=10
+        obj.addProperty("App::PropertyLength","XInterval",grp,"Length in X direction, triggers grid rebuild").XInterval=10
+
+        obj.addProperty("App::PropertyIntegerConstraint","CountRows",grp,"Whenu using Custom grid size this works.").CountRows = (3,1,10000,1)
+        obj.addProperty("App::PropertyIntegerConstraint","CountColumns",grp,"When using Custom grid size this works.").CountColumns = (3,1,10000,1)
+
+        grp = "Vertices"
+        obj.addProperty("App::PropertyLinkList","Vertices",grp,"Part::Vertex objects making up grid")
+        obj.addProperty("App::PropertyInteger","PointSize",grp,"Point size applied to Part::Vertexes").PointSize = 8
+        obj.addProperty("App::PropertyBool","GridVisibility",grp,"Visibility toggler for Part::Vertexes").GridVisibility = True
+
+        grp = "GridSurface"
+        obj.addProperty("App::PropertyBool","ColumnMode",grp,"If True, the grid is treated as column-oriented instead of row-oriented").ColumnMode = False
+        obj.addProperty("App::PropertyBool","Reversed",grp,"Flips the normal of the face").Reversed = False
+        obj.addProperty("App::PropertyEnumeration","Method",grp,"Method for making the bspline surface, LoftedRows makes bsplines out each row and lofts them").Method = ["Interpolate Points","Lofted Edges","Lofted Edges Ruled"]
+        obj.Method = "Lofted Edges"
+        obj.addProperty("App::PropertyEnumeration","RowWireType",grp,"Only for loft methods, the type of wire to make from each row of points").RowWireType = \
+        ["Open BSpline", "Closed BSpline", "Open Polyline", "Closed Polyline"]
+        obj.addProperty("App::PropertyEnumeration","Output",grp, "Surface, Edges, Gordon Template").Output = ["Surface","Edges", "Gordon Template"]
+        obj.Output="Surface"
+        obj.addProperty("App::PropertyLinkSubList", "PreWireEdges",grp,"When using Loft Row method the wire formed from these edges is lofted to row 0 as part of the loft.")
+        obj.addProperty("App::PropertyLinkSubList","PostWireEdges",grp,"When using Loft Row method the wire formed form these edges is lofted to the last row as part of the loft.")
+        obj.addProperty("App::PropertyString","Version",grp,"Version of GridSurface used to create this object.").Version = __version__
+
+        self.done = True
+        self.blockSignals = False
+
+
+    def onChanged(self, fp, prop):
+        if not hasattr(self, "done"):
+            return
+        rebuilders = ["YInterval","XInterval"]
+        if prop in rebuilders:
+            fp.ViewObject.Proxy.onDelete(None, None) #delete all children to trigger rebuild of grid
+        elif prop == "CountRows":
+            num_rows = self.countRows(fp)
+            while fp.CountRows > num_rows:
+                self.addRow(fp)
+                num_rows = self.countRows(fp)
+            while fp.CountRows < num_rows:
+                self.removeRow(fp)
+                num_rows = self.countRows(fp)
+        elif prop == "CountColumns":
+            num_cols = self.countColumns(fp)
+            while fp.CountColumns > num_cols:
+                self.addColumn(fp)
+                num_cols = self.countColumns(fp)
+            while fp.CountColumns < num_cols:
+                self.removeColumn(fp)
+                num_cols = self.countColumns(fp)
+
+
+    def makeSplines(self, fp, vrows):
+        """if fp.Output is "Edges" or "Gordon Template", then the shape becomes the rows of edges instead of a surface
+        """
+
+        splines = []
+        left = [] #left and right edges of gordon template
+        right = []
+        for row in vrows:
+            spline = Part.BSplineCurve()
+            if "BSpline" in fp.RowWireType:
+                spline.interpolate(row, PeriodicFlag = "Closed BSpline" == fp.RowWireType)
+            elif "Open Polyline" == fp.RowWireType:
+                spline = Part.makePolygon(row)
+            elif "Closed Polyline" in fp.RowWireType:
+                spline = Part.makePolygon(row + [row[0]])
+            splines.append(spline.toShape() if hasattr(spline, "toShape") else spline)
+            if fp.Output == "Gordon Template":
+                left.append(row[0])
+                right.append(row[-1])
+        if fp.Output == "Gordon Template":
+            left_spline = Part.BSplineCurve()
+            right_spline = Part.BSplineCurve()
+            if "BSpline" in fp.RowWireType:
+                left_spline.interpolate(left)
+                right_spline.interpolate(right)
+                splines = [left_spline.toShape(), right_spline.toShape()] + splines
+            elif "Polyline" in fp.RowWireType:
+                left_spline = Part.makePolygon(left)
+                right_spline = Part.makePolygon(right)
+                splines = [left_spline, right_spline] + splines
+
+
+
+        fp.Shape = Part.makeCompound(splines)
+        return
+
+    def makeWire(self, edges):
+        """make the post and pre wire edges"""
+        if not edges:
+            return None
+        subobjects = []
+        for edge in edges:
+            feat = edge[0]
+            subs = edge[1]
+            for sub in subs:
+                if "Edge" in sub:
+                    subobjects.append(feat.getSubObject(sub))
+                else:
+                    FreeCAD.Console.PrintWarning(f"GridSurface: {sub} is not supported subobject type, skipping...\n")
+        if not subobjects:
+            return None
+        return Part.Wire(subobjects)
+
+        return None
+
+
+
+    def execute(self,fp):
+        if self.blockSignals:
+            self.blockSignals = False
+            return
+
+        vertices = fp.Vertices
+        if not vertices:
+            self.buildGrid(fp)
+            vertices = fp.Vertices
+
+        vert_dict = self.buildDictionary(fp)
+        rows = fp.CountRows
+        cols = fp.CountColumns
+        if fp.ColumnMode:
+            rows,cols = (cols,rows)
+        vrows = []
+        for rr in range(rows):
+            this_row = []
+            for cc in range(cols):
+                if not fp.ColumnMode:
+                    vert = self.fetch(fp,vert_dict,rr,cc)
+                else:
+                    vert = self.fetch(fp,vert_dict,cc,rr)
+                if not vert: #allow user to delete individual vertices
+                    continue
+                try:
+                    this_row.append(vert.Shape.CenterOfGravity)
+                except:
+                    this_row.append(vert.Placement.Base)
+            if this_row:
+                vrows.append(this_row)
+        if fp.Output == "Edges" or fp.Output == "Gordon Template":
+            self.makeSplines(fp, vrows)
+            return
+
+        surf = Part.BSplineSurface()
+        if fp.Method == "Interpolate Points":
+            if len(vrows) > 1:
+                surf.interpolate(vrows)
+            else:
+                spline = Part.BSplineCurve()
+                spline.interpolate(vrows[0])
+                fp.Shape = spline.toShape()
+                return
+        elif "Lofted Edges" in fp.Method:
+
+            preSpline = self.makeWire(fp.PreWireEdges) #returns None if no edges are defined
+            postSpline = self.makeWire(fp.PostWireEdges)
+            splines = []
+            ruled = True if "Ruled" in fp.Method else False
+            for row in vrows:
+                if "BSpline" in fp.RowWireType:
+                    spline = Part.BSplineCurve()
+                    periodicFlag = "Closed" in fp.RowWireType
+                    spline.interpolate(row, PeriodicFlag = periodicFlag)
+                    splines.append(spline)
+                else: # polyines
+                    if "Closed" in fp.RowWireType:
+                        row.append(row[0])
+                    poly = Part.makePolygon(row)
+                    splines.append(poly)
+            if preSpline:
+                splines = [preSpline] + splines
+            if postSpline:
+                splines = splines + [postSpline]
+            if len(splines) > 1:
+                loft = Part.makeLoft(splines, ruled = ruled)
+                surf = loft
+            else: #just make a bspline edge since there is only 1 row
+                fp.Shape = splines[0].toShape() if splines else Part.Shape()
+                return
+        fp.Shape = surf.toShape() if hasattr(surf, "toShape") else surf
+        if fp.Reversed:
+            fp.Shape = fp.Shape.copy().reversed()
+
+    def buildDictionary(self, fp):
+        """build and return a dictionary object of all the fp.Vertices objects"""
+        vert_dict = {}
+        verts = [v for v in fp.Vertices if v is not None]
+        for vert in verts:
+            vert.ViewObject.PointSize = fp.PointSize
+            vert.ViewObject.Visibility = fp.GridVisibility
+            row,col = (vert.Row, vert.Column)
+            if row == -1 and col == -1:
+                continue
+            vert_dict[vert.Name] = (vert,row,col)
+        return vert_dict
+
+
+    def fetch(self,fp,dictionary,row,col):
+        """fetch the Part::Vertex from the dictionary"""
+        if len(dictionary.items()) == 0:
+            return None
+        for k,v in dictionary.items():
+            if v[1] == row and v[2] == col:
+                return v[0]
+        return None
+
+
+    def countRows(self,fp):
+        """count the number of rows in the current grid"""
+        verts_dict = self.buildDictionary(fp)
+        high_row = 0
+        for k,v in verts_dict.items():
+            vert,row,col = v
+            if row > high_row:
+                high_row = row
+        return high_row + 1
+
+    def countColumns(self,fp):
+        """count the number of columns in the longest row"""
+        verts_dict = self.buildDictionary(fp)
+        high_col = 0
+        for k,v in verts_dict.items():
+            vert, row, col = v
+            if col > high_col:
+                high_col = col
+        return high_col + 1
+
+
+    def buildGrid(self, fp):
+        """constructs the grid of vertices, only called from execute() when fp.Vertices is empty"""
+        if self.blockSignals:
+            self.blockSignals = False
+            return
+        doc = fp.Document
+        num_x = fp.CountColumns
+        num_y = fp.CountRows
+        used = []
+        for xx in range(num_x):
+            for yy in range(num_y):
+                if not (xx,yy) in used:
+                    used.append((xx,yy))
+                    x = xx * fp.XInterval
+                    y = yy * fp.YInterval
+                    self.addVertex(fp, xx, yy, x, y)
+
+
+    def addColumn(self,fp):
+        """add a new column vertex to each row"""
+        num_rows = self.countRows(fp)
+        num_cols = self.countColumns(fp)
+        x = (num_cols) * fp.XInterval.Value
+        for rr in range(num_rows):
+            y = rr * fp.YInterval
+            vert = self.addVertex(fp, num_cols, rr, x, y)
+
+
+    def removeColumn(self,fp):
+        """remove the last column"""
+        num_cols = self.countColumns(fp)
+        to_remove = [v for v in fp.Vertices if v.Column == num_cols - 1]
+        for t in to_remove:
+           # self.blockSignals = True
+            fp.Document.removeObject(t.Name)
+
+    def addVertex(self, fp, col, row, x, y):
+
+        vert = fp.Document.addObject("Part::Vertex",f"{fp.Name}_Vertex")
+        vert.addProperty("App::PropertyInteger","Row",f"{fp.Label}",f"Row in the {fp.Label} object").Row = row
+        vert.addProperty("App::PropertyInteger","Column",f"{fp.Label}",f"Column in the {fp.Label} object").Column = col
+        vert.setEditorMode("Row",1)
+        vert.setEditorMode("Column",1)
+        vert.Placement.Base.x = x
+        vert.Placement.Base.y = y
+        vert.recompute()
+        fp.Vertices += [vert]
+        return vert
+
+    def addRow(self, fp):
+        """add a new row to end of the current rows"""
+        num_rows = self.countRows(fp)
+        y = (num_rows) * fp.YInterval.Value
+        verts_added = []
+        for cc in range(fp.CountColumns):
+            x = cc * fp.XInterval
+            vert = self.addVertex(fp, cc, num_rows, x, y)
+
+
+    def removeRow(self, fp):
+        """remove the last row of vertices"""
+        num_rows = self.countRows(fp)
+        to_remove = [v for v in fp.Vertices if v.Row == num_rows -1 ]
+        for t in to_remove:
+            fp.Document.removeObject(t.Name)
+
+
+
+class GridSurfaceVP:
+    def __init__(self, vobj):
+        vobj.Proxy = self
+        self.name = vobj.Object.Name
+        self.outputMode = "Surface"
+
+    @property
+    def FP(self):
+        return FreeCAD.ActiveDocument.getObject(self.name)
+
+    def setupContextMenu(self, vobj, menu):
+        def selectRowTrigger(row): return lambda: self.selectRow(row)
+        def selectColTrigger(col): return lambda: self.selectCol(col)
+        def outputMode(mode): return lambda: self.switchOutput(mode)
+        if not shiboken.isValid(menu):
+            FreeCAD.Console.PrintMessage(f"{self.FP.Name}: cannot create context menu.  You may try restarting FreeCAD.\n")
+            return
+        fp = vobj.Object
+        num_rows = fp.CountRows
+        num_cols = fp.CountColumns
+        selectRowMenu = menu.addMenu("Select row")
+        selectColMenu = menu.addMenu("Select column")
+
+        for row in range(num_rows):
+            action = selectRowMenu.addAction(f"Row {row}")
+            action.triggered.connect(selectRowTrigger(row))
+
+        for col in range(num_cols):
+            action = selectColMenu.addAction(f"Column {col}")
+            action.triggered.connect(selectColTrigger(col))
+
+        if fp.PostWireEdges or fp.PreWireEdges:
+            swapAction = menu.addAction("Swap Pre and Post Wire Edges")
+            swapAction.triggered.connect(self.swapPrePostWireEdges)
+
+        outputMenu = menu.addMenu("Output Mode")
+
+        if fp.Output != "Surface":
+            outputAction = outputMenu.addAction("Surface output")
+            outputAction.triggered.connect(outputMode("Surface"))
+
+        if fp.Output != "Edges":
+            outputAction = outputMenu.addAction("Edges output")
+            outputAction.triggered.connect(outputMode("Edges"))
+
+        if fp.Output != "Gordon Template":
+            outputAction = outputMenu.addAction("Gordon Template output")
+            outputAction.triggered.connect(outputMode("Gordon Template"))
+
+        if fp.Output == "Gordon Template":
+            selectAction = menu.addAction("Select for Gordon Surface")
+            selectAction.triggered.connect(self.selectForGordonTemplate)
+
+        visibilityAction = menu.addAction("Toggle visibility of vertices")
+        visibilityAction.triggered.connect(self.toggleVisibility)
+
+        mode = "Row Mode" if fp.ColumnMode else "Column Mode"
+        columnModeAction = menu.addAction(f"Switch to {mode}")
+        columnModeAction.triggered.connect(self.toggleColumnMode)
+
+        menu.addSeparator()
+
+    def toggleColumnMode(self, checked):
+        fp = self.FP
+        fp.ColumnMode = not fp.ColumnMode
+        fp.recompute()
+
+    def toggleVisibility(self, checked):
+        """Toggle visibility of Part::Vertex objects"""
+        fp = self.FP
+        for vert in fp.Vertices:
+            vert.Visibility = not vert.Visibility
+
+    def selectForGordonTemplate(self, checked):
+        """select the edges in proper order to make a Gordon surface object in Curves workbench"""
+        fp = self.FP
+        sel = FreeCADGui.Selection
+        sel.clearSelection()
+        for idx,edge in enumerate(fp.Shape.Edges):
+            sel.addSelection(fp.Document.Name, fp.Name, f"Edge{idx + 1}")
+
+    def switchOutput(self, mode):
+        """switch the output type to Surface, Edges, or Gordon Template"""
+        fp = self.FP
+        fp.Output = mode
+        fp.recompute()
+
+    def swapPrePostWireEdges(self, checked):
+        """swaps the pre and post wire edge properties"""
+        fp = self.FP
+        fp.PreWireEdges,fp.PostWireEdges = (fp.PostWireEdges,fp.PreWireEdges)
+        fp.recompute()
+
+    def selectRow(self, row):
+        fp = self.FP
+        FreeCADGui.Selection.clearSelection()
+        for vert in fp.Vertices:
+            if vert.Row == row:
+                FreeCADGui.Selection.addSelection(fp.Document.Name, vert.Name)
+
+    def selectCol(self, col):
+        fp = self.FP
+        FreeCADGui.Selection.clearSelection()
+        for vert in fp.Vertices:
+            if vert.Column == col:
+                FreeCADGui.Selection.addSelection(fp.Document.Name, vert.Name)
+
+    def claimChildren(self):
+        fp = self.FP
+        return fp.Vertices
+
+    def getIcon(self):
+        cmd = MeshRemodelCreateGridSurfaceCommandClass()
+        return cmd.GetResources()["Pixmap"]
+
+    def onDelete(self, vobj, obj):
+        fp = self.FP
+        verts = fp.Vertices
+        for vert in verts:
+            if vert:
+                fp.Document.removeObject(vert.Name)
+        return True
+
+    def __getstate__(self):
+        '''When saving the document this object gets stored using Python's json module.\
+            If we have any unserializable stuff return them here or None'''
+        return None
+
+    def __setstate__(self,state):
+        '''When restoring the serialized object from document we have the chance to set some internals here.\
+                Since no data were serialized nothing needs to be done here.'''
+        return None
+
+class MeshRemodelCreateGridSurfaceCommandClass(object):
+    def __init__(self):
+        pass
+    
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'CreateGridSurface.svg') ,
+            'MenuText': "Create GridSurfacee" ,
+            'ToolTip' : fixTip("""
+Create a GridSurface object.
+
+This object consists of a grid of Part::Vertex objects, each of which
+can be manipulated individually.  From these vertices the GridSurface
+object can produce a surface, edges from the rows or columns, or a Gordon 
+Surface template object.  The Gordon Surface Template can be the 
+source object for a Gordan Surface object created in Curves workbench.
+
+In Surface mode you can try different methods, including Lofting the edges
+and interpolating the points directly into a surface.  The loft can be ruled
+or (default) unruled.  Edges can be open or closed bsplines or polylines.
+
+In Loft mode you can also select edges of other objects to form part of the 
+surface by adding them before (Pre Wire Edges) and after (Post Wire Edges)
+the edges in the GridSurface object.
+
+""")}
+    
+    def Activated(self):
+
+        doc = FreeCAD.ActiveDocument if FreeCAD.ActiveDocument else FreeCAD.newDocument()
+        fp = doc.addObject("Part::FeaturePython", "GridSurface")
+        GridSurface(fp)
+        GridSurfaceVP(fp.ViewObject)
+        doc.recompute()
+
+    def isActive(self):
+        return True
+
+# end grid surface command class
+###################################################################
 # Create a wire from selected subobjects
 class MeshRemodelCreateWireCommandClass(object):
     """Create a wire from selected objects or subobjects"""
@@ -4631,6 +5108,7 @@ def initialize():
         Gui.addCommand("MeshRemodelAddSelectionObserver",MeshRemodelAddSelectionObserverCommandClass())
         Gui.addCommand("MeshRemodelPartSolid",MeshRemodelPartSolidCommandClass())
         Gui.addCommand("MeshRemodelSubObjectLoft", MeshRemodelSubObjectLoftCommandClass())
+        Gui.addCommand("MeshRemodelCreateGridSurface",MeshRemodelCreateGridSurfaceCommandClass())
         Gui.addCommand("MeshRemodelCreatePointObject", MeshRemodelCreatePointObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateCoplanarPointsObject", MeshRemodelCreateCoplanarPointsObjectCommandClass())
         Gui.addCommand("MeshRemodelCreateLine", MeshRemodelCreateLineCommandClass())
