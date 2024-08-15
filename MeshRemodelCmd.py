@@ -27,7 +27,7 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2024.08.14"
-__version__ = "1.10.1"
+__version__ = "1.10.2"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -3857,11 +3857,54 @@ class GridSurface:
         for vert in verts:
             vert.ViewObject.PointSize = fp.PointSize
             vert.ViewObject.Visibility = fp.GridVisibility
+            if not hasattr(vert, "Row"):
+                vert = self.insert_vertex(fp, vert)
+                if not vert:
+                    continue
             row,col = (vert.Row, vert.Column)
             if row == -1 and col == -1:
                 continue
             vert_dict[vert.Name] = (vert,row,col)
         return vert_dict
+
+    def insert_vertex(self, fp, vert):
+        """called by buildDictionary() when a new vertex has been inserted into the Vertices property"""
+        if not hasattr(vert, "Row"):
+            vert.addProperty("App::PropertyInteger","Row","GridSurface")
+            vert.Row = -1
+        if not hasattr(vert,"Column"):
+            vert.addProperty("App::PropertyInteger","Column","GridSurface")
+            vert.Column = -1
+        val=0
+        FreeCADGui.Selection.clearSelection()
+        FreeCADGui.Selection.addSelection(fp.Document.Name, vert.Name)
+        row,ok = QtGui.QInputDialog.getInt(FreeCADGui.getMainWindow(), "Row input", f"Enter row for this vertex {vert.Label} at {(vert.X, vert.Y, vert.Z)}",\
+                                    val, minValue = 0, step=1)
+        if not ok:
+            return vert
+        else:
+            col,ok = QtGui.QInputDialog.getInt(FreeCADGui.getMainWindow(), "Column input", f"Enter column for this vertex {vert.Label} at {(vert.X, vert.Y, vert.Z)}",\
+                                    val, minValue = 0, step=1)
+        if ok:
+            if not fp.ColumnMode:
+                row_list = [v for v in fp.Vertices if hasattr(v, "Row") and hasattr(v, "Column") and v.Row == row and v.Column >= col and v != vert]
+                for r in row_list:
+                    r.Column += 1
+                vert.Row = row
+                vert.Column = col
+                self.blockSignals = True
+                fp.CountColumns += 1
+
+            else:
+                column_list = [v for v in fp.Vertices if hasattr(v, "Row") and hasattr(v, "Column") and v != vert and v.Column == col and v.Row >= row]
+                for c in column_list:
+                    c.Row += 1
+                vert.Row = row
+                vert.Column = col
+                self.blockSignals = True
+                fp.CountRows += 1
+        return vert
+        
 
 
     def fetch(self,fp,dictionary,row,col):
@@ -4085,6 +4128,18 @@ class GridSurfaceVP:
             if vert:
                 fp.Document.removeObject(vert.Name)
         return True
+        
+    def dropObject(self, vp, dropped):
+        fp = self.FP
+        if not dropped in fp.Vertices:
+            fp.Vertices = fp.Vertices + [dropped]
+
+    def canDropObjects(self):
+        return True
+
+    def canDropObject(self, dropped):
+        return dropped.isDerivedFrom("Part::Vertex")
+
 
     def __getstate__(self):
         '''When saving the document this object gets stored using Python's json module.\

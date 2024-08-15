@@ -121,6 +121,8 @@ Grid Visibility allows to toggle all the Part::Vertex objects visibility in one 
 Point Size allows to set the Point Size of all the Part::Vertex objects in one go.
 Vertices is the list of Vertex objects used in the grid.  Note that it is possible to delete one or more of these without wrecking the GridSurface object, but it also might get broken.  Each Part::Vertex is given 2 new properties: Row and Column in a Grid Surface property group.  These are used to track the position of each Vertex in the group.  This affects how the vertices are all connected in the proper order when making the edges.
 
+You can add a new Part::Vertex object by dragging and dropping it onto the GridSurface object.  Upon recompute you will be asked in a dialog to specify which row and column the new vertex should occupy.  The vertex in question will be selected for you to help you find it.  It is important to enter the correct row and column values because they cannot be easily edited later since the remaining vertices on that same row (or column if in column mode) will get their column properties incremented during this step.  If you cancel either dialog the row and column properties will get set to -1, a flag that tells the GridSurface object to ignore this vertex on recompute.  At that point the best thing to do is delete the vertex, create a new one, and try again.  You can drag/drop multiple vertices at the same time, but as you answer the row/column dialogs make sure you are not yet counting those vertices that have not yet been assigned row/column values.  Better to do this one at a time.  It might be necessary to mark the document to recompute and do a full recompute if the new vertices do not appear to be in the correct order.  Right click the grid surface and click recompute object to see if that corrects the issue.  Check the vertices row and column values to ensure they look right.  Remember, row and columns are 0-indexed, so the first vertex in each row is at column 0, not column 1.
+
 ### Context menu
 In the context menu you manipulate a number of the above described properties.  You can also select multiple vertices by row or column, allowing manipulation of the entire row or column in one go.  You would do this by editing their X, Y, and Z properties.  But do not edit their placements while a group of them are selected or else they will all end up in the same coordinate.  Note that the Part::Vertex objects can also be attached to other vertices.  They can also be moved using the MeshRemodel Move Axial tool by first selecting the vertex to be moved, then the new vertex location, and then clicking the Move axial toolbar icon.  This is quick and easy, but not parametric in the even the target vertex moves.
 
@@ -329,6 +331,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2024.08.14 (1.10.2) -- allow to insert new points into grid surface grid
 * 2024.08.14 (1.10.1) -- add dialog for go back selection feature
 * 2024.08.13 (1.10.0) -- add grid surface object
 * 2024.04.16 (1.9.23) -- change == to is when checking for None  (Thanks, Ed Williams)
