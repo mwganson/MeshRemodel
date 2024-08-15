@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.08.14"
-__version__ = "1.10.2"
+__date__    = "2024.08.15"
+__version__ = "1.10.3"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -2571,7 +2571,8 @@ class MeshRemodelCreateLineCommandClass(object):
             Gui.Selection.addSelection(doc.getObject(lineName))
             FreeCAD.Console.PrintMessage(lineName+": length = "+str(line.Length)+"\n  midpoint at "+str(gu.midpoint(line.firstVertex().Point,line.lastVertex().Point))+"\n")
         if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
-            Part.show(Part.Point(gu.midpoint(line.firstVertex().Point,line.lastVertex().Point)).toShape(),lineName+"_Mid")
+            pv = doc.addObject("Part::Vertex",lineName+"_Mid")
+            pv.Placement.Base.x, pv.Placement.Base.y, pv.Placement.Base.z = gu.midpoint(line.firstVertex().Point,line.lastVertex().Point)
             doc.ActiveObject.ViewObject.PointSize = point_size
         doc.recompute()
         doc.commitTransaction()
@@ -3726,6 +3727,10 @@ class GridSurface:
         left = [] #left and right edges of gordon template
         right = []
         for row in vrows:
+            if len(row) == 1:
+                spline = Part.Vertex(row[0])
+                splines.append(spline)
+                continue
             spline = Part.BSplineCurve()
             if "BSpline" in fp.RowWireType:
                 spline.interpolate(row, PeriodicFlag = "Closed BSpline" == fp.RowWireType)
@@ -3741,13 +3746,17 @@ class GridSurface:
             left_spline = Part.BSplineCurve()
             right_spline = Part.BSplineCurve()
             if "BSpline" in fp.RowWireType:
-                left_spline.interpolate(left)
-                right_spline.interpolate(right)
-                splines = [left_spline.toShape(), right_spline.toShape()] + splines
-            elif "Polyline" in fp.RowWireType:
-                left_spline = Part.makePolygon(left)
-                right_spline = Part.makePolygon(right)
+                left_spline.interpolate(left) if left else []
+                right_spline.interpolate(right) if right else []
+                if left_spline:
+                    left_spline = left_spline.toShape()
+                if right_spline:
+                    right_spline = right_spline.toShape()
                 splines = [left_spline, right_spline] + splines
+            elif "Polyline" in fp.RowWireType:
+                left_spline = Part.makePolygon(left) if left else []
+                right_spline = Part.makePolygon(right) if right else []
+                splines = [left_spline] + [right_spline] + splines
 
 
 
@@ -3774,7 +3783,6 @@ class GridSurface:
         return None
 
 
-
     def execute(self,fp):
         if self.blockSignals:
             self.blockSignals = False
@@ -3784,7 +3792,7 @@ class GridSurface:
         if not vertices:
             self.buildGrid(fp)
             vertices = fp.Vertices
-
+            
         vert_dict = self.buildDictionary(fp)
         rows = fp.CountRows
         cols = fp.CountColumns
@@ -3826,6 +3834,12 @@ class GridSurface:
             splines = []
             ruled = True if "Ruled" in fp.Method else False
             for row in vrows:
+                if len(row) == 1:
+                    spline = Part.Vertex(row[0])
+                    splines.append(spline)
+                    if row != vrows[0] and row != vrows[-1]:
+                        FreeCAD.Console.PrintWarning(f"{fp.Label}: Lofts will fail if a vertex is used in the middle instead of starting or ending wire\n")
+                    continue
                 if "BSpline" in fp.RowWireType:
                     spline = Part.BSplineCurve()
                     periodicFlag = "Closed" in fp.RowWireType
@@ -3859,11 +3873,17 @@ class GridSurface:
             vert.ViewObject.Visibility = fp.GridVisibility
             if not hasattr(vert, "Row"):
                 vert = self.insert_vertex(fp, vert)
+                vert.recompute()
                 if not vert:
                     continue
             row,col = (vert.Row, vert.Column)
             if row == -1 and col == -1:
                 continue
+            if hasattr(vert,"GS_Ignore") and vert.GS_Ignore:
+                continue
+            elif not hasattr(vert,"GS_Ignore"):
+                vert.addProperty("App::PropertyBool","GS_Ignore","GridSurface").GS_Ignore = False
+                vert.recompute()
             vert_dict[vert.Name] = (vert,row,col)
         return vert_dict
 
@@ -3875,6 +3895,8 @@ class GridSurface:
         if not hasattr(vert,"Column"):
             vert.addProperty("App::PropertyInteger","Column","GridSurface")
             vert.Column = -1
+        if not hasattr(vert,"GS_Ignore"):
+            vert.addProperty("App::PropertyBool","GS_Ignore","GridSurface").GS_Ignore = False
         val=0
         FreeCADGui.Selection.clearSelection()
         FreeCADGui.Selection.addSelection(fp.Document.Name, vert.Name)
@@ -3887,22 +3909,38 @@ class GridSurface:
                                     val, minValue = 0, step=1)
         if ok:
             if not fp.ColumnMode:
-                row_list = [v for v in fp.Vertices if hasattr(v, "Row") and hasattr(v, "Column") and v.Row == row and v.Column >= col and v != vert]
-                for r in row_list:
-                    r.Column += 1
+                row_list = [v for v in fp.Vertices if hasattr(v, "Row") and hasattr(v, "Column") and v.Column >= col and v != vert]
+                highest_col = 0
+                items = ["yes, shift them all","yes, but only this row", "no, do not shift"]
+                item, ok = QtGui.QInputDialog.getItem(FreeCADGui.getMainWindow(),"Shift vertices?", \
+                            "Shift remaining vertices over one column?",items,0)
+                if ok and item != items[2]:
+                    for r in row_list:
+                        r.Column += 1 if item == items[0] or r.Row == row else 0
+                        if r.Column > highest_col:
+                            highest_col = r.Column
+
                 vert.Row = row
                 vert.Column = col
                 self.blockSignals = True
-                fp.CountColumns += 1
+                fp.CountColumns += 1 if highest_col >= fp.CountColumns else 0
 
             else:
-                column_list = [v for v in fp.Vertices if hasattr(v, "Row") and hasattr(v, "Column") and v != vert and v.Column == col and v.Row >= row]
-                for c in column_list:
-                    c.Row += 1
+                column_list = [v for v in fp.Vertices if hasattr(v, "Row") and hasattr(v, "Column") and v != vert and v.Row >= row]
+                highest_row = 0
+                items = ["yes, shift them all","yes, but only this column", "no, do not shift"]
+                item, ok = QtGui.QInputDialog.getItem(FreeCADGui.getMainWindow(),"Shift vertices?", \
+                            "Shift remaining vertices over one row?",items,0)
+                if ok and item != items[2]:
+                    for c in column_list:
+                        c.Row += 1 if item == items[0] or c.Column == col else 0
+                        if c.Row > highest_row:
+                            highest_row = c.Row
                 vert.Row = row
                 vert.Column = col
                 self.blockSignals = True
-                fp.CountRows += 1
+                fp.CountRows += 1 if highest_row >= fp.CountRows else 0
+                
         return vert
         
 
@@ -3979,8 +4017,9 @@ class GridSurface:
         vert = fp.Document.addObject("Part::Vertex",f"{fp.Name}_Vertex")
         vert.addProperty("App::PropertyInteger","Row",f"{fp.Label}",f"Row in the {fp.Label} object").Row = row
         vert.addProperty("App::PropertyInteger","Column",f"{fp.Label}",f"Column in the {fp.Label} object").Column = col
-        vert.setEditorMode("Row",1)
-        vert.setEditorMode("Column",1)
+        vert.addProperty("App::PropertyBool","GS_Ignore","GridSurface").GS_Ignore = False
+        # vert.setEditorMode("Row",1)
+        # vert.setEditorMode("Column",1)
         vert.Placement.Base.x = x
         vert.Placement.Base.y = y
         vert.recompute()
@@ -4020,6 +4059,7 @@ class GridSurfaceVP:
         def selectRowTrigger(row): return lambda: self.selectRow(row)
         def selectColTrigger(col): return lambda: self.selectCol(col)
         def outputMode(mode): return lambda: self.switchOutput(mode)
+        def methodMode(mode): return lambda: self.switchMethod(mode)
         if not shiboken.isValid(menu):
             FreeCAD.Console.PrintMessage(f"{self.FP.Name}: cannot create context menu.  You may try restarting FreeCAD.\n")
             return
@@ -4059,14 +4099,55 @@ class GridSurfaceVP:
             selectAction = menu.addAction("Select for Gordon Surface")
             selectAction.triggered.connect(self.selectForGordonTemplate)
 
+        methodMenu = menu.addMenu("Switch method")
+            
+        if fp.Method != "Interpolate Points":
+            methodAction = methodMenu.addAction("Interpolate Points")
+            methodAction.triggered.connect(methodMode("Interpolate Points"))
+            
+        if fp.Method != "Lofted Edges":
+            methodAction = methodMenu.addAction("Lofted Edges")
+            methodAction.triggered.connect(methodMode("Lofted Edges"))
+            
+        if fp.Method != "Lofted Edges Ruled":
+            methodAction = methodMenu.addAction("Lofted Edges Ruled")
+            methodAction.triggered.connect(methodMode("Lofted Edges Ruled"))
+
         visibilityAction = menu.addAction("Toggle visibility of vertices")
         visibilityAction.triggered.connect(self.toggleVisibility)
 
         mode = "Row Mode" if fp.ColumnMode else "Column Mode"
         columnModeAction = menu.addAction(f"Switch to {mode}")
         columnModeAction.triggered.connect(self.toggleColumnMode)
+        
+        body = FreeCADGui.ActiveDocument.ActiveView.getActiveObject("pdbody")
+        if body and not fp in body.Group:
+            bodyAction = menu.addAction(f"Add to {body.Label}")
+            bodyAction.triggered.connect(self.addToBody)
+        elif body and fp in body.Group:
+            bodyAction = menu.addAction(f"Remove from {body.Label}")
+            bodyAction.triggered.connect(self.removeFromBody)
+            
 
         menu.addSeparator()
+        
+    def addToBody(self, checked):
+        fp = self.FP
+        body = FreeCADGui.ActiveDocument.ActiveView.getActiveObject("pdbody")
+        if not fp in body.Group:
+            body.Group += [fp]
+            for vert in fp.Vertices:
+                if not vert in body.Group:
+                    body.Group += [vert]
+        
+        
+    def removeFromBody(self, checked):
+        fp = self.FP
+        body = FreeCADGui.ActiveDocument.ActiveView.getActiveObject("pdbody")
+        if fp in body.Group:
+            to_remove = [obj for obj in body.Group if obj == fp or obj in fp.Vertices]
+            to_remain = [obj for obj in body.Group if obj not in to_remove]
+            body.Group = to_remain
 
     def toggleColumnMode(self, checked):
         fp = self.FP
@@ -4086,6 +4167,11 @@ class GridSurfaceVP:
         sel.clearSelection()
         for idx,edge in enumerate(fp.Shape.Edges):
             sel.addSelection(fp.Document.Name, fp.Name, f"Edge{idx + 1}")
+
+    def switchMethod(self, mode):
+        fp = self.FP
+        fp.Method = mode
+        fp.recompute()
 
     def switchOutput(self, mode):
         """switch the output type to Surface, Edges, or Gordon Template"""
@@ -4138,7 +4224,10 @@ class GridSurfaceVP:
         return True
 
     def canDropObject(self, dropped):
-        return dropped.isDerivedFrom("Part::Vertex")
+        return dropped.isDerivedFrom("Part::Vertex") or \
+                bool(dropped.isDerivedFrom("Part::FeaturePython") and \
+                len(dropped.Shape.Vertexes) == 1 and \
+                hasattr(dropped,"X") and hasattr(dropped,"Y") and hasattr(dropped,"Z"))
 
 
     def __getstate__(self):
@@ -4607,7 +4696,9 @@ class MeshRemodelCreateCircleCommandClass(object):
             Gui.Selection.clearSelection()
             Gui.Selection.addSelection(doc.getObject(circName))
         if modifiers == QtCore.Qt.ControlModifier or modifiers==QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
-            Part.show(Part.Point(center).toShape(),circName+"_Ctr") #show the center point on ctrl click or shift+ctrl click
+            #show the center point on ctrl click or shift+ctrl click
+            vert = doc.addObject("Part::Vertex", circName+"_Ctr")
+            vert.Placement.Base.x, vert.Placement.Base.y, vert.Placement.Base.z = center
             doc.ActiveObject.ViewObject.PointSize = point_size
 
         doc.recompute()
@@ -4705,7 +4796,9 @@ are not getting the arc orientation you were expecting -- will need to delete un
             Gui.Selection.clearSelection()
             Gui.Selection.addSelection(a)
         if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
-            Part.show(Part.Point(center).toShape(),arcName+"_Ctr") #show the center point
+            #Part.show(Part.Point(center).toShape(),arcName+"_Ctr") #show the center point
+            pv = doc.addObject("Part::Vertex",arcName+"_Ctr")
+            pv.Placement.Base.x, pv.Placement.Base.y, pv.Placement.Base.z = center
             doc.ActiveObject.ViewObject.PointSize = point_size
         doc.recompute()
         doc.commitTransaction()
