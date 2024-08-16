@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.08.15"
-__version__ = "1.10.3"
+__date__    = "2024.08.16"
+__version__ = "1.10.4"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -35,6 +35,8 @@ import Draft, DraftGeomUtils, DraftVecUtils, Mesh, MeshPart
 import time
 import numpy as np
 import shiboken2 as shiboken
+from pivy import coin
+
 
 
 if FreeCAD.GuiUp:
@@ -187,6 +189,13 @@ component objects before attempting modifications.\n")
         normal /= np.linalg.norm(normal) #normalize
         norm = FreeCAD.Vector(normal[0], normal[1], normal[2])
         return trio[0], norm
+
+    def wireIsPlanar(self, wire):
+        """check if the wire is planar and return bool"""
+        pts = wire.discretize(5)
+        pts = [Part.Vertex(p.x,p.y,p.z) for p in pts[:4]]
+        return self.isCoplanar(pts[:3], pts[3].Point, tol=Part.Precision.confusion())
+
 
     def isCoplanar(self, trio, pt, tol=1e-5):
         """ check if pt is one the same plane as the one defined by
@@ -3700,7 +3709,8 @@ class GridSurface:
             return
         rebuilders = ["YInterval","XInterval"]
         if prop in rebuilders:
-            fp.ViewObject.Proxy.onDelete(None, None) #delete all children to trigger rebuild of grid
+            if hasattr(fp.ViewObject.Proxy,"onDelete"):
+                fp.ViewObject.Proxy.onDelete(None, None) #delete all children to trigger rebuild of grid
         elif prop == "CountRows":
             num_rows = self.countRows(fp)
             while fp.CountRows > num_rows:
@@ -3843,7 +3853,11 @@ class GridSurface:
                 if "BSpline" in fp.RowWireType:
                     spline = Part.BSplineCurve()
                     periodicFlag = "Closed" in fp.RowWireType
-                    spline.interpolate(row, PeriodicFlag = periodicFlag)
+                    try:
+                        spline.interpolate(row, PeriodicFlag = periodicFlag)
+                    except:
+                        FreeCAD.Console.PrintError(f"GridSurface: Error interpolating spline from row = {row}\n")
+                        spline = Part.Shape()
                     splines.append(spline)
                 else: # polyines
                     if "Closed" in fp.RowWireType:
@@ -3858,8 +3872,28 @@ class GridSurface:
                 loft = Part.makeLoft(splines, ruled = ruled)
                 surf = loft
             else: #just make a bspline edge since there is only 1 row
-                fp.Shape = splines[0].toShape() if splines else Part.Shape()
-                return
+                if splines:
+                    shape = splines[0].toShape() if hasattr(splines[0],"toShape") else splines[0]
+                    if fp.Output != "Surface":
+                        fp.Shape = shape
+                        return
+                    else:
+                        #try to make a face since there is only 1 row and output type is surface
+                        if not shape.isNull() and shape.isClosed():
+                            if gu.wireIsPlanar(shape):
+                                face = Part.makeFace(shape, "Part::FaceMakerBullseye")
+                                fp.Shape = face
+                                return
+                            else:
+                                # FreeCAD.Console.PrintMessage(f"{fp.Label}: making filled face from nonplanar wire, check for defects.\n")
+                                face = Part.makeFilledFace(shape.Edges)
+                                fp.Shape = face
+                                return
+                        else: #not closed
+                            fp.Shape = shape
+                            return
+                else:
+                    fp.Shape = Part.Shape()
         fp.Shape = surf.toShape() if hasattr(surf, "toShape") else surf
         if fp.Reversed:
             fp.Shape = fp.Shape.copy().reversed()
@@ -3924,6 +3958,8 @@ class GridSurface:
                 vert.Column = col
                 self.blockSignals = True
                 fp.CountColumns += 1 if highest_col >= fp.CountColumns else 0
+                self.blockSignals = True
+                fp.CountRows += 1 if row >= fp.CountRows else 0
 
             else:
                 column_list = [v for v in fp.Vertices if hasattr(v, "Row") and hasattr(v, "Column") and v != vert and v.Row >= row]
@@ -3940,6 +3976,8 @@ class GridSurface:
                 vert.Column = col
                 self.blockSignals = True
                 fp.CountRows += 1 if highest_row >= fp.CountRows else 0
+                self.blockSignals = True
+                fp.CountColumns += 1 if col >= fp.CountColumns else 0
                 
         return vert
         
@@ -4051,9 +4089,12 @@ class GridSurfaceVP:
         self.name = vobj.Object.Name
         self.outputMode = "Surface"
 
+        self.ghostName = None # the name of the ghost object
+
+
     @property
     def FP(self):
-        return FreeCAD.ActiveDocument.getObject(self.name)
+        return FreeCAD.ActiveDocument.getObject(self.name) if hasattr(self,"name") else FreeCAD.ActiveDocument.getObject("GridSurface")
 
     def setupContextMenu(self, vobj, menu):
         def selectRowTrigger(row): return lambda: self.selectRow(row)
@@ -4128,9 +4169,84 @@ class GridSurfaceVP:
             bodyAction = menu.addAction(f"Remove from {body.Label}")
             bodyAction.triggered.connect(self.removeFromBody)
             
+        ghost = fp.Document.getObject(self.ghostName) if self.ghostName else None
+        if not ghost:
+            transformAction = menu.addAction("Begin transforming grid")
+            transformAction.triggered.connect(self.beginTransformingGrid)
+        else:
+            transformAction = menu.addAction("Finish transforming grid")
+            transformAction.triggered.connect(self.finishTransformingGrid)
+            
+            cancelAction = menu.addAction("Cancel transforming grid")
+            cancelAction.triggered.connect(self.cancelTransformingGrid)
+            
 
         menu.addSeparator()
+
+    def beginTransformingGrid(self, checked):
+        """begin transform grid"""
+        fp = self.FP
+        vert_dict = fp.Proxy.buildDictionary(fp)
+        verts = []
+        for k,v in vert_dict.items():
+            verts.append(v[0].Shape.copy())
+        comp = Part.makeCompound(verts)
+        ghost = fp.Document.getObject(f"{fp.Name}_Ghost")
+        if ghost:
+            fp.Document.removeObject(ghost.Name)
+        ghost = Part.show(comp,f"{fp.Name}_Ghost")
+        self.ghostName = ghost.Name
+        ghost.addProperty("App::PropertyString","Purpose","Base").Purpose = """
+This ghost object is a temporary object to be used to aid in transforming
+the grid.  Transform this object using either the dragger or editing its
+Placement property, attach via Part workbench menu Attachment, etc., and 
+then in the GridSurface object context menu select Finish transforming grid
+to delete the object and apply the transformation to the vertices in the
+grid.  You can also click Cancel or simply delete this object to cancel"""        
         
+        
+        ghost.Shape = comp
+        ghost.ViewObject.PointSize = fp.PointSize
+        ghost.ViewObject.PointColor = (255,0,0)
+        ghost.Document.recompute()
+        FreeCADGui.Selection.clearSelection()
+        FreeCADGui.Selection.addSelection(fp.Document.Name, ghost.Name)
+        FreeCADGui.runCommand("Std_TransformManip",0)
+        fp.ViewObject.Visibility = False
+
+     
+    def finishTransformingGrid(self,checked):
+         """finish the transformation and delete ghost"""
+         fp = self.FP
+         vert_dict = fp.Proxy.buildDictionary(fp)
+         ghost = fp.Document.getObject(self.ghostName)
+         if ghost:
+            fp.Document.openTransaction("Transform Grid") 
+            plm = ghost.Placement
+            ii = 0
+            for k,v in vert_dict.items():
+                vert,row,col = v
+                vert.Placement.Base.x, vert.Placement.Base.y, vert.Placement.Base.z = ghost.Shape.Vertexes[ii].CenterOfGravity
+                vert.X, vert.Y, vert.Z = (0,0,0)
+                ii += 1
+            fp.Document.removeObject(self.ghostName)
+         fp.ViewObject.Visibility = True
+         fp.Document.recompute()
+         self.ghostName = None
+         fp.Document.commitTransaction()
+    
+    def cancelTransformingGrid(self, checked):
+        """cancel transform and delete ghost"""
+        fp = self.FP
+        if self.ghostName:
+            ghost = fp.Document.getObject(self.ghostName)
+            if ghost:
+                fp.Document.removeObject(self.ghostName)
+        self.ghostName = None
+        fp.ViewObject.Visibility = True
+        fp.Document.recompute()
+    
+                
     def addToBody(self, checked):
         fp = self.FP
         body = FreeCADGui.ActiveDocument.ActiveView.getActiveObject("pdbody")
@@ -4225,7 +4341,7 @@ class GridSurfaceVP:
 
     def canDropObject(self, dropped):
         return dropped.isDerivedFrom("Part::Vertex") or \
-                bool(dropped.isDerivedFrom("Part::FeaturePython") and \
+                bool(dropped.isDerivedFrom("Part::Feature") and \
                 len(dropped.Shape.Vertexes) == 1 and \
                 hasattr(dropped,"X") and hasattr(dropped,"Y") and hasattr(dropped,"Z"))
 
@@ -4269,10 +4385,24 @@ the edges in the GridSurface object.
     def Activated(self):
 
         doc = FreeCAD.ActiveDocument if FreeCAD.ActiveDocument else FreeCAD.newDocument()
+        sel = FreeCADGui.Selection.getCompleteSelection()
+        picked = global_picked if global_picked else []
+        if not picked:
+            for s in sel:
+                picked.extend(s.PickedPoints)
+
         fp = doc.addObject("Part::FeaturePython", "GridSurface")
         GridSurface(fp)
         GridSurfaceVP(fp.ViewObject)
         doc.recompute()
+        
+        if len(picked) > 1:
+            fp.CountRows = 1
+            fp.CountColumns = len(picked)
+            fp.recompute()
+            for idx, vert in enumerate(fp.Vertices):
+                vert.Placement.Base.x, vert.Placement.Base.y, vert.Placement.Base.z = picked[idx].x, picked[idx].y, picked[idx].z
+            doc.recompute()
 
     def isActive(self):
         return True
