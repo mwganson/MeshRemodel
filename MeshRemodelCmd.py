@@ -27,7 +27,7 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2024.08.16"
-__version__ = "1.10.4"
+__version__ = "1.10.5"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -1224,6 +1224,7 @@ class MeshRemodelRemovePointCommandClass(object):
         self.mesh = None
         self.pt = None
         self.edge = None
+        self.picked = []
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'RemovePoint.svg') ,
@@ -1241,6 +1242,10 @@ the edge was selected).  There must be at least one facet containing that edge.
 """}        
     
     def Activated(self):
+        if global_picked:
+            self.picked = global_picked
+        if self.picked:
+            print(f"self.picked = {self.picked}")
         modifiers = QtGui.QApplication.keyboardModifiers()
         if modifiers & QtCore.Qt.AltModifier:
             if self.edge:
@@ -1275,18 +1280,17 @@ f"""MeshRemodel Error: Facet not found in {self.mesh.Label}. Select an edge from
                 self.mesh.Document.recompute()
                 self.mesh.Document.commitTransaction()
         else:
-            if self.pt:
-                new_mesh = self.removeFacets(self.mesh.Mesh.copy(), self.pt)
-                self.mesh.Document.openTransaction("Remove point")
+            self.mesh.Document.openTransaction("Remove points")
+            for pt in self.picked:
+                new_mesh = self.removeFacets(self.mesh.Mesh.copy(), pt)
                 self.mesh.Mesh = new_mesh
-                self.mesh.Document.commitTransaction()
-            else:
-                FreeCAD.Console.PrintError("MeshRemodel: No point selected to remove.\n")
-            
+            self.mesh.Document.commitTransaction()
 
     def removeFacets(self, mesh, pt):
         """remove the point, and all the facets containing the point
         and return the new mesh"""
+        if not gu.findPointInMesh(mesh, pt): #removed during previous call
+            return mesh
         copy = mesh.copy()
         topology = copy.Topology
         # topology is a tuple ([vectorlist],[facetlist])
@@ -1314,19 +1318,20 @@ f"""MeshRemodel Error: Facet not found in {self.mesh.Label}. Select an edge from
         if not FreeCAD.ActiveDocument:
             return False
         sel = Gui.Selection.getCompleteSelection()
-        if len(sel) > 2:
-            return False
+        # if len(sel) > 2:
+        #     return False
         count = 0
         edgecount = 0
         meshcount = 0
         self.edge = None
         self.pt = None
         self.mid = None
+        self.picked = []
         for s in sel:
             if hasattr(s.Object,"Mesh") or s.Object.isDerivedFrom("Mesh::Feature") :
                 meshcount = 1
                 self.mesh = s.Object
-            if s.Object.isDerivedFrom("Part::FeaturePython") and \
+            if s.Object.isDerivedFrom("Part::Feature") and \
                     bool("PointsObject" in s.Object.Name or "WireFrameObject" in s.Object.Name):
                 self.mesh = s.Object.Source if s.Object.Source else self.mesh
                 if s.Object.Source:
@@ -1334,6 +1339,7 @@ f"""MeshRemodel Error: Facet not found in {self.mesh.Label}. Select an edge from
             if s.SubElementNames and "Vertex" in s.SubElementNames[0]:
                 sub = s.Object.getSubObject(s.SubElementNames[0])
                 self.pt = sub.Point
+                self.picked.append(self.pt)
                 count += 1
             if s.SubElementNames and "Edge" in s.SubElementNames[0]:
                 sub = s.Object.getSubObject(s.SubElementNames[0])
@@ -1341,7 +1347,7 @@ f"""MeshRemodel Error: Facet not found in {self.mesh.Label}. Select an edge from
                 edgecount += 1
                 self.mid = s.PickedPoints[0]
                 
-        if count == 1 and meshcount == 1 and gu.findPointInMesh(self.mesh.Mesh, self.pt):
+        if count >= 1 and meshcount == 1 and gu.findPointInMesh(self.mesh.Mesh, self.pt):
             return True
         elif count == 0 and meshcount == 1 and edgecount == 1 and self.edge \
                 and len(self.edge.Vertexes) == 2 \

@@ -335,6 +335,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2024.08.16(1.10.5) -- make mesh remove point work with multiple points selected
 * 2024.08.16 (1.10.4) -- more work on GridSurface objects
 * now upon creation if there is more than one picked point in the selection, then the grid surface object is created with one row and from those picked points
 * if there is only one column and if the output type is surface and if the one edge is closed, then a face is made, either planar with makeFace() or it can be nonplanar with makeFilledFace()
