@@ -1244,8 +1244,6 @@ the edge was selected).  There must be at least one facet containing that edge.
     def Activated(self):
         if global_picked:
             self.picked = global_picked
-        if self.picked:
-            print(f"self.picked = {self.picked}")
         modifiers = QtGui.QApplication.keyboardModifiers()
         if modifiers & QtCore.Qt.AltModifier:
             if self.edge:
