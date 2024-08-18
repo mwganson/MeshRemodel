@@ -27,7 +27,7 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2024.08.17"
-__version__ = "1.10.6"
+__version__ = "1.10.7"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -3200,6 +3200,8 @@ class BlockSelectorDialog(QtGui.QDialog):
     def __init__(self, blocks, parent=None):
         def trigger(idx): 
             return lambda: self.on_block_selected(idx)
+        def report_trigger(txt):
+            return lambda: self.on_report(txt)
         super(BlockSelectorDialog, self).__init__(parent)
         self.blocks = blocks
         self.selected_index = None
@@ -3219,11 +3221,21 @@ class BlockSelectorDialog(QtGui.QDialog):
 
         # Create buttons for each block
         for i, block in enumerate(blocks):
+            button_row_layout = QtGui.QHBoxLayout()
+            
             button = QtGui.QPushButton(f'Block {i + 1}')
             tooltip_text = "\n".join(block)
             button.setToolTip(tooltip_text)
             button.clicked.connect(trigger(i+1))
-            scroll_layout.addWidget(button)
+            button_row_layout.addWidget(button)
+            
+            report_button = QtGui.QPushButton(f"> text document")
+            report_button.setToolTip("send contents to a new text document object")
+            report_button.clicked.connect(report_trigger(tooltip_text))
+            button_row_layout.addWidget(report_button)
+            
+            
+            scroll_layout.addLayout(button_row_layout)
 
         scroll_content.setLayout(scroll_layout)
         scroll_area.setWidget(scroll_content)
@@ -3234,6 +3246,11 @@ class BlockSelectorDialog(QtGui.QDialog):
     def on_block_selected(self, index):
         self.selected_index = index
         self.accept()  # Close the dialog and set the result to Accepted
+        
+    def on_report(self, txt):
+        txt = "# Copy / paste this into the python console to restore this selection block\n" + txt
+        obj = FreeCAD.ActiveDocument.addObject("App::TextDocument", "Selection block")
+        obj.Text = txt
 
 
 # go back selection
@@ -3259,6 +3276,11 @@ In the dialog you will find a column of buttons labeled Block 1, Block 2, etc.
 Each button has a tooltip that will display the selection commands that will be
 invoked when the button is clicked.  Only the selections made previously in
 documents with the same name as the current active document will be available.
+
+Click the > text document button to send the block to a new text document object.  
+This is useful where you wish to resume some work in another session and want this
+selection block available for you to use.  Use it by copy/paste into the python 
+console.  This provides persistent storage for selection blocks.
 
 """}
 

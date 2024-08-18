@@ -336,7 +336,8 @@ This sets the tolerance to use when determining which points lie on the same pla
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
 
-* 2024.08.17(1.10.) -- rearrange toolbar icons to take up lest horizontal space
+* 2024.08.17(1.10.7) -- add option to save selection blocks to a text document object in the go back selection feature
+* 2024.08.17(1.10.6) -- rearrange toolbar icons to take up lest horizontal space
 * add extra commands group to toolbar
 * GridSurface can now be made from an existing wire object using the vertices of the object for a single row
 * Mesh boundary wire will attempt to make filled (non planar) faces on Shift+Click.
