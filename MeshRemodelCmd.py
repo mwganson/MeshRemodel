@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.08.16"
-__version__ = "1.10.5"
+__date__    = "2024.08.17"
+__version__ = "1.10.6"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -35,8 +35,6 @@ import Draft, DraftGeomUtils, DraftVecUtils, Mesh, MeshPart
 import time
 import numpy as np
 import shiboken2 as shiboken
-from pivy import coin
-
 
 
 if FreeCAD.GuiUp:
@@ -923,6 +921,9 @@ If a planar wire can be produced, then a mesh face will also be created from it
 and added as a new document object.  You can merge the face with the mesh in the
 Mesh workbench.  After merging use the analyze, evaluate, and repair tool to remove
 the duplicated points and to check for any additional defects that might exist.
+
+Shift+Click to attempt to make faces out of nonplanar wires.  (This can sometimes
+take a long time, so save your work first in case you have to force restart.)
 """} 
 
     def Activated(self):
@@ -930,19 +931,37 @@ the duplicated points and to check for any additional defects that might exist.
         wires = MeshPart.wireFromMesh(copy)
         FreeCAD.Console.PrintMessage(f"MeshRemodel: {len(wires)} wires created\n")
         doc = self.mesh.Document
+        modifiers = QtGui.QApplication.keyboardModifiers()
+        if modifiers & QtCore.Qt.ShiftModifier:
+            makeFilledFaces = True
+        else:
+            makeFilledFaces = False
         if not wires:
             return
         doc.openTransaction("Mesh boundary wires")
-        for wire in wires:
+        for idx,wire in enumerate(wires):
+            FreeCAD.Console.PrintMessage(f"Making face from wire {idx+1} of {len(wires)}\n")
+            FreeCADGui.updateGui()
             obj = doc.addObject("Part::Feature", f"{self.mesh.Label}_BoundaryWire")
             obj.Shape = wire
             plane = wire.findPlane()
+            face = None
             if plane:
                 face = Part.makeFace(wire,"Part::FaceMakerBullseye")
+            elif makeFilledFaces:
+                try:
+                    face = Part.makeFilledFace(wire.Edges)
+                except:
+                    face = None
+            else:
+                FreeCAD.Console.PrintMessage(f"skipping wire {idx+1} of {len(wires)} because it is nonplanar, Shift+CLick to force trying to make filled face (might take a long time, so save your work first.)\n")
+            if face:
                 mface = MeshPart.meshFromShape(face, 0.25, 50)
                 mobj = doc.addObject("Mesh::Feature",f"{self.mesh.Label}_MeshFace")
                 mobj.Mesh = mface
         doc.commitTransaction()
+        doc.recompute()
+        FreeCAD.Console.PrintMessage("Done with Boundary Wires command\n")
 
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
@@ -4360,7 +4379,7 @@ grid.  You can also click Cancel or simply delete this object to cancel"""
                 Since no data were serialized nothing needs to be done here.'''
         return None
 
-class MeshRemodelCreateGridSurfaceCommandClass(object):
+class MeshRemodelCreateGridSurfaceCommandClass:
     def __init__(self):
         pass
     
@@ -4407,6 +4426,15 @@ the edges in the GridSurface object.
             for idx, vert in enumerate(fp.Vertices):
                 vert.Placement.Base.x, vert.Placement.Base.y, vert.Placement.Base.z = picked[idx].x, picked[idx].y, picked[idx].z
             doc.recompute()
+            
+        elif sel:
+            if len(sel) == 1 and sel[0].Object.isDerivedFrom("Part::Feature") and sel[0].Object.Shape.ShapeType == "Wire":
+                fp.CountRows = 1
+                fp.CountColumns = len(sel[0].Object.Shape.Vertexes)
+                fp.recompute()
+                for idx, vert in enumerate(fp.Vertices):
+                    vert.Placement.Base.x, vert.Placement.Base.y, vert.Placement.Base.z = sel[0].Object.Shape.Vertexes[idx].Point
+                doc.recompute()
 
     def isActive(self):
         return True
@@ -5448,10 +5476,48 @@ class MeshRemodelSubShapeBinderCommandClass(object):
 # end check geometry
 
 ##################################################################################################
+class GroupCommandPointsObjects:
+    def GetCommands(self):
+        return tuple([
+        "MeshRemodelCreatePointsObject",
+        "MeshRemodelCreateWireFrameObject",
+        "MeshRemodelCreateCoplanarPointsObject",
+        
+        ])
+
+    def GetDefaultCommand(self): # return the index of the tuple of the default command. This method is optional and when not implemented '0' is used  
+        return 0
+
+    def GetResources(self):
+        return { 'MenuText': 'MeshRemodel mesh proxy objects', 'ToolTip': 'Proxy objects for dealing with meshes'}
+        
+    def IsActive(self): # optional
+        return True
 
 
+class GroupCommandExtras:
+    def GetCommands(self):
+        
+        return tuple([
+                    "MeshRemodelDraftUpgrade",
+                    "MeshRemodelCreateSketch",
+                    "MeshRemodelMergeSketches",
+                    "MeshRemodelFlattenDraftBSpline",
+                    "MeshRemodelValidateSketch",
+                    "MeshRemodelPartCheckGeometry",
+                    "MeshRemodelSubShapeBinder",
+                    "MeshRemodelSettings"]) # a tuple of command names that you want to group
 
-# initialize
+    def GetDefaultCommand(self): # return the index of the tuple of the default command. This method is optional and when not implemented '0' is used  
+        return 0
+
+    def GetResources(self):
+        return { 'MenuText': 'MeshRemodel Extras', 'ToolTip': 'Extra convenient commands'}
+        
+    def IsActive(self): # optional
+        return True
+        
+
 
 def initialize():
     if FreeCAD.GuiUp:
@@ -5490,6 +5556,8 @@ def initialize():
         Gui.addCommand("MeshRemodelPartCheckGeometry", MeshRemodelPartCheckGeometryCommandClass())
         Gui.addCommand("MeshRemodelSubShapeBinder", MeshRemodelSubShapeBinderCommandClass())
         Gui.addCommand("MeshRemodelSettings", MeshRemodelSettingsCommandClass())
+        Gui.addCommand("GroupCommandExtras",GroupCommandExtras())
+        Gui.addCommand("GroupCommandPointsObjects", GroupCommandPointsObjects())
 
 
 initialize()

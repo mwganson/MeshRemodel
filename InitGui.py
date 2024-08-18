@@ -58,8 +58,10 @@ class MeshRemodelWorkbench(Workbench):
     def Initialize(self):
         "This function is executed when FreeCAD starts"
         import MeshRemodelCmd #needed files for FreeCAD commands
-        self.list = ["MeshRemodelCreatePointsObject",
-                    "MeshRemodelCreateWireFrameObject",
+        self.list = [
+                    "GroupCommandPointsObjects",
+                  #  "MeshRemodelCreatePointsObject",
+                  #  "MeshRemodelCreateWireFrameObject",
                     "MeshRemodelMeshBoundaryWires",
                     "MeshRemodelCreateCrossSectionsObject",
                     "MeshRemodelMovePoint",
@@ -69,7 +71,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelMeshSimpleCopy",
                     "MeshRemodelOffsetMesh",
                     "MeshRemodelDuplicateSelectedFacets",
-                    "MeshRemodelCreateCoplanarPointsObject",
+                  #  "MeshRemodelCreateCoplanarPointsObject",
                     "MeshRemodelAddSelectionObserver",
                     "MeshRemodelPartSolid",
                     "MeshRemodelSubObjectLoft",
@@ -78,7 +80,6 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelCreateLine",
                     "MeshRemodelCreatePolygon",
                     "MeshRemodelCreateBSpline",
-                    "MeshRemodelFlattenDraftBSpline",
                     "MeshRemodelCreatePlane",
                     "MeshRemodelCreateCircle",
                     "MeshRemodelCreateArc",
@@ -86,14 +87,15 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelRotateObject",
                     "MeshRemodelMoveAxial",
                     "MeshRemodelGoBackSelection",
-                    "MeshRemodelDraftUpgrade",
-                    "MeshRemodelCreateSketch",
-                    "MeshRemodelMergeSketches",
-                    "MeshRemodelValidateSketch",
-                    "MeshRemodelPartCheckGeometry",
-                    "MeshRemodelSubShapeBinder",
-                    "MeshRemodelSettings"] # A list of command names created in the line above
-        self.appendToolbar("MeshRemodel Commands",self.list[:-5]) # leave settings, validate sketch and merge sketch off toolbar
+                    "GroupCommandExtras",
+                    # "MeshRemodelMergeSketches",
+                    # "MeshRemodelValidateSketch",
+                    # "MeshRemodelPartCheckGeometry",
+                    # "MeshRemodelSubShapeBinder",
+                    # "MeshRemodelSettings",
+                    
+                    ] # A list of command names created in the line above
+        self.appendToolbar("MeshRemodel Commands",self.list) # leave settings, validate sketch and merge sketch off toolbar
         self.appendMenu("Mesh&Remodel",self.list) # creates a new menu
         #considered putting the menu inside the Edit menu, but decided against it
         #self.appendMenu(["&Edit","MeshRemodel"],self.list) # appends a submenu to an existing menu
