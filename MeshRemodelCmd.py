@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.08.17"
-__version__ = "1.10.7"
+__date__    = "2024.08.18"
+__version__ = "1.10.8"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -5495,7 +5495,389 @@ class MeshRemodelSubShapeBinderCommandClass(object):
             return True
         return False
 
-# end check geometry
+# end subshapebinder
+################################################################################
+
+
+
+class OpenEdgeFinder:
+    def __init__(self, obj):
+        obj.Proxy = self
+        grp = "OpenEdgeFinder"
+        obj.addProperty("App::PropertyFloat","Tolerance",grp,"Tolerance to use when finding coincident points.").Tolerance = Part.Precision.confusion()
+        obj.addProperty("App::PropertyLink","Sketch",grp,"Sketch to find open edges, also works with other object types").Sketch = None
+        obj.addProperty("App::PropertyVectorList","Points",grp,"List of points in linked (Sketch) object.").Points = []
+        obj.addProperty("App::PropertyVectorList","IssuePoints",grp,"List of the points with issues").IssuePoints = []
+        obj.addProperty("App::PropertyColor","PointColor",grp,"Color for open points").PointColor = (255,0,0)
+        obj.addProperty("App::PropertyFloat","PointSize",grp,"Sphere radius for open end markers, 0 = attempt auto scaling").PointSize = 0
+        obj.addProperty("App::PropertyLinkHidden","Container",grp,"Body or Part parent object, if any")
+        obj.addProperty("App::PropertyString","Version",grp,"Version used to create this object").Version = __version__
+        obj.addProperty("App::PropertyBool","FindTSections",grp,"If True, also check for T sections with more than 2 points at a location").FindTSections=True
+        obj.addProperty("App::PropertyBool","FindCrossSections", grp, "If True, also check for cross sections").FindCrossSections = True
+        obj.addProperty("App::PropertyBool","FindOverlaps",grp,"If True, also check for and show overlapping edges").FindOverlaps = True
+        obj.addProperty("App::PropertyBool","FindStrayPoints",grp,"If True, find non-construction mode points").FindStrayPoints = True
+        obj.addProperty("App::PropertyFloat","SphereRadius",grp,"Readonly, sphere radius used, which is either PointSize or calculated based on sketch size if PointSize = 0 for auto scaling")
+        obj.setEditorMode("SphereRadius", 1)
+        obj.addProperty("App::PropertyBool","FindOpenEnds",grp,"If true look for open ended edges").FindOpenEnds = True
+        obj.addProperty("App::PropertyString","Report",grp,"Report on findings of sketch validation")
+        obj.addProperty("App::PropertyInteger","CountIssues",grp,"Count of how many issues the sketch has").CountIssues = 0
+        obj.addProperty("App::PropertyVectorList","OpenPoints",grp,"coordinate list for all the open edge ends found")
+
+    def equal(self, fp, p1, p2):
+        """return true if p1 and p2 are within tolerance distance of each other"""
+        return p1.isEqual(p2, fp.Tolerance)
+
+    def in_list(self, fp, pt, plist):
+        """return true if pt is in plist"""
+        for p in plist:
+            if self.equal(fp, p, pt):
+                return True
+        return False
+
+
+    def near_points(self, fp, pt, pts):
+        """return a list of points in pts that are within tolerance distnace of pt"""
+        nears = [p for p in pts if self.equal(fp, p, pt)]
+        return nears
+
+    def is_on_multiple_edges(self, fp, pt):
+        """return true if pt is on multiple edges, note that only open points are passed into this function"""
+        on_edges = [edge for edge in fp.Sketch.Shape.Edges if edge.isInside(pt, fp.Tolerance, True)]
+        return len(on_edges) > 1
+
+    def stray_points(self, fp):
+        """return all non-construction mode points in the sketch"""
+        if not hasattr(fp.Sketch, 'Geometry'):
+            return [] # not a sketch
+
+        pt_list = []
+        for idx,geo in enumerate(fp.Sketch.Geometry):
+            if geo.TypeId == "Part::GeomPoint":
+                if not fp.Sketch.getConstruction(idx):
+                    pt_list.append(FreeCAD.Vector(geo.X, geo.Y, geo.Z))
+        return pt_list
+
+
+    def intersections(self, fp, edges):
+        """return a list of self-intersections as vectors among the edges, overlapping edges, if any"""
+
+        count = 0
+        try:
+            fp.Sketch.Shape.check(True)
+        except ValueError as e:
+           # print(f"{type(e)}, count = {count}")
+            count += 1
+        # print(f"count = {count}")
+        if not count:
+            return ([],[])
+        intersections = []
+        overlaps = []
+        all_vertexes = [v.Point for v in fp.Sketch.Shape.Vertexes]
+        for i, edge1 in enumerate(edges):
+            for j, edge2 in enumerate(edges):
+                if i == j:
+                    continue
+                intpts = []
+                try:
+                    intpts = edge1.Curve.intersect(edge2.Curve, fp.Tolerance)
+                except Exception as e:
+                    if not i in overlaps:
+                        if edge1.common(edge2).Length: #do not count line segments on the same line, but not connected as overlaps
+                            overlaps.append(i)
+
+                vectors = [FreeCAD.Vector(p.X,p.Y,p.Z) for p in intpts]
+                for v in vectors:
+                    if edge1.isInside(v, fp.Tolerance, False) and \
+                    edge2.isInside(v,fp.Tolerance,False):
+                        if not self.in_list(fp, v, intersections):
+                            if not self.in_list(fp, v, all_vertexes):
+                                intersections.append(v)
+
+        #intersections = [FreeCAD.Vector(p[0], p[1], p[2]) for p in intersections]
+        return (intersections, overlaps)
+
+    def scale_spheres(self, fp):
+        if fp.PointSize != 0:
+            return fp.PointSize #no scaling unless set to 0
+        bb = fp.Sketch.Shape.BoundBox
+        longest = max(bb.XLength, bb.YLength, bb.ZLength)
+        return longest/50
+
+    def execute(self, fp):
+        if not fp.Sketch:
+            fp.Shape = Part.Shape()
+            fp.Label = f"OpenEdgeFinder -- no sketch"
+            return
+        fp.Label = f"OpenEdgeFionder: checking {fp.Sketch.Label}"
+        edges = fp.Sketch.Shape.Edges if hasattr(fp.Sketch,"Shape") else []
+        if not edges:
+            edges = fp.Sketch.Edges if hasattr(fp.Sketch,"Edges") else []
+        if not edges and not fp.FindStrayPoints:
+            fp.Shape = Part.Shape()
+            return
+        # print(f"edges = {edges}")
+        pts = []
+        for edge in edges:
+            first = edge.valueAt(edge.FirstParameter)
+            last = edge.valueAt(edge.LastParameter)
+            if not self.equal(fp, last, first):
+                pts.append(first)
+                pts.append(last)
+
+        opens = []
+        if fp.FindOpenEnds:
+            for p in pts:
+                if len(self.near_points(fp, p, pts)) < 2:
+                    if not self.in_list(fp, p, opens):
+                        opens.append(p)
+
+        if not hasattr(fp,"OpenPoints"):
+            fp.addProperty("App::PropertyVectorList","OpenPoints","OpenEdgeFinder","Open edge end points found")
+        fp.OpenPoints = opens
+        tsections = [p for p in pts if len(self.near_points(fp, p, pts)) > 2] if fp.FindTSections else []
+        # extra_ts are only used for the Report, these are open ends that are actually t-sections
+        extra_ts = [op for op in opens if self.is_on_multiple_edges(fp, op)] if fp.FindTSections else []
+        intersections, overlaps = self.intersections(fp, edges) if fp.FindCrossSections else ([],[])
+        strays = self.stray_points(fp) if fp.FindStrayPoints else []
+        fp.Points = pts + strays
+        issues = opens + tsections + intersections + strays
+        count_issues = len(issues) + int(len(overlaps) / 2) #count overlapped edges as 1 issue per every 2 overlapped edges
+
+        if not count_issues:
+            fp.Label = f"{count_issues} issues in {fp.Sketch.Label}"
+        else:
+            s = "s"if count_issues != 1 else ""
+            fp.Label = f"{count_issues} issue{s} in {fp.Sketch.Label}"
+        fp.IssuePoints = issues
+        radius = self.scale_spheres(fp)
+        fp.SphereRadius = radius
+        verts = [Part.makeSphere(radius, pt) for pt in issues]
+        overlapped_edges = [fp.Sketch.Shape.Edges[ii] for ii in overlaps]
+        verts += overlapped_edges if fp.FindOverlaps else []
+        if len(verts) == 1:
+            comp = verts[0]
+        else:
+            comp = Part.makeCompound(verts) if verts else Part.Shape()
+
+        if hasattr(fp.ViewObject,"ShapeAppearance"):
+            fp.ViewObject.ShapeAppearance = (FreeCAD.Material(DiffuseColor=fp.PointColor,), )
+        else:
+            fp.ViewObject.DiffuseColor = fp.PointColor
+        fp.ViewObject.LineColor = fp.PointColor
+        fp.ViewObject.LineWidth = fp.Sketch.ViewObject.LineWidth * 4
+        fp.Shape = comp
+        fp.CountIssues = count_issues
+        if fp.CountIssues:
+            fp.ViewObject.signalChangeIcon()
+        report = f"""Total issues: {count_issues}
+Open ended edges: {len(opens)-len(extra_ts)}
+TSections: {len(tsections)+len(extra_ts)}
+Cross Sections: {len(intersections)}
+Overlapped edges: {overlaps}
+Stray points: {len(strays)}"""
+        fp.Report = report
+
+
+class OpenEdgeFinderVP:
+    def __init__(self, obj):
+        obj.Proxy = self
+        self.name = obj.Object.Name
+
+    def attach(self, vobj):
+        self.Object = vobj.Object
+
+    def doubleClicked(self, vobj):
+        fp = vobj.Object
+        if fp.Sketch:
+            fp.Sketch.ViewObject.doubleClicked()
+
+    def setupContextMenu(self, vobj, menu):
+        fp = vobj.Object
+        if fp.Sketch:
+            text = f"Edit {fp.Sketch.Label}"
+            action = menu.addAction(text)
+            action.triggered.connect(lambda: fp.Sketch.ViewObject.doubleClicked())
+        text = "Print report to Report View"
+        action = menu.addAction(text)
+        action.triggered.connect(self.printReport)
+    def printReport(self):
+        fp = FreeCAD.ActiveDocument.getObject(self.name)
+        msg = []
+        msg.append(f"\n\nOpenEdgeFinder {fp.Version} report, now part of MeshRemodel workbench in Extras menu")
+        msg.append(f"Sketch: {fp.Sketch.Label}\n{fp.Report}")
+        if fp.OpenPoints:
+            distances = []
+            for p in fp.OpenPoints:
+                dist_to_points = [math.fabs(p.distanceToPoint(p2)) for p2 in fp.OpenPoints if math.fabs(p.distanceToPoint(p2)) != 0.0]
+                minimum = min(dist_to_points)
+                if not minimum in distances:
+                    distances.append(minimum)
+            distances_strings = [f"{d} mm or {d*1e6} nanometers" if d < 1e4 else f"{d} mm" for d in distances]
+
+            msg.append(f"Shortest distances between nearest open points:")
+            for dis in distances_strings:
+                msg.append(f"   {dis}")
+        msg = "\n".join(msg)
+        FreeCAD.Console.PrintMessage(msg)
+
+
+    def dropObject(self, vp, dropped):
+        fp = vp.Object
+        fp.Sketch = dropped
+        # for some reason dropped object gets kicked out of container, so put it back in
+        if fp.Container:
+            if not dropped in fp.Container.Group:
+                fp.Container.Group += [dropped]
+
+    def canDropObjects(self):
+        return True
+
+    def canDropObject(self, dropped):
+        return hasattr(dropped, "ViewObject")
+
+    def getIcon(self):
+        fp = self.Object
+        return __icon__ if not fp.CountIssues else __icon__.replace("None","red")
+
+    def __getstate__(self):
+        '''When saving the document this object gets stored using Python's json module.\
+            If we have any unserializable stuff return them here or None'''
+        return None
+
+    def __setstate__(self,state):
+        '''When restoring the serialized object from document we have the chance to set some internals here.\
+                Since no data were serialized nothing needs to be done here.'''
+        return None
+
+
+def put_in_body(doc, fp, sk):
+    """put object in same body or part as sketch"""
+    bodies = [obj for obj in doc.Objects if obj.isDerivedFrom("PartDesign::Body") and sk in obj.Group]
+    if bodies:
+        bodies[0].Group = bodies[0].Group + [fp]
+        fp.Container = bodies[0]
+    else:
+        parts = [obj for obj in doc.Objects if obj.isDerivedFrom("App::Part") and sk in obj.Group]
+        if parts:
+            parts[0].Group = parts[0].Group + [fp]
+            fp.Container = parts[0]
+
+__icon__ = """
+/* XPM */
+static char *dummy[]={
+"64 64 5 1",
+"# c #6b0000",
+"a c #aa0000",
+"b c #cacaca",
+"c c limegreen",
+". c None",
+"................................................................",
+"................................................................",
+"................................................................",
+"................................................................",
+"................................................................",
+"................................................................",
+"................................................................",
+"................................................................",
+"......#####.....................................................",
+".....#aaaaa#....................................................",
+"....##aaaaaa#...................................................",
+"...#aaaaaaaaa#bb................................................",
+"...#aaa###aaa#bbbbbbbbbbbb......................................",
+"...#aaa#b#aaa#bbbbbbbbbbbbbbbbbbbbbbb...........................",
+"...#aaa###aaa#ccccccccbbbbbbbbbbbbbbbbbbbbbbbbb.................",
+"...#aaaaaaaaa#bbbbbbbccccccccccccbbbbbbbbbbbbbbbbbbbb...........",
+"....#aaaaaaa#...bbbbbbbbbbbbbbbbcccccccccccbbbbbbbbbbb..........",
+".....#aaaaa#..............bbbbbbbbbbbbbbbbcccccccccccbb.........",
+"......#####..........................bbbbbbbbbbbbbccbb..........",
+"..............................................bbbccbbb..........",
+"............................................bbbcccbbb...........",
+"...........................................bbbccbbbb............",
+"..........................................bbbccbbb..............",
+".........................................bbbccbbb...............",
+".......................................bbbcccbbb................",
+"......................................bbbccbbbb.................",
+".....................................bbbccbbb...................",
+"....................................bbbccbbb....................",
+"..................................bbbcccbbb.....................",
+".................................bbbccbbbb......................",
+"................................bbbccbbb........................",
+"...............................bbbccbbb.........................",
+".............................bbbcccbbb..........................",
+"............................bbbccbbbb...........................",
+"...........................bbbccbbb.............................",
+"..........................bbbccbbb..............................",
+"........................bbbcccbbb...............................",
+".......................bbbccbbbb................................",
+"......................bbbccbbb..................................",
+".....................bbbccbbb...................................",
+"...................bbbcccbbb....................................",
+"..................bbbccbbbb.....................................",
+".................bbbccbbb.......................................",
+".................bbccbbbb.......................................",
+"................bbccbbbbbbbbb...................................",
+".................bbccccbbbbbbbbb................................",
+".................bbbbbcccccbbbbbbbbb............................",
+"....................bbbbbbcccccbbbbbbbbb........................",
+".......................bbbbbbbcccccbbbbbbbbb.......#####........",
+"...........................bbbbbbbccccbbbbbbbbbb..#aaaaa#.......",
+"...............................bbbbbbcccccbbbbbbb##aaaaaa#......",
+"...................................bbbbbbcccccbb#aaaaaaaaa#.....",
+".......................................bbbbbbccc#aaa###aaa#.....",
+"..........................................bbbbbb#aaa#b#aaa#.....",
+"..............................................bb#aaa###aaa#.....",
+"................................................#aaaaaaaaa#.....",
+".................................................#aaaaaaa#......",
+"..................................................#aaaaa#.......",
+"...................................................#####........",
+"................................................................",
+"................................................................",
+"................................................................",
+"................................................................",
+"................................................................"};
+"""
+
+
+class MeshRemodelOpenEdgeFinderCommandClass:
+    
+    def __init__(self):
+        pass
+
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'OpenEdgeFinder.svg') ,
+            'MenuText': "Open edge finder" ,
+            'ToolTip' : "Check sketches and other objects for open edges, crossed edges, t-sections, and stray points"}
+ 
+    def Activated(self):
+    
+        doc = FreeCAD.ActiveDocument
+        if not doc:
+            FreeCAD.Console.PrintError("No open document.  Open a document, select object to check, run macro.\n")
+        else:
+
+            sketches = Gui.Selection.getSelection()
+            for sk in sketches:
+                if not sk.isDerivedFrom("Part::Feature"):
+                    continue
+                fp = doc.addObject("Part::FeaturePython","OpenEdgeFinder")
+                OpenEdgeFinder(fp)
+                OpenEdgeFinderVP(fp.ViewObject)
+                fp.Sketch = sk
+                put_in_body(doc, fp, sk)
+   
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        sel = Gui.Selection.getSelection()
+        if len(sel) == 0:
+            return False
+        if sel[0].isDerivedFrom("Part::Feature"):
+            return True
+        return False
+
+
+
+
 
 ##################################################################################################
 class GroupCommandPointsObjects:
@@ -5525,6 +5907,7 @@ class GroupCommandExtras:
                     "MeshRemodelCreateSketch",
                     "MeshRemodelMergeSketches",
                     "MeshRemodelFlattenDraftBSpline",
+                    "MeshRemodelOpenEdgeFinder",
                     "MeshRemodelValidateSketch",
                     "MeshRemodelPartCheckGeometry",
                     "MeshRemodelSubShapeBinder",
@@ -5575,6 +5958,7 @@ def initialize():
         Gui.addCommand("MeshRemodelCreateSketch", MeshRemodelCreateSketchCommandClass())
         Gui.addCommand("MeshRemodelMergeSketches", MeshRemodelMergeSketchesCommandClass())
         Gui.addCommand("MeshRemodelValidateSketch", MeshRemodelValidateSketchCommandClass())
+        Gui.addCommand("MeshRemodelOpenEdgeFinder",MeshRemodelOpenEdgeFinderCommandClass())
         Gui.addCommand("MeshRemodelPartCheckGeometry", MeshRemodelPartCheckGeometryCommandClass())
         Gui.addCommand("MeshRemodelSubShapeBinder", MeshRemodelSubShapeBinderCommandClass())
         Gui.addCommand("MeshRemodelSettings", MeshRemodelSettingsCommandClass())
