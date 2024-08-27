@@ -168,7 +168,9 @@ This enables preselection mode where points get automatically selected by holdin
 <br/>
 Click the icon to enable or to disable Auto Preselection Mode.  There is also a button that will appear in the status bar when this mode is active to indicate you are in Auto Preselection Mode.  You can also click that button to remove the selection observer and return to normal selection mode.<br/>
 <br/>
-The way the selection observer works is it monitors the preselection of points (only Vertex type objects).  If you are holding down the Ctrl key when the point is first preselected (hovered over with the mouse) that point gets added to a list variable internally called global_picked.  When you use one of the object creation tools that uses selected points, e.g. the bspline or line tool, the tool code will check to see if global_picked contains points, and if so, will use those points.  These global_picked points are not updated if a point is normally selected (by clicking on it).  (But if you deselect a point by clicking on it, then the point will be removed from the global_picked list.)
+The way the selection observer works is it monitors the preselection of points (only Vertex type objects).  If you are holding down the Ctrl key when the point is first preselected (hovered over with the mouse) that point gets added to a list variable internally called global_picked.  When you use one of the object creation tools that uses selected points, e.g. the bspline or line tool, the tool code will check to see if global_picked contains points, and if so, will use those points.  These global_picked points are not updated if a point is normally selected (by clicking on it).  (But if you deselect a point by clicking on it, then the point will be removed from the global_picked list.)<br/>
+<br/>
+New for version 1.10.9, now you can use this to automatically add the next nearest point to the last point you added.  This is done by holding down Ctrl while clicking the toolbar icon, presuming you are already in auto selection mode and have already added at least one point.  Ctrl+Shift+Click will add the next nearest point, skipping the closest point.  Alt+Click removes last added point.<Lbr/>
 <br/>
 ## Part Solid
 <img src="Resources/icons/PartSolid.svg" alt="Part Solid"><br/>
@@ -335,7 +337,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
-
+* 2024.08.27 (1.10.9) -- add ability to add nearest point, 2nd nearest point, and remove last added point to auto selection observer
 * 2024.08.18 (1.10.8) -- add open edge finder tool
 * 2024.08.17 (1.10.7) -- add option to save selection blocks to a text document object in the go back selection feature
 * 2024.08.17 (1.10.6) -- rearrange toolbar icons to take up lest horizontal space
