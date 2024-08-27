@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.08.18"
-__version__ = "1.10.8"
+__date__    = "2024.08.23"
+__version__ = "1.10.9"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -364,14 +364,16 @@ component objects before attempting modifications.\n")
         pb.killProgressBar()
         return verts
 
-    def nearestPoint(self, pt, pts, exclude):
+    def nearestPoint(self, pt, pts, exclude, skipOne = False):
         """ nearestPoint(pt, pts, exclude)
             pt is a vector, pts a list of vectors
             exclude is a list of vectors to exclude from process
-            return nearest point to pt in pts and not in exclude"""
+            return nearest point to pt in pts and not in exclude
+            if skipOne is true, return 2nd closest point"""
         if len(pts) == 0: #should never happen
             raise Exception("MeshRemodel GeomUtils Error: nearestPoint() pts length = 0\n")
         nearest = pts[0]
+        nextNearest = nearest
         d = 10**100
         for p in pts:
             if p in exclude:
@@ -379,8 +381,9 @@ component objects before attempting modifications.\n")
             dis = self.dist(pt, p)
             if dis < d:
                 d = dis
+                nextNearest = nearest
                 nearest = p
-        return nearest
+        return nearest if not skipOne else nextNearest
 
     def isColinear(self,A,B,C):
         """ isColinear(A, B, C)
@@ -5193,7 +5196,8 @@ class MeshRemodelSelectionObserver():
 
     def __init__(self):
         self.mode = ["Vertex"] #can also be ["Edge","Vertex"] or ["Edge"]
-        pass
+        self.lastObj = None
+        self.lastSubs = []
 
     def setMode(self,mode):
         self.mode = mode
@@ -5214,11 +5218,31 @@ class MeshRemodelSelectionObserver():
 
     def isVertexMode(self):
         return "Vertex" in self.mode
-
+        
+    def addNearestPoint(self, skipOne = False):
+        """called when user has Ctrl+(Shift+)Clicked on the Cancel objserver button on the statusbar"""
+        if not self.lastObj or not global_picked:
+            FreeCAD.Console.PrintError("No last object, add a selected vertex from an object and try again.\n")
+            return
+        
+        verts = self.lastObj.Shape.Vertexes
+        pts = [v.Point for v in verts]
+        pt = global_picked[-1]
+        nearest = gu.nearestPoint(pt, pts, global_picked, skipOne)
+     #   FreeCAD.Console.PrintMessage(f"nearest = {nearest}\n")
+        if nearest.isEqual(pt, Part.Precision.confusion()):
+            FreeCAD.Console.PrintMessage("No more vertices to add for this object\n")
+            return
+        idx = pts.index(nearest)
+       # FreeCAD.Console.PrintMessage(f"idx = {idx}\n")
+        self.setPreselection(self.lastObj.Document.Name, self.lastObj.Name, f"Vertex{idx + 1}")
+        
     def setPreselection(self,doc,obj,sub):                # Preselection object
         modifiers = QtGui.QApplication.keyboardModifiers()
-        if not modifiers == QtCore.Qt.ControlModifier:
+        if not modifiers & QtCore.Qt.ControlModifier:
             return
+        self.lastObj = FreeCAD.ActiveDocument.getObject(obj)
+        self.lastSubs.append(sub)
         if self.isVertexMode() and "Vertex" in str(sub):
             Gui.Selection.addSelection(doc,obj,str(sub))
             idx = int(sub[6:])
@@ -5226,12 +5250,47 @@ class MeshRemodelSelectionObserver():
             p = thisobj.Shape.Vertexes[idx-1].Point
             if not gu.hasPoint(p,global_picked,.0001):
                 global_picked.append(p)
+                self.lastSubs.append(sub)
+               # FreeCAD.Console.PrintMessage(f"Adding {sub} to selection\n")
+                self.writeToConsole(doc, obj, sub)
+            # else:
+            #     FreeCAD.Console.PrintMessage(f"skipping {sub} as it is already in global_picked\n")
 
         elif self.isEdgeMode() and "Edge" in str(sub):
             Gui.Selection.addSelection(doc,obj,str(sub))
+            
+    def writeToConsole(self, doc, obj, sub):
+        """write to the python console as a comment so the go back selection tool
+        can work with these selections"""
+        Gui.doCommandGui(f"# Gui.Selection.addSelection('{doc}','{obj}','{sub}')\n")
+
+    def removeLastPoint(self):
+        """remove the last point added to global_picked"""
+        if not global_picked:
+            return
+        if not self.lastObj:
+            return
+        if not self.lastSubs:
+            return
+        global_picked.pop()
+        Gui.doCommandGui(f"Gui.Selection.removeSelection('{self.lastObj.Document.Name}', '{self.lastObj.Name}', '{self.lastSubs[-1]}')\n")
+        self.lastSubs.pop()
+        
 
     def addSelection(self,doc,obj,sub,pnt):               # Selection object
-        pass
+        if not "Vertex" in sub:
+            return
+        v = FreeCAD.ActiveDocument.getObject(obj).getSubObject(sub)
+        point = v.Point if hasattr(v,"Point") else None
+        if not point:
+            # FreeCAD.Console.PrintMessage(f"not adding {v} to global_picked list, obj = {obj}, sub = {sub}\n")
+            return
+        if not gu.hasPoint(point, global_picked, 0.0001):
+            global_picked.append(point)
+            self.lastObj = FreeCAD.ActiveDocument.getObject(obj)
+            if self.lastSubs and self.lastSubs[-1] != sub:
+                self.lastSubs.append(sub)
+           # FreeCAD.Console.PrintMessage(f"added {point} = sub {sub}\n")
         #App.Console.PrintMessage("addSelection"+ "\n")
         #App.Console.PrintMessage(str(doc)+ "\n")          # Name of the document
         #App.Console.PrintMessage(str(obj)+ "\n")          # Name of the object
@@ -5250,6 +5309,9 @@ class MeshRemodelSelectionObserver():
                     try:
                         if gu.isSamePoint(global_picked[ii],p,.0001):
                             global_picked.remove(global_picked[ii])
+                            if len(self.lastSubs) >= ii and sub == self.lastSubs[ii]:
+                                self.lastSubs.remove(self.lastSubs[ii])
+                            FreeCAD.Console.PrintMessage(f"Removing {sub} from selection\n")
                     except:
                         pass
         pass
@@ -5261,7 +5323,8 @@ class MeshRemodelSelectionObserver():
     def clearSelection(self,doc):                         # If click on the screen, clear the selection
         #FreeCAD.Console.PrintMessage("clearSelection"+ "\n")  # If click on another object, clear the previous object
         global_picked.clear()
-        pass
+        self.lastObj = None
+        self.lastSubs = []
 
 
 #end MeshRemodelSelectionObserver class
@@ -5280,18 +5343,36 @@ class MeshRemodelAddSelectionObserverCommandClass(object):
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'AddSelectionObserver.svg') ,
             'MenuText': "Add Selection &Observer" ,
-            'ToolTip' : "Allows to select vertices by Ctrl + preselection \
-This is intended for use with BSpline selection of points, but \
-can be used with all MeshRemodel tools that use selected points.  DOES NOT work if you \
-mix points selected in this mode with normal selection mode in the same operation"}
+            'ToolTip' : \
+"""
+Allows to use Ctrl + Preselect to add vertices to the selection.  The selected
+vertices should work with all MeshRemodel commands, but not necessarily with
+other workbenches.
+
+If the selection observer is already installed:
+Click = remove observer
+Ctrl+Click = add nearest point to last point
+Ctrl+Shift+Click = add 2nd nearest point to last point
+Alt+Click = remove last added point
+"""}
 
     def on_clicked(self):
-        self.bar.removeWidget(self.btn)
-        FreeCADGui.Selection.removeObserver(self.sel)
-        self.bar = None
-        self.btn = None
-        self.sel = None
-        global_picked.clear()
+        modifiers = QtGui.QApplication.keyboardModifiers()
+        if modifiers & QtCore.Qt.ControlModifier:
+            skipOne = False
+            if modifiers & QtCore.Qt.ShiftModifier:
+                skipOne = True
+                FreeCAD.Console.PrintMessage("skipping one = true\n")
+            self.sel.addNearestPoint(skipOne)
+        elif modifiers & QtCore.Qt.AltModifier:
+            self.sel.removeLastPoint()
+        else:
+            self.bar.removeWidget(self.btn)
+            FreeCADGui.Selection.removeObserver(self.sel)
+            self.bar = None
+            self.btn = None
+            self.sel = None
+            global_picked.clear()
 
     def Activated(self):
         doc = FreeCAD.ActiveDocument
@@ -5306,6 +5387,13 @@ mix points selected in this mode with normal selection mode in the same operatio
             self.btn.show()
             global_picked.clear()
         else:
+            modifiers = QtGui.QApplication.keyboardModifiers()
+            if modifiers & QtCore.Qt.ControlModifier: #add nearest point
+                self.on_clicked()
+                return
+            if modifiers & QtCore.Qt.AltModifier: #remove last point
+                self.on_clicked()
+                return
             FreeCADGui.Selection.removeObserver(self.sel)
             self.sel = None
             self.bar.removeWidget(self.btn)
