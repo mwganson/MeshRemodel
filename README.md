@@ -340,7 +340,9 @@ So, why use this rather than the tool available inside the sketch editor?  If yo
 <img src="Resources/icons/DraftUpgrade.svg" alt="Draft upgrade icon"> <br/>
 Select 2 or more objects to enable this command.  It uses Draft.upgrade() to connect the objects into a single wire.  It is here as a convenience.  Note: the selected objects should all be connected together, but need not necessarily form a closed loop.  For example, you might have an arc and 2 lines connected one to each end of the arc.  You should not include circles unless you wish to connect them to other objects (not common).  The idea here to create wires from connected lines, open polygons, and arcs, then use these new wires, along with existing (coplanar) circles and closed polygons to create a sketch with the Create Sketch tool or you can also use the wires directly with Part workbench tools like, extrude or sweep.  As noted in other sections of this document, it is often useful to use this again on the created wire to form it into a face. Faces tend to work better with other tools rather than wires, particularly in cases where the tool complains the wire is not coplanar.  If you get that error message run this tool again on the wire and upgrade it to a face.  Then try the tool that complained the wire was not coplanar again.<br/>
 <br/>
-
+## Open Edge Finder tool
+<img src="Resources/icons/OpenEdgeFinder.svg" alt = "open edge finder icon"><br/>
+This is a sketch validation tool.  It looks for open edges, crossed edges, and T-Sections.  The issues will be depicted visually as red spheres on the screen at the problematic vertex locations.  The object can be deleted once the issues are corrected.
 ## Merge Sketches
 <img src="Resources/icons/MergeSketches.svg" alt = "merge sketches"><br/>
 Select 2 or more sketches to enable this command.  This uses Sketcher workbench merge sketches command.  It is here as a convenience.
