@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.09.08"
-__version__ = "1.10.10"
+__date__    = "2024.09.10"
+__version__ = "1.10.11"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -6247,6 +6247,8 @@ class CustomListWidget(QtWidgets.QListWidget):
         self.add_default_items(float_list)
         self.itemClicked.connect(self.handle_item_click)
         self.itemDoubleClicked.connect(self.edit_item_value)
+        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.customContextMenuRequested.connect(self.showContextMenu)
         
     def edit_item_value(self, item):
         if item.text() != "+":
@@ -6266,25 +6268,42 @@ class CustomListWidget(QtWidgets.QListWidget):
         plus_item = QtWidgets.QListWidgetItem("+")
         plus_item.setFlags(plus_item.flags() & ~QtCore.Qt.ItemIsSelectable)
         self.addItem(plus_item)
-        
-    def keyPressEvent(self, event):
-        if event.key() == QtCore.Qt.Key_Delete:
-            for item in self.selectedItems():
-                self.takeItem(self.row(item))
-        else:
-            super(CustomListWidget, self).keyPressEvent(event)
+
+    def showContextMenu(self, pos: QtCore.QPoint):
+        # Find the item at the clicked position
+        item = self.itemAt(pos)
+        if item:
+            context_menu = QtWidgets.QMenu(self)
+            delete_action = QtGui.QAction("Delete", self)
+            delete_action.triggered.connect(lambda: self.removeItem(item))
+            if item.text() == "+":
+                delete_action.setEnabled(False)
+            context_menu.addAction(delete_action)
+            add_action = context_menu.addAction("Add item")
+            add_action.triggered.connect(self.addNewItem)
+            context_menu.exec_(self.mapToGlobal(pos))
             
+    def addNewItem(self):
+        new_item = QtWidgets.QListWidgetItem("0.0")
+        self.insertItem(self.count() - 1, new_item)
+        self.setCurrentItem(new_item)
+
     def handle_item_click(self, item):
         if item.text() == "+":
             new_item = QtWidgets.QListWidgetItem("0.0")
             self.insertItem(self.count() - 1, new_item)
             self.setCurrentItem(new_item)
 
+    def removeItem(self, item: QtWidgets.QListWidgetItem):
+        row = self.row(item)
+        self.takeItem(row) 
     
     def value(self):
         float_list = []
         for index in range(self.count()):
             item = self.item(index)
+            if item.text() == "+":
+                continue
             try:
                 float_value = float(item.text())
                 float_list.append(float_value)
