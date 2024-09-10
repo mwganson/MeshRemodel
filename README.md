@@ -75,7 +75,7 @@ This operation will also create a new empty mesh if nothing is selected to dupli
 going to be duplicating facets from one mesh to another.<br/>
 
 ## MeshOffset
-<img src="Resources/icons/MeshOffset.svg" alt="Mesh offset"><br/>
+<img src="Resources/icons/OffsetMesh.svg" alt="Mesh offset"><br/>
 Offset a mesh by moving it's points along their normals by the specified distance in the Offset property.  Offset is a floating point property that gets interpreted as mm.  This might not always work as expected and can cause defects in the mesh, so it's a good idea to run mesh evaluate and repair on the results.  But it can also in some cases cure some defects in the mesh.  In particular I have found it can cure some folds on surface errors.<br/>
 
 If the source mesh is a non-solid mesh, meaning only a single wall, then you can set the Merge Source property to True and it will merge the orignal source mesh with the offset.  This will still leave a gap that will need to be filled manually using the add facet tool.  Since this is a parametric object that will recompute itself it is a good idea to make a simple copy of it and work on the copy instead of working to repair this object directly.  Otherwise it might recompute and undo all of your repairs.<br/>
