@@ -26,11 +26,15 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.08.23"
-__version__ = "1.10.9"
+__date__    = "2024.09.08"
+__version__ = "1.10.10"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
+try:
+    from PySide import QtWidgets
+except:
+    QtWidgets = QtGui
 import Draft, DraftGeomUtils, DraftVecUtils, Mesh, MeshPart
 import time
 import numpy as np
@@ -65,7 +69,7 @@ class MeshRemodelGeomUtils(object):
 
     #progress bar on status bar with cancel button
     class MRProgress:
-        def __init__(self):
+        def __init__(self, total=0, txt = ""):
             self.pb = None
             self.btn = None
             self.bar = None
@@ -74,6 +78,8 @@ class MeshRemodelGeomUtils(object):
             self.total = 0
             self.mw = FreeCADGui.getMainWindow()
             self.lastUpdate = time.time()
+            if total:
+                return self.makeProgressBar(total, buttonText = txt if txt else "Cancel")
 
         def makeProgressBar(self,total=0,buttonText = "Cancel",tooltip = "Cancel current operation",updateInterval = .5):
             """total is max value for progress bar, mod = number of updates you want"""
@@ -107,7 +113,7 @@ class MeshRemodelGeomUtils(object):
                 self.lastUpdate = timeNow
                 self.pb.setValue(self.value)
                 FreeCADGui.updateGui()
-            if self.mw.isHidden():
+            if self.mw.isHidden() or self.value >= self.total:
                 self.bCanceled = True
                 self.killProgressBar()
             return self.bCanceled
@@ -5020,115 +5026,1674 @@ are not getting the arc orientation you were expecting -- will need to delete un
 
 ####################################################################################
 
-# Make a sketch from selected objects
+class SketchPlus:
+
+# class level attributes
+# wire filter dialogs use this dictionary of shapes to create the ghost objects and access the wires
+# each function sets its key or keys to the incoming shape for filtering in the dialogs
+    wireShapeDict = {}
+    ScaleUniformCenterDefault = ["Origin"]
+    MirrorAxisDefault = ["None","Sketch X Axis","Sketch Y Axis","Both X and Y"]
+    PathArraySettingsDefault = ["Normal To Path", "Align To Origin", "Fixed", "Tangent To Path"]
+    PointArraySettingsDefault = ["No Point Array","Align To Origin","Fixed"]
+    PolarCenterDefault = ["Origin"]
+    ExecutionOrderDefault = ["Wire Order", "External", "Construction", "Mirroring","Polar Array", \
+        "Point Array", "Rectangular Array", "Path Array", "Scaling","Uniform Scaling", "Offsetting","Face Making", \
+        "Wire Statuses"  ]
+    RectangularRotationCenterDefault = ["Origin","Center Of Gravity"]
+
+    def __init__(self, obj):
+        obj.Proxy = self
+
+        generalWireInstructions = \
+"""
+Wire filtering uses 1-based indices for the wires, example 1 = Wire1,  2 = Wire2,
+etc.  An empty list [] signifies to use all the wires.  Generally, any index left
+out gets used and any negative values get filtered out.
+
+Suppose you have 3 wires: Wire1, Wire2, and Wire3.
+
+[] = Use all 3 wires
+[1] = Use Wire1, Wire2, and Wire3
+[-1, 2, 3] = Use Wire2 and Wire3, but not Wire1
+[-1. -2, -3] = Use none of the wires
+[-1] = Use Wire2 and Wire3, but not Wire1
+[3, 1, 2] = reorder the wires so Wire3 now becomes Wire1, Wire1 becomes Wire2, and
+            Wire2 becomes Wire3.
+
+Note that wires available will be different depending on the order of function
+execution, which can be set with the Execution Order property.
+
+"""
+        grp = "Additional Plus Properties"
+
+##### Mirroring
+
+        obj.addProperty("App::PropertyEnumeration","MirrorAxis",grp,\
+"""Axis for mirroring sketch elements.  Options are X, Y, X and Y, or Construction
+Line Segment.  If you use X and Y and your elements are constrained to the X and
+Y axes, it can produce a closed wire, but sometimes this fails.  I have found
+that by removing and adding a constraint back can sometimes correct the issue.
+""").MirrorAxis = SketchPlus.MirrorAxisDefault
+        obj.addProperty("App::PropertyIntegerList","MirrorWires",grp,
+f"""Wires to mirror.
+{generalWireInstructions}
+
+Unused wires remain stationary.  To remove a wire entirely, use the Wire Order property.
+
+""")
+        obj.addProperty("App::PropertyString","Version",grp,"Version of MeshRemodel used to create this SketchPlus object").Version = __version__
+
+##### Scaling
+        obj.addProperty("App::PropertyFloat","ScaleX",grp, "Scale in the X direction, converts to bspline curves if scaling is non-uniform").ScaleX = 1
+        obj.addProperty("App::PropertyFloat","ScaleY",grp,"Scale in the Y direction, converts to bspline curves if scaling is non-uniform").ScaleY = 1
+        obj.addProperty("App::PropertyIntegerList","ScaleWires",grp,"Wires to scale")
+
+
+##### Scale Uniform
+        obj.addProperty("App::PropertyFloat","ScaleUniform",grp,"Scale X and Y uniformly, does not convert to bsplines").ScaleUniform = 1
+
+        obj.addProperty("App::PropertyEnumeration","ScaleUniformCenter",grp,\
+"""Default is origin, but can be construction circle, construction point or
+construction arc of circle.  Uniform scaling has the advantage that it does not
+produce bsplines the way the other scaling often does (if non-uniform, x != y).
+It also can make use of an arbitrary center where the other scaling feature
+does not provide that option.""").ScaleUniformCenter = SketchPlus.ScaleUniformCenterDefault
+        obj.addProperty("App::PropertyIntegerList","ScaleUniformWires",grp,"Wires to scale uniformly")
+
+
+##### Offsetting
+        obj.addProperty("App::PropertyDistance","Offset",grp,"Offset to be applied to the sketch").Offset = 0
+        obj.addProperty("App::PropertyEnumeration","OffsetJoin",grp,"Offset join types").OffsetJoin = ["Arcs","Tangent", "Intersection"]
+        obj.addProperty("App::PropertyBool","OffsetFill",grp,"Whether to fill in gap between original and offset").OffsetFill = False
+        obj.addProperty("App::PropertyBool","OffsetIntersection",grp,"Affects how child edges and wires are handled, whether as a group or independently").OffsetIntersection = False
+        obj.addProperty("App::PropertyBool","OffsetOpenResult",grp,"Whether to allow offset to produce open wire").OffsetOpenResult = False
+        obj.addProperty("App::PropertyIntegerList","OffsetWires",grp,"Wires to offset")
+        obj.addProperty("App::PropertyBool","OffsetInterimFace",grp,"Make a temporary face before offsetting, then use the generated wires afterwards.  Seems to make the offsetting more robust.").OffsetInterimFace = True
+
+
+        obj.addProperty("App::PropertyEnumeration","FaceMaker",grp,\
+"""Whether to make a face, and which face maker to use.  Bullseye excels at faces
+within faces within faces and supports much nesting, Cheese excels at multiple
+faces but only 1 layer deep, Simple only uses the outer wire.  In the actual
+implementation, Simple uses Bullseye to make the face first, then another face
+is made from the OuterWire of the first face, which is the return value.  If
+FaceMakerSimple is used with inner wires it gives self-intersections, so that is
+why Bullseye is used internally in this script.""").FaceMaker = \
+            ["None","Bullseye","Cheese","Simple"]
+        obj.addProperty("App::PropertyBool","ShowConstruction", grp, \
+"""Whether to show construction geometry as normal geometry.  This is intended
+as a way to quickly view construction geometry without needing to toggle it
+to normal and back again.  For permanent use it is generally better to toggle the
+construction geometry to normal mode in the sketch editor.  But this can also
+be a way to dynamically change sketch elements.""").ShowConstruction = False
+        obj.addProperty("App::PropertyBool","ShowExternal",grp,\
+"""Whether to show external geometry as normal geometry.  This can save some
+time by not requiring you to trace over the imported external geometry in cases
+where you want it to be normal geometry.  Bsplines can be more of a challenge to
+recreate from tracing, and this should recreate them flawlessly.  It is important
+to understand that the geometry will change quite a lot as the external links
+change or as the sketch is moved or rotated, so the results can sometimes be
+unexpected.""").ShowExternal = False
+        obj.addProperty("App::PropertyIntegerList","WireOrder",grp,\
+f"""The order of the Wires in the sketch.
+{generalWireInstructions}
+""")
+
+##### Path Array
+        obj.addProperty("App::PropertyIntegerList","PathArrayWires",grp,"""
+Wires to be used in the PathArray as copies""")
+        obj.addProperty("App::PropertyIntegerList","PathArrayPath", grp, """
+The Wire to be used as the spline for the Path Array, should only be one wire usually.""")
+        obj.addProperty("App::PropertyIntegerConstraint","PathArrayCount",grp,"""
+Number of copies of the path array wires to made in the path array, number of elements.""").PathArrayCount = (0,0,100000,1)
+        obj.addProperty("App::PropertyBool","PathArrayKeepPath",grp,"Whether to keep the path wire after making the path array").PathArrayKeepPath = False
+
+        obj.addProperty("App::PropertyEnumeration","PathArraySettings",grp,"Some settings for the path array").PathArraySettings = SketchPlus.PathArraySettingsDefault
+
+##### Point Array
+        obj.addProperty("App::PropertyIntegerList","PointArrayWires",grp,
+f"""List the Wires to use for the base of the point array here.
+{generalWireInstructions}
+""")
+
+        obj.addProperty("App::PropertyEnumeration","PointArraySettings",grp,
+"""If "Fixed", then no rotation is done for each copy.  If "Align To Origin", then
+the rotation is based on the point's angle relative to the x axis.  If "No Point
+Array" then there will be no point arraying done.
+""").PointArraySettings = SketchPlus.PointArraySettingsDefault
+##### Polar Array
+        obj.addProperty("App::PropertyIntegerConstraint", "PolarCount",grp, "Numer of elements in the polar array").PolarCount = (0,0,10000,1)
+        obj.addProperty("App::PropertyAngle","PolarStart",grp,"Start of Polar array in degrees, default = 0 degrees").PolarStart = 0
+        obj.addProperty("App::PropertyAngle","PolarEnd",grp,"End of polar array in degrees, default = 360 degrees").PolarEnd = 360
+        obj.addProperty("App::PropertyFloatList", "PolarAngles",grp,
+"""Optional list of custom angles in degrees.  If this is set, then PolarStart,
+PolarEnd and PolarCount properties are ignored.  Include 0 if you also want the
+original to be included in the array.
+
+This can be used to rotate a circle or other single wire in place.  Just add a
+construction point coincident to the center of the wire and use
+that point as the PolarCenter and set a single angle in this PolarAngles property.
+""").PolarAngles = []
+
+        obj.addProperty("App::PropertyEnumeration","PolarCenter",grp,"Center of the polar array").PolarCenter = SketchPlus.PolarCenterDefault
+        obj.addProperty("App::PropertyIntegerList","PolarWires",grp,
+f"""Wires to use as polar array pattern sources.
+{generalWireInstructions}
+Note that all rogue points (non-construction mode points) are also made part of the
+polar array.  There is currently no way to exclude them other than not having
+rogue points in your sketch.  Rogue points can come to be in a number of ways,
+including directly created non-construction mode points, construction points
+converted to normal points when Show Construction = True, and external points
+that are converted to normal points when ShowExternal = True.
+""").PolarWires = []
+
+
+        obj.addProperty("App::PropertyStringList","ExecutionOrder",grp,\
+"""The order of execution of the various functions, but also a way to suppress functions.
+
+There is a dialog in the context menu to edit this string list or you may do it manually.
+Put a hyphen (-) immediately in front of the name, e.g. "-Wire Order" to disable that function.
+Do not use any spaces in between the hyphen and the start of the name, e.g. "- Wire Order" is
+invalid and will result in an exception being thrown and execution halted.
+
+If a function is included twice (or more) in the list it will be executed twice, but this was
+not the intention of this feature and you might not get expected results if you do this.  If there
+is a property associated with the function, then that same property gets used both times.
+
+The order of execution can be important in some cases.  Note that the wire filter
+editors in the context menu will only show the available number of wires for a function
+at the time the function is being executed.  So, as an example, if you have a single
+wire to begin with and use a polar array to make 8 wires out of it, then the functions
+that follow the polar array will have 8 wires to use.  If a mirror operation follows
+the polar array, then the MirrorWires property has 8 wires to filter where if the
+Mirror function comes before the polar array then MirrorWires cam only filter the
+first oriiginal wire.
+
+""").ExecutionOrder = SketchPlus.ExecutionOrderDefault
+
+
+##### Rectangular Array
+        obj.addProperty("App::PropertyIntegerConstraint","RectangularCountX",grp,"Count of elements in x direction").RectangularCountX = (3,1,100000,1)
+        obj.addProperty("App::PropertyIntegerConstraint","RectangularCountY",grp,"Count of elements in y direction").RectangularCountY = (3,1,100000,1)
+        obj.addProperty("App::PropertyDistance","RectangularIntervalX",grp,"Distance between elements in x direction").RectangularIntervalX = 10
+        obj.addProperty("App::PropertyDistance","RectangularIntervalY",grp,"Distance between elements in y direction").RectangularIntervalY = 10
+        obj.addProperty("App::PropertyIntegerList","RectangularWires",grp,"Wires to use in rectangular array")
+        obj.addProperty("App::PropertyAngle","RectangularRotation",grp,"Angle by which to rotate the rectangular array as a group").RectangularRotation = 0
+
+        obj.addProperty("App::PropertyEnumeration","RectangularRotationCenter",grp,"Center of rotation for rectangular array, also supported: construction circles, arcs, and points").RectangularRotationCenter = SketchPlus.RectangularRotationCenterDefault
+
+        grp = "Additional Status Information"
+        obj.addProperty("App::PropertyString", "WireStatuses", grp, "Information about each wire")
+
+    def onDocumentRestored(self, fp):
+        # this updates all the keys in the SketchPlus.wireShapeDict dictionary
+        # done in a singleshot because otherwise there is an access violation if 
+        # there are links to external geometry in the object
+        QtCore.QTimer().singleShot(100, lambda: self.execute(fp))
+
+    def onChanged(self, fp, prop):
+        if prop == "OffsetFill":
+            if fp.OffsetFill:
+                fp.ViewObject.DisplayMode = "Flat Lines" # do it here so if the user toggles back to Wireframe it will stay there
+            else:
+                if "Wireframe" in fp.ViewObject.getEnumerationsOfProperty("DisplayMode"):
+                    fp.ViewObject.DisplayMode = "Wireframe" # facemaker function toggles it back if necessary
+
+    def fetchConstruction(self, fp, prop, defaults, filter=["LineSegment"]):
+        """get construction elements as a dictionary and put them into prop
+        prop is typically an enumeration of options for centering something,
+        such as a polar array or for a line segment to serve as an axis for mirroring
+        """
+        current = getattr(fp, prop)
+        filter = [f"Part::Geom{val}" for val in filter]
+
+        setattr(fp, prop, defaults)
+        constructionElements = {}
+        for idx,geo in enumerate(fp.Geometry):
+                if fp.getConstruction(idx):
+                    if geo.TypeId in filter:
+                        elementName = f"Construction {geo.TypeId[10:]} {len(constructionElements) + 1}"
+                        constructionElements[elementName] = geo
+                        enums = fp.getEnumerationsOfProperty(prop)
+                        if not elementName in enums:
+                            setattr(fp, prop, enums + [elementName])
+                    # else:
+                    #     print(f"skipping {geo.TypeId}, not in {filter}")
+        enums = fp.getEnumerationsOfProperty(prop)
+        if current in enums:
+            setattr(fp, prop, current)
+        else:
+            FreeCAD.Console.PrintWarning(f"{fp.Label}: {current} no longer exists, setting {prop} to defaults\n")
+            setattr(fp, prop, defaults)
+        return constructionElements
+
+    def handleMirroring(self, fp, shape):
+        """handle mirroring here instead of execute()"""
+        constructionLines = self.fetchConstruction(fp, "MirrorAxis", SketchPlus.MirrorAxisDefault, ["LineSegment"])
+        SketchPlus.wireShapeDict["MirrorWires"] = shape
+        if shape.isNull():
+            return shape
+
+        normal2 = None # will become (0,1,0) if we are mirroring both x and y
+
+
+        if fp.MirrorAxis == "None":
+            return shape
+        else:
+            #shape will be transformed back to the identity placement before mirroring
+            base = FreeCAD.Vector(0,0,0)
+            if fp.MirrorAxis == "Sketch Y Axis":
+                normal = FreeCAD.Vector(1, 0, 0)
+            elif fp.MirrorAxis == "Sketch X Axis":
+                normal = FreeCAD.Vector(0, 1, 0)
+            elif fp.MirrorAxis == "Both X and Y":
+                normal = FreeCAD.Vector(1,0,0) # do the Y axis first
+                normal2 = FreeCAD.Vector(0,1,0) # then the X
+            elif fp.MirrorAxis in constructionLines:
+                geo = constructionLines[fp.MirrorAxis] #construction linesegment
+                direction = (geo.StartPoint - geo.EndPoint).normalize()
+                base = geo.StartPoint #any point will do, line treated as infinite
+                normal = FreeCAD.Vector(direction.y, -direction.x, 0)
+
+            patternWires, stationaryWires = self.filterWires(shape, fp.MirrorWires)
+            if not patternWires and not fp.MirrorWires:
+                patternWires = shape.Wires #use all wires if user does not filter them
+                stationaryWires = []
+            roguePoints = self.getRoguePoints(fp, shape)
+
+            if not patternWires and not roguePoints:
+                FreeCAD.Console.PrintError("Nothing to mirror, add some Wires to the Mirror Wires property, add some non-construction mode Points or set Mirror Axis to 'None' to avoid this message.\n")
+                return shape
+            patternShape = Part.makeCompound(patternWires + roguePoints)
+            mirror = patternShape.mirror(base, normal)
+            fusion = Part.makeCompound([patternShape,mirror])
+
+            if normal2:
+                mirror2 = fusion.mirror(base, normal2)
+                fusion = Part.makeCompound([fusion, mirror2])
+
+            # this helps connect the wires that meet at the axes, but sometimes still fails
+            # Note that without this we just get a collection of edges, not wired together
+
+            wires = []
+            for edgelist in Part.sortEdges(fusion.Edges):
+                wires.append(Part.Wire(edgelist))
+
+            comp = Part.makeCompound(wires + stationaryWires + self.getRoguePoints(fp, fusion))
+            return comp
+
+    def handleScaling(self, fp, shape):
+        """handle scaling, if applicable"""
+        SketchPlus.wireShapeDict["ScaleWires"] = shape
+        if fp.ScaleX == 1 and fp.ScaleY == 1:
+            return shape
+        if shape.isNull():
+            return shape
+        matrix = FreeCAD.Matrix()
+        matrix.A11 = fp.ScaleX
+        matrix.A22 = fp.ScaleY
+        matrix.A33 = 1 if fp.ScaleX != fp.ScaleY else fp.ScaleX #might not make bsplines if x and y are equal
+
+        used, unused = self.filterWires(shape, fp.ScaleWires)
+        roguePoints = self.getRoguePoints(fp, shape)
+        if used + roguePoints:
+            usedComp = Part.makeCompound(used + roguePoints)
+        else:
+            return shape # there was nothing to scale
+
+        scaledShape = usedComp.transformShape(matrix, True, True) #copy, checkScale
+        if not unused:
+            return usedComp
+        else:
+            unusedComp = Part.makeCompound(unused)
+            fusion = usedComp.fuse(unusedComp)
+            return fusion
+
+
+    def handleUniformScaling(self, fp, shape):
+        """handle uniform scaling"""
+        SketchPlus.wireShapeDict["ScaleUniformWires"] = shape
+        # find construction circles and add them to the enumeration
+        constructionCircles = self.fetchConstruction(fp, "ScaleUniformCenter", SketchPlus.ScaleUniformCenterDefault, filter=["Circle","Point","ArcOfCircle"])
+        if fp.ScaleUniform == 1.0:
+            return shape
+        if shape.isNull():
+            return shape
+
+        center = FreeCAD.Vector()
+
+        if fp.ScaleUniformCenter != "Origin":
+            geo = constructionCircles[fp.ScaleUniformCenter]
+            center = geo.Location if hasattr(geo, "Location") else FreeCAD.Vector(geo.X, geo.Y, geo.Z)
+
+        used, unused = self.filterWires(shape, fp.ScaleUniformWires)
+        roguePoints = self.getRoguePoints(fp, shape)
+        if used + roguePoints:
+            usedComp = Part.makeCompound(used + roguePoints)
+        else:
+            return shape # there was nothing to scale
+        usedComp.scale(fp.ScaleUniform, center)
+        if not unused:
+            return usedComp
+        else:
+            unusedComp = Part.makeCompound(unused)
+            fusion = usedComp.fuse(unusedComp)
+            return fusion
+
+
+    def handleOffset(self, fp, shape):
+        """Offset the shape and return the offset if Offset != 0"""
+        SketchPlus.wireShapeDict["OffsetWires"] = shape
+        if shape.isNull():
+            return shape
+        offset = fp.Offset.Value
+        if offset == 0:
+            return shape
+        join_dict = {"Arcs": 0, "Tangent":1, "Intersection":2}
+        join = join_dict[fp.OffsetJoin]
+        fill = fp.OffsetFill
+        openResult = fp.OffsetOpenResult
+        intersection = fp.OffsetIntersection
+
+        patternWires, stationaryWires = self.filterWires(shape, fp.OffsetWires)
+        roguePoints = self.getRoguePoints(fp, shape)
+        #not offsetting rogue points
+        if not patternWires:
+            return shape #nothing to offset
+        else:
+            patternWiresComp = Part.makeCompound(patternWires)
+
+            try:
+                if fp.OffsetInterimFace:
+                    compOrFace = Part.makeFace(patternWiresComp,"Part::FaceMakerBullseye")
+                else:
+                    compOrFace = patternWiresComp
+                offsetShape = compOrFace.makeOffset2D(offset, join = join, \
+                            fill = fill, openResult = openResult, \
+                            intersection = intersection)
+                if not fill:
+                    offsetShape = Part.makeCompound(offsetShape.Wires)
+
+            except Exception as e:
+                FreeCAD.Console.PrintError(f"{fp.Label}: Error offsetting: {e}\n")
+                return shape
+            if offsetShape.isNull():
+                FreeCAD.Console.PrintError("Error in offsetting, output shape is null")
+                return shape
+            if stationaryWires + roguePoints:
+                final_shape = Part.makeCompound(stationaryWires + roguePoints + [offsetShape])
+            else:
+                final_shape = offsetShape
+            return final_shape
+
+
+        return shape
+
+    def handleFaceMaker(self, fp, shape):
+        """Make a face using selected facemaker"""
+        if shape.isNull():
+            return shape
+        if fp.FaceMaker == "None":
+            return shape
+        fp.ViewObject.DisplayMode = "Flat Lines"
+        facemaker = f"Part::FaceMaker{fp.FaceMaker}" if fp.FaceMaker != "Simple" else "Part::FaceMakerBullseye"
+        try:
+            face = Part.makeFace(shape, facemaker)
+            if fp.FaceMaker == "Simple":
+                face = Part.makeFace(face.OuterWire, facemaker)
+            return face
+        except Exception as e:
+            FreeCAD.Console.PrintError(f"{fp.Label}: error making face: {e}\n")
+            return shape
+
+    def getRoguePoints(self, fp, shape):
+        """get vertcies that are not part of any edges"""
+        def vertInList(vertex, vertLists):
+            for vertList in vertLists:
+                for vert in vertList:
+                    if vertex.Point.isEqual(vert.Point, Part.Precision.confusion()):
+                        return True
+            return False
+        if hasattr(Part.Wire, "getChildshapes"):
+            children = [wire.getChildShapes(f"Vertex{idx+1}") for idx,wire in enumerate(shape.Wires)]
+        else:
+            children = []
+            for idx,wire in enumerate(shape.Wires):
+                inner_children = []
+                for v in wire.Vertexes:
+                    inner_children.append(v)
+                children.append(inner_children)
+        rogues = [v for v in shape.Vertexes if not vertInList(v, children)]
+
+        return rogues
+
+    def handleShowConstruction(self, fp, shape):
+        if not fp.ShowConstruction:
+            return shape
+        constructionGeometry = []
+        constructionPoints = []
+        wires = []
+        roguePoints = self.getRoguePoints(fp, shape) #non construction mode points pre-existing
+
+        for idx,geo in enumerate(fp.Geometry):
+            if fp.getConstruction(idx):
+                gshape = geo.toShape()
+                if "Point" in geo.TypeId:
+                    constructionPoints.append(gshape)
+                else:
+                    constructionGeometry.append(gshape)
+
+        if constructionGeometry:
+            comp = Part.makeCompound(constructionGeometry)
+        else:
+            comp = Part.Shape()
+        edges = shape.Edges + comp.Edges
+        sortedEdges = Part.sortEdges(edges)
+        wires = [Part.Wire(e) for e in sortedEdges]
+
+
+        if constructionPoints or constructionGeometry or roguePoints:
+            combined = wires + constructionPoints + roguePoints
+            wireComp = Part.makeCompound(combined)
+            return wireComp
+        else:
+            return shape
+
+    def handleWireOrder(self, fp, shape):
+        """handle the ordering of the wires"""
+        SketchPlus.wireShapeDict["WireOrder"] = shape
+        if shape.isNull():
+            return shape
+        used, disregarded = self.filterWires(shape, fp.WireOrder)
+        roguePoints = self.getRoguePoints(fp, shape)
+        if used + roguePoints:
+            return Part.makeCompound(used + roguePoints)
+        else:
+            return Part.Shape()
+
+    def filterWires(self, shape, order, addUnmentioned = True):
+        """returns (filteredIn, filteredOut) both lists of wires.  +1 = put Wire1
+        into the filteredIn list, -1 = put it into the filteredOut list.  If
+        addUnmentioned = True, then unmentioned wires get added to the filteredIn
+        list.
+        """
+        #user might have deleted some wires from sketch, so we make sure
+        #to filter ot any unavailable wire indices
+        available = [idx + 1 for idx in range(len(shape.Wires))]
+        available += [-d for d in available]
+
+        outs = [-wo for wo in order if wo < 0 and wo in available]
+        ins = [wo for wo in order if wo > 0 and wo in available]
+        if 0 in order:
+            return ([], shape.Wires) #all wires unused
+        filteredOut = [shape.Wires[wo-1] for wo in outs]
+        filteredIn = [shape.Wires[wo-1] for wo in ins]
+        if addUnmentioned:
+            filteredIn += [shape.Wires[wo] for wo in range(len(shape.Wires)) if wo+1 not in outs + ins]
+            ins += [wo+1 for wo in range(len(shape.Wires)) if wo+1 not in outs + ins]
+
+        return (filteredIn, filteredOut)
+
+
+    def handleExternal(self, fp, shape):
+        """ create a compound from the external geometry by projecting it to the sketch plane
+            the compound is combined with input shape and a compound of both is returned
+        """
+        if not fp.ShowExternal:
+            return shape
+        externalGeometry = []
+        externalPoints = []
+        wires = []
+
+        for idx,geo in enumerate(fp.ExternalGeo[2:]):
+            if not "Point" in geo.TypeId:
+                externalGeometry.append(geo.toShape())
+            else:
+                externalPoints.append(geo.toShape())
+
+        if externalGeometry:
+            comp = Part.makeCompound(externalGeometry)
+        else:
+            comp = Part.Shape()
+
+        roguePoints = self.getRoguePoints(fp, shape)
+        edges = shape.Edges + comp.Edges
+        sortedEdges = Part.sortEdges(edges)
+        wires = [Part.Wire(e) for e in sortedEdges]
+
+        if externalGeometry or externalPoints or roguePoints:
+            wireComp = Part.makeCompound(wires + externalPoints + roguePoints)
+            return wireComp
+
+        return shape
+
+    def handlePolar(self, fp, shape):
+        """Polar array """
+        SketchPlus.wireShapeDict["PolarWires"] = shape
+        if shape.isNull():
+            return shape
+        count = len(fp.PolarAngles) if fp.PolarAngles else fp.PolarCount
+        roguePoints = self.getRoguePoints(fp, shape)
+        if not count:
+            return shape
+        patternWires, stationaryWires = self.filterWires(shape, fp.PolarWires)
+        if not fp.PolarWires:
+            patternWires = shape.Wires #use all wires as default if PolarWires is empty
+            stationaryWires = []
+        if patternWires + roguePoints:
+            patternComp = Part.makeCompound(patternWires + roguePoints)
+        else:
+            FreeCAD.Console.PrintError("Nothing to pattern, skipping Polar Pattern function\n")
+            return shape
+
+        constructionCircles = self.fetchConstruction(fp, "PolarCenter", SketchPlus.PolarCenterDefault, filter=["Circle","Point","ArcOfCircle"])
+        center = FreeCAD.Vector() #for default Origin
+        if fp.PolarCenter != "Origin":
+            geo = constructionCircles[fp.PolarCenter]
+            center = geo.Location if hasattr(geo, "Location") else FreeCAD.Vector(geo.X, geo.Y, geo.Z)
+
+        start = fp.PolarStart.Value
+        end = fp.PolarEnd.Value
+        rng = end - start
+        step = rng / count
+        if fp.PolarAngles:
+            angles = fp.PolarAngles
+        else:
+            angles = [step * occurrence for occurrence in range(count)]
+       # print(f"angles = {angles} from start,end,rng,step,count: {start},{end},{rng},{step},{fp.PolarCount}")
+        copies = []
+        for angle in angles:
+            copy = patternComp.copy()
+            copy.rotate(center, FreeCAD.Vector(0,0,1), angle)
+            copies.append(copy)
+
+        copiesAndStationaryComp = Part.makeCompound(copies + stationaryWires)
+        roguePoints2 = self.getRoguePoints(fp, copiesAndStationaryComp)
+
+        wires = []
+        edges = copiesAndStationaryComp.Edges
+        if edges:
+            se = Part.sortEdges(edges)
+            wires = [Part.Wire(s) for s in se]
+        finalShape = Part.makeCompound(wires + roguePoints2)
+        return finalShape
+
+    def wireInWireList(self, wire, wireList):
+        """check if wire is in wireList"""
+        for w in wireList:
+            if w.isEqual(wire):
+                return True
+        return False
+
+
+    def handlePathArray(self, fp, shape):
+        """makes a path array"""
+        SketchPlus.wireShapeDict["PathArrayWires"] = shape
+        SketchPlus.wireShapeDict["PathArrayPath"] = shape
+        if shape.isNull():
+            return shape
+
+        if fp.PathArrayCount == 0:
+            return shape
+
+        if len(shape.Wires) == 0:
+            FreeCAD.Console.PrintError(f"{fp.Label}: no wires to use in path array, skipping function.  Note that points are not patterned in this function.\n")
+        if len(fp.PathArrayWires) > len(shape.Wires):
+            FreeCAD.Console.PrintError("PathArrayWires property must have less than\
+or equal to the available number of wires.\n")
+            return shape
+
+        patternWires, stationaryWires = self.filterWires(shape, fp.PathArrayWires)
+        paths, unused = self.filterWires(shape, fp.PathArrayPath)
+        if not fp.PathArrayKeepPath:
+            stationaryWires = [w for w in stationaryWires if not self.wireInWireList(w, paths)]
+
+        if not patternWires:
+            FreeCAD.Console.PrintError("No pattern wires to use in path array, skipping\n")
+            return shape
+
+        if not paths:
+            FreeCAD.Console.PrintError("No path selected to use for path array, skipping\n")
+            return shape
+
+        discretePoints = []
+        for path in paths:
+            discretePoints.append(path.discretize(fp.PathArrayCount + 1))
+
+        #not arraying roguePoints for this function
+        copies = []
+        #each spline is a list of dicretized points here
+        for idx, pathPts in enumerate(discretePoints):
+            path = paths[idx]  # spline is a Part.Wire object
+            edges = path.Edges  # Get the edges of the wire
+
+
+            for i, vec in enumerate(pathPts):
+                for wire in patternWires:
+                    copy = wire.copy()
+                    vector = vec - copy.CenterOfGravity
+                    # since we discretized the wire and not the edges, we have to figure
+                    # out which edge contains this point
+                    containing_edge = None
+                    for edge in edges:
+                        (dist, vectors, infos) = edge.distToShape(Part.Vertex(vec))
+                        if math.fabs(dist) < Part.Precision.confusion():
+                            containing_edge = edge
+                            if infos[0][0] == "Edge":
+                                u = infos[0][2]
+                            else: #infos[0][0] == "Vertex":
+                                u = infos[0][1] # 1.0 or 0.0 if this is a vertex on the edge
+                            break
+
+                    if containing_edge is None:
+                        print(f"skipping vector {vec}, no containing edge found")
+                        continue  # should not happen
+
+                    if fp.PathArraySettings == "Align To Origin":
+                        angle = math.degrees(math.atan2(vec.y, vec.x))
+                        copy.rotate(copy.CenterOfGravity, FreeCAD.Vector(0, 0, 1), angle)
+
+                    elif fp.PathArraySettings == "Normal To Path":
+                        tangent = containing_edge.tangentAt(u)
+                        normal = FreeCAD.Vector(-tangent.y, tangent.x, 0)  #rotate 90 degrees
+                        angle = math.degrees(math.atan2(normal.y, normal.x))
+                        copy.rotate(copy.CenterOfGravity, FreeCAD.Vector(0, 0, 1), angle)
+
+                    elif fp.PathArraySettings == "Tangent To Path":
+                        tangent = containing_edge.tangentAt(u)
+                        angle = math.degrees(math.atan2(tangent.y, tangent.x))
+                        copy.rotate(copy.CenterOfGravity, FreeCAD.Vector(0, 0, 1), angle)
+                    elif fp.PathArraySettings == "Fixed":
+                        pass # no rotation
+
+                    copy.Placement.translate(vector)
+                    copies.append(copy)
+        roguePoints = self.getRoguePoints(fp,shape)
+        copiesAndStationaryComp = Part.makeCompound(copies + stationaryWires + roguePoints)
+        roguePoints2 = self.getRoguePoints(fp, copiesAndStationaryComp)
+
+        wires = []
+        edges = copiesAndStationaryComp.Edges
+        if edges:
+            se = Part.sortEdges(edges)
+            wires = [Part.Wire(s) for s in se]
+        finalShape = Part.makeCompound(wires + roguePoints)
+        return finalShape
+
+    def handlePointArray(self, fp, shape):
+        """makes a point array of desired wires at construction point locations"""
+        SketchPlus.wireShapeDict["PointArrayWires"] = shape
+        if shape.isNull():
+            return shape
+        if fp.PointArraySettings == "No Point Array":
+            return shape
+        if len(shape.Wires) == 0:
+            FreeCAD.Console.PrintError(f"{fp.Label}: no wires to use in point array, skipping function.  Note that points are not patterned in this function.\n")
+        if len(fp.PointArrayWires) > len(shape.Wires):
+            FreeCAD.Console.PrintError("PointArrayWires property must less than\
+or equal to the available number of wires.\n")
+            return shape
+
+        patternWires, stationaryWires = self.filterWires(shape, fp.PointArrayWires)
+        if not patternWires and not fp.PointArrayWires:
+            patternWires = shape.Wires
+            stationaryWires = []
+
+        constructionPoints = []
+        for geoid, geo in enumerate(fp.Geometry):
+            if fp.getConstruction(geoid):
+                if "Point" in geo.TypeId:
+                    constructionPoints.append(geo.toShape())
+        if not constructionPoints:
+            FreeCAD.Console.PrintError(f"No construction mode points found in {fp.Label}.  The\
+PointArray function requires there be at least one construction mode point in the sketch.  \
+Skipping function\n")
+            return shape
+
+
+        #not arraying roguePoints for this function
+        copies = []
+        patternWiresComp = Part.makeCompound(patternWires)
+        for vert in constructionPoints:
+            for wire in patternWiresComp.Wires:
+                copy = wire.copy()
+                vector = vert.Point - copy.CenterOfGravity #Assume "Fixed" is alignment type"
+                if fp.PointArraySettings == "Align To Origin":
+                    angle = math.degrees(math.atan2(vert.Point.y, vert.Point.x))
+                    copy.rotate(copy.CenterOfGravity, FreeCAD.Vector(0,0,1), angle)
+                copy.Placement.translate(vector)
+                copies.append(copy)
+        roguePoints = self.getRoguePoints(fp,shape)
+        copiesAndStationaryComp = Part.makeCompound(copies + stationaryWires + roguePoints)
+        roguePoints2 = self.getRoguePoints(fp, copiesAndStationaryComp)
+
+        wires = []
+        edges = copiesAndStationaryComp.Edges
+        if edges:
+            se = Part.sortEdges(edges)
+            wires = [Part.Wire(s) for s in se]
+        finalShape = Part.makeCompound(wires + roguePoints)
+        return finalShape
+
+    def handleRectangularArray(self, fp, shape):
+        """makes a rectangular array of desired wires"""
+        SketchPlus.wireShapeDict["RectangularWires"] = shape
+        if shape.isNull():
+            return shape
+        constructionCircles = self.fetchConstruction(fp, "RectangularRotationCenter", SketchPlus.RectangularRotationCenterDefault, filter=["Circle","Point","ArcOfCircle"])
+        if not fp.RectangularWires:
+            return shape
+        if len(fp.RectangularWires) > len(shape.Wires):
+            FreeCAD.Console.PrintError("RectangularWires property must be less than\
+or equal to the available number of wires.\n")
+            return shape
+        if max(fp.RectangularWires) > len(shape.Wires):
+            FreeCAD.Console.PrintError(f"RectangularWires property contains an invalid\
+wire: {max(fp.RectangularyWires)} > the number of available wires: {len(shape.Wires)}.\
+Skipping rectangular array function.\n")
+            return shape
+        if min(fp.RectangularWires) < 1:
+            FreeCAD.Console.PrintError("RectangularWires property can only contain\
+positive integers.  Wire list is 1-based, not 0-based, so 1 = Wire1, etc.\
+Skipping rectangular array function\n")
+            return shape
+
+        patternWires, stationaryWires = self.filterWires(shape, fp.RectangularWires)
+        if not patternWires and not fp.RectangularWires:
+            patternWires = shape.Wires
+            stationaryWires = []
+
+        center = FreeCAD.Vector() #assume "Origin" is center for now
+        angle = fp.RectangularRotation.Value
+        if angle != 0:
+            if fp.RectangularRotationCenter == "Center Of Gravity":
+                center = None #have to wait until the array is built to calculate this
+            elif fp.RectangularRotationCenter not in SketchPlus.RectangularRotationCenterDefault: #construction geo
+                geoCenter = constructionCircles[fp.RectangularRotationCenter].toShape()
+                center = FreeCAD.Vector(geoCenter.X, geoCenter.Y, 0) if hasattr(geoCenter,"X") else geoCenter.CenterOfGravity
+
+        #not arraying roguePoints for this function
+        copies = []
+        xInt = fp.RectangularIntervalX.Value
+        yInt = fp.RectangularIntervalY.Value
+        for xx in range(fp.RectangularCountX):
+            for yy in range(fp.RectangularCountY):
+                for wire in patternWires:
+                    copy = wire.copy()
+                    target = FreeCAD.Vector(xx*xInt, yy*yInt, 0)
+                    copy.Placement.translate(target)
+                    copies.append(copy)
+
+        if copies and angle:
+            copyComp = Part.makeCompound(copies)
+            center = copyComp.CenterOfGravity if not center else center
+            for copy in copies:
+                copy.rotate(center, FreeCAD.Vector(0,0,1), angle)
+
+        roguePoints = self.getRoguePoints(fp,shape)
+        copiesAndStationaryComp = Part.makeCompound(copies + stationaryWires + roguePoints)
+        roguePoints2 = self.getRoguePoints(fp, copiesAndStationaryComp)
+
+        wires = []
+        edges = copiesAndStationaryComp.Edges
+        if edges:
+            se = Part.sortEdges(edges)
+            wires = [Part.Wire(s) for s in se]
+        finalShape = Part.makeCompound(wires + roguePoints)
+        return finalShape
+
+    def handleWireStatuses(self, fp, shape):
+        """fill in the WireStatuses string property"""
+        opens = [idx+1 for idx,w in enumerate(shape.Wires) if not w.isClosed()]
+        closed = [idx+1 for idx,w in enumerate(shape.Wires) if w.isClosed()]
+        if not opens + closed:
+            status = "No wires"
+        else:
+            status = f"Open Wires: {opens}\n"
+            status += f"Closed Wires: {closed}\n"
+
+        fp.WireStatuses = status
+        return shape
+
+    def execute(self, fp):
+
+        fp.recompute() # necessary, calls the c++ base class recompute handler
+        if not hasattr(self,"wireShapeDict"):
+            setattr(self,"wireShapeDict",{})
+        fp_plm = fp.Placement
+        fp.Placement = FreeCAD.Placement()
+        shape = fp.Shape.copy()
+
+        function_dict = {"Wire Order":self.handleWireOrder,
+                        "External":self.handleExternal,
+                        "Construction":self.handleShowConstruction,
+                        "Mirroring":self.handleMirroring,
+                        "Path Array":self.handlePathArray,
+                        "Point Array":self.handlePointArray,
+                        "Polar Array": self.handlePolar,
+                        "Rectangular Array": self.handleRectangularArray,
+                        "Scaling": self.handleScaling,
+                        "Uniform Scaling": self.handleUniformScaling,
+                        "Offsetting": self.handleOffset,
+                        "Face Making": self.handleFaceMaker,
+                        "Wire Statuses":self.handleWireStatuses, }
+
+
+        # do not validate that the func is in the dictionary, but rather
+        # just let it throw an exception if it is not
+        # only thing checked for is the hyphen, which is a normal condition
+        # where the user wishes to suppress the function
+
+        for func in fp.ExecutionOrder:
+            if not func.startswith("-"):
+                shape = function_dict[func](fp, shape)
+
+        fp.Shape = shape
+        fp.Placement = fp_plm
+
+    def __getstate__(self):
+        '''avoids error messages about objects not being JSON serializable'''
+        return None
+
+    def __setstate__(self,state):
+        '''avoid JSON serializable error messages'''
+        return None
+
+class WireFilterEditorTask:
+    def __init__(self, fp, shape, prop, selectionMode = False):
+        def triggerChecked(i): return lambda: self.checked(i)
+        def triggerUp(i): return lambda: self.up(i)
+        def triggerDown(i): return lambda: self.down(i)
+        self.fp = fp
+        self.shape = shape
+        self.prop = prop
+        self.selectionMode = selectionMode
+        self.visibility = self.fp.ViewObject.Visibility
+        self.camera = FreeCADGui.activeView().getCamera()
+        FreeCADGui.activeDocument().activeView().viewTop()
+        self.ghost = self.fp.Document.addObject("Part::Feature",f"{self.prop}_Ghost")
+        self.ghost.ViewObject.PointSize = 10
+        self.ghost.addProperty("App::PropertyString","Information","Base","information").Information =\
+f"""
+This is a temporary object used to aid in identifying wires during the editing
+of one of the various wire filter integer list properties of the {self.fp.Label}
+object.  It can be deleted if the dialog is closed, but it should be automatically
+deleted upon closing the dialog.
+"""
+        self.fp.ViewObject.Visibility = False
+        self.form = QtGui.QWidget()
+        if not self.selectionMode:
+            self.form.setWindowTitle(f"Edit {prop}")
+            self.order = self.fixOrder(getattr(fp,prop))
+        else:
+            self.form.setWindowTitle(f"Select wires")
+            self.order = [idx+1 for idx in range(len(self.shape.Wires))]
+
+        defaultsBtn = QtWidgets.QPushButton("Defaults")
+        defaultsBtn.clicked.connect(self.setDefaults)
+        layout = QtGui.QGridLayout()
+        self.form.setLayout(layout)
+        layout.addWidget(defaultsBtn,0,0,1,1)
+        noneBtn = QtWidgets.QPushButton("None")
+        noneBtn.clicked.connect(self.noneBtnClicked)
+        layout.addWidget(noneBtn,0,1,1,1)
+        allBtn = QtWidgets.QPushButton("All")
+        allBtn.clicked.connect(self.allBtnClicked)
+        layout.addWidget(allBtn,0,2,1,1)
+        layout.addWidget(QtWidgets.QSplitter(),1,0,1,3)
+        self.cbs = []
+        for idx, wire in enumerate(shape.Wires):
+            wireNumber = self.order[idx] if self.order[idx] > 0 else -1 * self.order[idx]
+            cb = QtGui.QCheckBox(f"Wire{wireNumber}")
+            cb.setObjectName(f"{wireNumber}")
+            cb.setChecked(wireNumber in self.order)
+            self.cbs.append(cb)
+            cb.clicked.connect(triggerChecked(idx))
+            layout.addWidget(cb, idx+2, 1,alignment=QtCore.Qt.AlignCenter)
+            up = QtGui.QPushButton()
+            up.setIcon(QtGui.QIcon(FreeCADGui.getIcon("button_up")))
+            up.clicked.connect(triggerUp(idx))
+            if not self.selectionMode:
+                layout.addWidget(up, idx+2, 0)
+            down = QtGui.QPushButton()
+            down.setIcon(QtGui.QIcon(FreeCADGui.getIcon("button_down")))
+            down.clicked.connect(triggerDown(idx))
+            if not self.selectionMode:
+                layout.addWidget(down, idx+2, 2)
+        self.relabel()
+
+    def fixOrder(self, order):
+        """The wire order might be incomplete, so we fill in any missing wires
+        while retaining the current order"""
+
+        available = [idx + 1 for idx in range(len(self.shape.Wires))]
+        available += [-av for av in available]
+        default = [i+1 for i in range(len(self.shape.Wires))]
+        if 0 in order: #0 signals to filter out all wires
+            return [-d for d in default]
+        order = [o for o in order if not o == 0 and o in available]
+        if len(list(set(order))) == len(self.shape.Wires):
+            return order
+
+        order = list(set(order)) #remove any duplicates
+        default = [d for d in default if d not in order and -d not in order]
+        return order + default
+
+    def setDefaults(self):
+        self.order = [d+1 for d in range(len(self.shape.Wires))]
+        self.relabel()
+        
+    def allBtnClicked(self):
+        self.order = [d+1 for d in range(len(self.shape.Wires))]
+        self.relabel()
+        
+    def noneBtnClicked(self):
+        self.order = [-(d+1) for d in range(len(self.shape.Wires))]
+        self.relabel()
+
+    def up(self, idx):
+        cb = self.cbs[idx]
+        wireNumber = int(cb.objectName())
+        wireNumber *= -1 if not wireNumber in self.order else 1
+        where = self.order.index(wireNumber)
+        if where == 0:
+            self.order = self.order[1:] + [self.order[0]]
+        else:
+             self.order[where], self.order[where - 1] = self.order[where - 1], self.order[where]
+        self.relabel()
+
+    def down(self, idx):
+        cb = self.cbs[idx]
+        wireNumber = int(cb.objectName())
+        wireNumber *= -1 if not wireNumber in self.order else 1
+        where = self.order.index(wireNumber)
+        if self.order[-1] == wireNumber:
+            self.order = [self.order[-1]] + self.order[:-1]
+        else:
+             self.order[where], self.order[where + 1] = self.order[where + 1], self.order[where]
+        self.relabel()
+
+    def relabel(self):
+        for idx,o in enumerate(self.order):
+            self.cbs[idx].setText(f"Wire{o if o > 0 else -o}")
+            self.cbs[idx].setObjectName(f"{o if o > 0 else -o}")
+            self.cbs[idx].setChecked(o > 0)
+        used,unused = self.fp.Proxy.filterWires(self.shape, self.order)
+        roguePoints = self.fp.Proxy.getRoguePoints(self.fp, self.shape)
+        if self.ghost:
+            self.ghost.Shape = Part.makeCompound(used + roguePoints) if bool(used + roguePoints) else Part.Shape()
+
+    def checked(self, idx):
+        val = self.order[idx]
+        cb = self.cbs[idx]
+        wireNumber = val * ( -1 if val < 0 else 1)
+        val = wireNumber * (1 if cb.isChecked() else -1)
+        self.order[idx] = val
+        self.relabel()
+
+    def reject(self):
+        try:
+            self.ghost.Document.removeObject(self.ghost.Name)
+        except:
+            pass
+        self.fp.ViewObject.Visibility = self.visibility
+        FreeCADGui.activeView().setCamera(self.camera)
+        FreeCADGui.Control.closeDialog()
+
+    def accept(self):
+        try:
+            self.ghost.Document.removeObject(self.ghost.Name)
+        except:
+            pass
+        self.fp.ViewObject.Visibility = self.visibility
+        FreeCADGui.activeView().setCamera(self.camera)
+        FreeCADGui.ActiveDocument.resetEdit()
+        if not self.selectionMode:
+            self.fp.Document.openTransaction(f"edit {self.prop}")
+            setattr(self.fp, self.prop, self.order)
+            self.fp.Document.recompute()
+            self.fp.Document.commitTransaction()
+        else:
+            used = [o for o in self.order if o > 0]
+            self.fp.ViewObject.Proxy.selectWires(used)
+        FreeCADGui.Control.closeDialog()
+
+
+class ExecutionOrderTask:
+    def __init__(self, fp):
+        def triggerChecked(i): return lambda: self.checked(i)
+        def triggerUp(i): return lambda: self.up(i)
+        def triggerDown(i): return lambda: self.down(i)
+        self.fp = fp
+        self.prop = "ExecutionOrder"
+        self.default = SketchPlus.ExecutionOrderDefault
+        self.form = QtGui.QWidget()
+        self.form.setWindowTitle(f"Edit execution order")
+        #self.order will be a list of strings
+        self.order = getattr(self.fp, self.prop)
+
+        defaultsBtn = QtWidgets.QPushButton("Defaults")
+        defaultsBtn.clicked.connect(self.setDefaults)
+        layout = QtGui.QGridLayout()
+        self.form.setLayout(layout)
+        layout.addWidget(defaultsBtn,0,0,1,1)
+        self.cbs = []
+        for idx, funcName in enumerate(self.order):
+            cb = QtGui.QCheckBox(funcName)
+            cb.setChecked(not funcName.startswith("-"))
+            self.cbs.append(cb)
+            cb.clicked.connect(triggerChecked(idx))
+            layout.addWidget(cb, idx+1, 1,alignment=QtCore.Qt.AlignCenter)
+            up = QtGui.QPushButton()
+            up.setIcon(QtGui.QIcon(FreeCADGui.getIcon("button_up")))
+            up.clicked.connect(triggerUp(idx))
+            layout.addWidget(up, idx+1, 0)
+            down = QtGui.QPushButton()
+            down.setIcon(QtGui.QIcon(FreeCADGui.getIcon("button_down")))
+            down.clicked.connect(triggerDown(idx))
+            layout.addWidget(down, idx+1, 2)
+        self.relabel()
+
+    def getStandardButtons(self):
+        return (QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Apply)
+
+    def setDefaults(self):
+        self.order = SketchPlus.ExecutionOrderDefault
+        self.relabel()
+
+    def up(self, idx):
+        cb = self.cbs[idx]
+        funcName = cb.text()
+        where = self.order.index(funcName)
+        if where == 0:
+            self.order = self.order[1:] + [self.order[0]]
+        else:
+             self.order[where], self.order[where - 1] = self.order[where - 1], self.order[where]
+        self.relabel()
+
+    def down(self, idx):
+        cb = self.cbs[idx]
+        funcName = cb.text()
+        where = self.order.index(funcName)
+        if self.order[-1] == funcName:
+            self.order = [self.order[-1]] + self.order[:-1]
+        else:
+             self.order[where], self.order[where + 1] = self.order[where + 1], self.order[where]
+        self.relabel()
+
+    def relabel(self):
+        for idx,o in enumerate(self.order):
+            self.cbs[idx].setText(o)
+            self.cbs[idx].setChecked(not o.startswith('-'))
+
+    def checked(self, idx):
+        funcName = self.order[idx]
+        cb = self.cbs[idx]
+        funcName = "-" + funcName if not cb.isChecked() else funcName[1:]
+        self.order[idx] = funcName
+        self.relabel()
+
+    def clicked(self, button):
+        if button == QtWidgets.QDialogButtonBox.Apply:
+           self.fp.Document.openTransaction("Apply execution order edit")
+           self.fp.ExecutionOrder = self.order
+           self.fp.Document.recompute()
+           self.fp.Document.commitTransaction()
+
+    def reject(self):
+        FreeCADGui.Control.closeDialog()
+
+    def accept(self):
+        FreeCADGui.ActiveDocument.resetEdit()
+        self.fp.Document.openTransaction("Edit execution order")
+        setattr(self.fp, self.prop, self.order)
+        self.fp.Document.recompute()
+        self.fp.Document.commitTransaction()
+        FreeCADGui.Control.closeDialog()
+        
+class AddExternalTask:
+    def __init__(self, fp):
+        self.fp = fp
+        self.form = QtWidgets.QWidget()
+        self.form.setWindowTitle("Add external geometry")
+        layout = QtWidgets.QVBoxLayout()
+        msg = \
+"""
+Selection options:
+
+Whole object = add all vertices
+Face = add all edges of that face
+Edges or Vertices = add those subobjects.
+
+OK = add selected
+"""
+        label = QtWidgets.QLabel(msg)
+        layout.addWidget(label)
+        self.form.setLayout(layout)
+        FreeCADGui.Selection.clearSelection()
+        
+    def addExternalLink(self, objName, subName):
+        """add the external link"""
+        try:
+            self.fp.addExternal(objName, subName)
+            FreeCAD.Console.PrintMessage(f"{self.fp.Label}: added {objName}:{subName} as external geometry.\n")
+        except:
+            FreeCAD.Console.PrintMessage(f"{self.fp.Label}: error adding {objName}, {subName}, skipping\n")
+        
+    def addExternalLinks(self):
+        """add the external links selected by the user"""
+        def isSameEdge(edge1, edge2):
+            if edge1.Length != edge2.Length:
+                return False
+            if len(edge1.Vertexes) != len(edge2.Vertexes):
+                return False
+            for idx,vert in enumerate(edge1.Vertexes):
+                if not edge1.Vertexes[idx].Point.isEqual(edge2.Vertexes[idx].Point, Part.Precision.confusion()):
+                    return False
+            return True
+                
+        sel = FreeCADGui.Selection.getCompleteSelection()
+        if not sel:
+            return
+        pbOuter = gu.MRProgress(len(sel)) if len(sel) > 100 else None
+        for s in sel:
+            if pbOuter and pbOuter.isCanceled():
+                break
+            obj = s.Object
+            while obj.isDerivedFrom("App::Link"):
+                obj = obj.LinkedObject
+            shape = Part.getShape(obj)
+            if obj.Document != s.Object.Document:
+                FreeCAD.Console.PrintError("Linked object must reside in same document.\n")                
+            if not shape or shape.isNull():
+                continue
+            subNames = s.SubElementNames
+            if not subNames[0]: #get all the vertices
+                pb = gu.MRProgress(len(shape.Vertexes),"Stop") if len(shape.Vertexes) > 100 else None
+                for idx,vert in enumerate(shape.Vertexes):
+                    if pb and pb.isCanceled():
+                        break
+                    self.addExternalLink(obj.Name, f"Vertex{idx+1}")
+
+            elif "Face" in subNames[0]:
+                face = s.SubObjects[0]
+                print(f"face = {face}, with {len(face.Edges)} edges")
+                if len(face.Edges) > 100:
+                    pb = gu.MRProgress(len(face.Edges),"Stop")
+                for idx, edge in enumerate(face.Edges):
+                    if pb and pb.isCanceled():
+                        break
+                    for idx2, edge2 in enumerate(shape.Edges):
+                        if isSameEdge(edge, edge2):
+                            self.addExternalLink(obj.Name, f"Edge{idx2+1}")
+                            break
+            else:
+                self.addExternalLink(obj.Name, subNames[0])
+        
+        
+    def accept(self):
+        self.fp.Document.openTransaction("Add external links")
+        self.addExternalLinks()
+        self.fp.Document.commitTransaction()
+        FreeCADGui.Control.closeDialog()
+
+    def reject(self):
+        FreeCADGui.Control.closeDialog()
+        
+class CustomListWidget(QtWidgets.QListWidget):
+    def __init__(self, parent=None, float_list= []):
+        super(CustomListWidget, self).__init__(parent)
+        self.add_default_items(float_list)
+        self.itemClicked.connect(self.handle_item_click)
+        self.itemDoubleClicked.connect(self.edit_item_value)
+        
+    def edit_item_value(self, item):
+        if item.text() != "+":
+            current_value = float(item.text())
+            new_value, ok = QtGui.QInputDialog.getDouble(self, "Edit Value", 
+                                                   "Enter new value:", 
+                                                   current_value, 
+                                                   -10000, 10000, 2)
+            if ok:
+                item.setText(str(new_value))
+
+    def add_default_items(self, floats):
+        for f in floats:
+            item = QtWidgets.QListWidgetItem(f"{f}")
+            self.addItem(item)
+       
+        plus_item = QtWidgets.QListWidgetItem("+")
+        plus_item.setFlags(plus_item.flags() & ~QtCore.Qt.ItemIsSelectable)
+        self.addItem(plus_item)
+        
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Delete:
+            for item in self.selectedItems():
+                self.takeItem(self.row(item))
+        else:
+            super(CustomListWidget, self).keyPressEvent(event)
+            
+    def handle_item_click(self, item):
+        if item.text() == "+":
+            new_item = QtWidgets.QListWidgetItem("0.0")
+            self.insertItem(self.count() - 1, new_item)
+            self.setCurrentItem(new_item)
+
+    
+    def value(self):
+        float_list = []
+        for index in range(self.count()):
+            item = self.item(index)
+            try:
+                float_value = float(item.text())
+                float_list.append(float_value)
+            except ValueError:
+                print(f"Error: Item '{item.text()}' is not a valid float.")
+        return float_list
+
+class FunctionTask:
+    def __init__(self, fp, funcType):
+        self.fp = fp
+        self.form = QtWidgets.QWidget()
+        self.funcType = funcType
+        self.form.setWindowTitle(f"Setup {funcType} function")
+        self.props = self.getProps(self.funcType)
+        layout = QtWidgets.QVBoxLayout()
+        self.form.setLayout(layout)
+        if self.funcType == "Point":
+            constructionPoints = []
+            for idx,geo in enumerate(self.fp.Geometry):
+                if self.fp.getConstruction(idx):
+                    if "Point" in geo.TypeId:
+                        constructionPoints.append(geo)
+            
+            layout.addWidget(QtWidgets.QLabel(f"Construction points count: {len(constructionPoints)}"))
+
+        for prop in self.props:
+            hbox = QtWidgets.QHBoxLayout()
+            hbox.addWidget(QtWidgets.QLabel(prop[0]))
+            hbox.addWidget(prop[2])
+            layout.addLayout(hbox)
+            
+    def accept(self):
+        for prop in self.props:
+            val = None
+            task = prop[4]
+            propName = prop[0]
+            if hasattr(task, "order"):
+                val = task.order
+                QtCore.QTimer().singleShot(10, task.reject)
+            else:
+                val = prop[3]()
+            setattr(self.fp, propName, val)
+        self.fp.Document.recompute()
+        QtCore.QTimer().singleShot(10, FreeCADGui.Control.closeDialog)
+        
+    def reject(self):
+        for prop in self.props:
+            task = prop[4]
+            if hasattr(task, "reject"):
+                task.reject()
+        QtCore.QTimer().singleShot(10, FreeCADGui.Control.closeDialog)
+        
+    def getPathArrayWires(self):
+        """we don't handle patharraywires here because the path array requires
+        2 different wire arrays, one for the path, and one for the wires to pattern"""
+        return getattr(self.fp, "PathArrayWires")
+        
+    def editPathArrayWires(self):
+        msg_box = QtWidgets.QMessageBox()
+        msg_box.setWindowTitle("Exiting dialog")
+        msg_box.setIcon(QtWidgets.QMessageBox.Question)
+        msg_box.setText("Apply any changes to the SketchPlus object properties before closing?")
+        msg_box.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        msg_box.setDefaultButton(QtWidgets.QMessageBox.No)
+        yes_button = msg_box.button(QtWidgets.QMessageBox.Yes)
+        no_button = msg_box.button(QtWidgets.QMessageBox.No)
+        yes_button.setText("Apply")
+        no_button.setText("Discard")
+        result = msg_box.exec_()
+        if result == QtWidgets.QMessageBox.Yes:
+            QtCore.QTimer().singleShot(1, self.accept)
+        else:
+            QtCore.QTimer().singleShot(1, self.reject)
+        QtCore.QTimer().singleShot(150, self.doEdit)
+        
+    def doEdit(self):
+        self.fp.ViewObject.Proxy.editWireFilter("PathArrayWires")
+        
+    def getProps(self, funcType):
+        """returns a list of tuples:
+        (propName, propType, widget, getter, task)"""
+        def makeWidget(propName, propType):
+            widget = None
+            task = None
+            if propType == "App::PropertyDistance":
+                widget = QtWidgets.QDoubleSpinBox()
+                widget.setRange(-float("inf"),float("inf"))
+                widget.setValue(getattr(self.fp, propName))
+                getter = widget.value
+            elif propType == "App::PropertyBool":
+                widget = QtWidgets.QCheckBox()
+                widget.setChecked(getattr(self.fp, propName))
+                getter = widget.isChecked
+            elif propType == "App::PropertyIntegerConstraint":
+                widget = QtWidgets.QSpinBox()
+                if "Rectangular" in propName:
+                    widget.setRange(1, 100000)
+                elif "Polar" in propName or "Path" in propName:
+                    widget.setRange(0, 100000)
+                widget.setValue(getattr(self.fp, propName))
+                getter = widget.value
+            elif propType == "App::PropertyFloatList":
+                widget = CustomListWidget(parent=self.form, float_list = getattr(self.fp, propName))
+                getter = widget.value
+            elif propType == "App::PropertyFloat":
+                widget = QtWidgets.QDoubleSpinBox()
+                widget.setRange(-float("inf"),float("inf"))
+                widget.setValue(getattr(self.fp, propName))
+                getter = widget.value
+            elif propType == "App::PropertyAngle":
+                widget = QtWidgets.QDoubleSpinBox()
+                widget.setRange(-float("inf"),float("inf"))
+                widget.setValue(getattr(self.fp, propName))
+                getter = widget.value
+            elif propType == "App::PropertyEnumeration":
+                widget = QtWidgets.QComboBox()
+                widget.addItems(self.fp.getEnumerationsOfProperty(propName))
+                widget.setEditable(False)
+                widget.setCurrentText(getattr(self.fp, propName))
+                getter = widget.currentText
+            elif propType == "App::PropertyIntegerList":
+                if propName != "PathArrayWires":
+                    task = WireFilterEditorTask(self.fp, SketchPlus.wireShapeDict[propName], propName)
+                    widget = task.form
+                    getter = task.order
+                else:
+                    widget = QtWidgets.QPushButton("Edit PathArrayWires")
+                    widget.setToolTip("Closes this dialog and opens the PathArrayWires filter editor")
+                    widget.clicked.connect(self.editPathArrayWires)
+                    getter = self.getPathArrayWires
+            else:
+                FreeCAD.Console.PrintError(f"unsupported property type: {propType}, propName = {propName}")
+            widget.setObjectName(f"{propName}")
+            return (widget, getter, task)
+            
+        propNames = [prop for prop in self.fp.PropertiesList if prop.startswith(funcType)]
+        if "Scale" in funcType and not "Uniform" in funcType:
+            propNames = [p for p in propNames if not "Uniform" in p]
+        elif "ScaleUniform" in funcType:
+            propNames = [p for p in propNames if "Uniform" in p]
+        propTypes  = [self.fp.getTypeIdOfProperty(p) for p in propNames]
+        propTuples = []
+        for idx,propName in enumerate(propNames):
+            widget,getter,task = makeWidget(propNames[idx], propTypes[idx])
+            propTuples.append((propNames[idx], propTypes[idx], widget, getter, task))
+        return propTuples
+        
+class SketchPlusVP:
+    def __init__(self, vobj):
+        vobj.Proxy = self
+
+    def attach(self, vobj):
+        self.Object = vobj.Object
+
+    def setupContextMenu(self, vobj, menu):
+        def makeSelTrigger(i): return lambda : self.selectWire(self.Object, i)
+        def makeWFTrigger(key): return lambda : self.editWireFilter(key)
+        def makeFuncTrigger(func): return lambda: self.setupFunction(func)
+        fp = self.Object
+        
+        funcMenu = menu.addMenu("Setup array or function")
+        funcs = sorted(["Show","Path", "Point", "Polar", "Rectangular", "Offset", "Scale",
+                "ScaleUniform","Mirror","FaceMaker"])
+        for func in funcs:
+            funcAction = funcMenu.addAction(func)
+            funcAction.triggered.connect(makeFuncTrigger(func))
+        
+        if fp.Shape.Wires:
+            selWireAction = menu.addAction("Select Wires")
+            selWireAction.triggered.connect(self.setupWireSelection)
+
+        wireFilterMenu = None
+        if hasattr(fp.Proxy,"wireShapeDict"):
+            for k,v in sorted(SketchPlus.wireShapeDict.items()):
+                if v and not v.isNull():
+                    if not wireFilterMenu:
+                        wireFilterMenu = menu.addMenu("Edit wire filter properties")
+                    wfAction = wireFilterMenu.addAction(k)
+                    wfAction.triggered.connect(makeWFTrigger(k))
+
+        execAction = menu.addAction("Edit execution order")
+        execAction.triggered.connect(self.editExecutionOrder)
+        
+        addExternalAction = menu.addAction("Add external geometry")
+        addExternalAction.triggered.connect(self.addExternal)
+        
+        hideDependentAction = menu.addAction("Hide dependencies")
+        hideDependentAction.triggered.connect(self.hideDependencies)
+        
+
+        
+        
+    def setupFunction(self, funcType):
+
+        fp = self.Object
+        if not FreeCADGui.Control.activeDialog():
+            panel = FunctionTask(fp, funcType)
+            FreeCADGui.Control.showDialog(panel)
+        else:
+            FreeCAD.Console.PrintError("Another task panel is already open\n")
+        
+    def hideDependencies(self):
+        fp = self.Object
+        for obj in fp.OutListRecursive:
+            if hasattr(obj, "ViewObject") and obj.ViewObject.Visibility == True:
+                obj.ViewObject.Visibility = False
+        
+    def addExternal(self):
+        fp = self.Object
+        if not FreeCADGui.Control.activeDialog():
+            panel = AddExternalTask(fp)
+            FreeCADGui.Control.showDialog(panel)
+        else:
+            FreeCAD.Console.PrintError("Another task panel is already open\n")
+        
+    def editExecutionOrder(self):
+        """Edit the execution order string"""
+        fp = self.Object
+        if not FreeCADGui.Control.activeDialog():
+            panel = ExecutionOrderTask(fp)
+            FreeCADGui.Control.showDialog(panel)
+        else:
+            FreeCAD.Console.PrintError("Another task panel is already open\n")
+
+    def setupWireSelection(self):
+        fp = self.Object
+        shape = fp.Shape
+        if not FreeCADGui.Control.activeDialog():
+            panel = WireFilterEditorTask(fp, shape, "", selectionMode = True)
+            FreeCADGui.Control.showDialog(panel)
+        else:
+            FreeCAD.Console.PrintError("Another task panel is already open\n")
+
+    def editWireFilter(self, key):
+        fp = self.Object
+        shape = SketchPlus.wireShapeDict[key]
+        if not FreeCADGui.Control.activeDialog():
+            panel = WireFilterEditorTask(fp, shape, key)
+            FreeCADGui.Control.showDialog(panel)
+        else:
+            FreeCAD.Console.PrintError("Another task panel is already open\n")
+
+    def selectWires(self, order):
+        FreeCADGui.Selection.clearSelection()
+        for o in order:
+            self.selectWire(self.Object, o-1)
+
+    def selectWire(self, fp, idx):
+        """select the edges of Wire{idx+1} or Wires[idx]"""
+        wireEdges = fp.Shape.Wires[idx].Edges
+        shapeEdges = fp.Shape.Edges
+        subnames = []
+        for we in wireEdges:
+            for ii,se in enumerate(shapeEdges):
+                if se.isEqual(we):
+                    #print(f"Match found: Edge{ii+1} is in Wire{idx+1}")
+                    subnames.append(f"Edge{ii+1}")
+
+        for subname in subnames:
+            FreeCADGui.Selection.addSelection(fp.Document.Name, fp.Name, subname)
+
+    def __getstate__(self):
+        '''When saving the document this object gets stored using Python's json module.\
+                Since we have some un-serializable parts here -- the Coin stuff -- we must define this method\
+                to return a tuple of all serializable objects or None.'''
+        return None
+    def __setstate__(self,state):
+        '''When restoring the serialized object from document we have the chance to set some internals here.\
+                Since no data were serialized nothing needs to be done here.'''
+        return None
+
+
+
+# Make a sketch plus object
 class MeshRemodelCreateSketchCommandClass(object):
-    """Create sketch from selected objects"""
+    """Create sketch plus object"""
 
     def __init__(self):
         self.subs = []
 
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'CreateSketch.svg') ,
-            'MenuText': "Create s&ketch" ,
+            'MenuText': "Create s&ketch plus" ,
             'ToolTip' : fixTip("\
-Create a new sketch.\n\
-If no object is selected the attachment editor opens\n\
-Ctrl+Click to make sketch out of selected objects\n\
-Alt+Click make merged sketch out of selected objects\n\
-Shift+Click 1st 3 points selected define sketch plane, points added as links to external geometry \n\
+Create a new SketchPlus object\n\
 ")}
- 
+
     def Activated(self):
-        doc = FreeCAD.ActiveDocument
-        if not self.objs:
-            doc.openTransaction("New sketch")
-            sk = doc.addObject("Sketcher::SketchObject", "Sketch")
-            doc.commitTransaction()
-            FreeCADGui.Selection.addSelection(sk)
-            from AttachmentEditor import Commands
-            Commands.editAttachment(sk)
-            doc.recompute()
-            return
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
-        prec = pg.GetInt("SketchRadiusPrecision", 1)
 
-        if modifiers == QtCore.Qt.NoModifier:
-            if not "Sketcher_NewSketch" in Gui.listCommands():
-                Gui.activateWorkbench("SketcherWorkbench")
-                Gui.activateWorkbench("MeshRemodelWorkbench")
-            Gui.runCommand("Sketcher_NewSketch")
-            return
-        if modifiers == QtCore.Qt.AltModifier:
-            #alternative method: on alt+click make separate sketch from each object, then merge them together
-            sketches=[]
-            for obj in self.objs:
-                sketches.append(Draft.makeSketch(obj,autoconstraints=True,radiusPrecision=prec))
-            doc.recompute()
-            FreeCADGui.Selection.clearSelection()
-            for sk in sketches:
-                if sk:
-                    FreeCADGui.Selection.addSelection(sk)
-            if len(sketches) >= 2:
-                if not "Sketcher_NewSketch" in Gui.listCommands():
-                    Gui.activateWorkbench("SketcherWorkbench")
-                    Gui.activateWorkbench("MeshRemodelWorkbench")
-                FreeCADGui.runCommand("Sketcher_MergeSketches")
-
-            sketch = doc.ActiveObject
-            doc.recompute()
-            for sk in sketches:
-                if sk:
-                    doc.removeObject(sk.Name)
-        elif modifiers == QtCore.Qt.ControlModifier:
-            #on ctrl+click make single sketch out of selected objects
-            sketch = Draft.makeSketch(self.objs,autoconstraints=True,radiusPrecision=prec)
-            doc.recompute()
-        elif modifiers == QtCore.Qt.ShiftModifier:
-            #on shift+click map sketch to first 3 picked points as a plane, add all picked points as links to external geometry
-            sel = FreeCADGui.Selection.getSelectionEx()
-            picked = []
-            if global_picked:
-                picked = global_picked
-            else:
-                for s in sel:
-                    picked.extend(list(s.PickedPoints))
-            if len(picked) < 3:
-                FreeCAD.Console.PrintMessage("MeshRemodel: Not enough picked points, need at least 3.\n")
+        sketchPlus = None
+        activeObject = None
+        activeObjectOriginVisibility = False
+        
+        def addToActiveObject(obj):
+            """check for existing active Body or App::Part and add object to it if found"""
+            global activeObject
+            global activeObjectOriginVisibility
+            body = FreeCADGui.ActiveDocument.ActiveView.getActiveObject("pdbody")
+            part = FreeCADGui.ActiveDocument.ActiveView.getActiveObject("part")
+            if body:
+                if not obj in body.Group:
+                    body.Group += [obj]
+                    activeObjectOriginVisibility = body.Origin.ViewObject.Visibility
+                    body.Origin.ViewObject.Visibility = True
+                    activeObject = body
+            elif part:
+                if not obj in Part.Group:
+                    part.Group += [obj]
+                    activeObjectOriginVisibility = part.Origin.ViewObject.Visibility
+                    part.Origin.ViewObject.Visibility = True
+                    activeObject = part
+        
+        def attached():
+            """a callback for the attachment function, when OK or Cancel is clicked, opens sketch in editor"""
+            obj = sketchPlus
+            QtCore.QTimer.singleShot(100, obj.ViewObject.doubleClicked) # give time for other dialog to close
+            if activeObject:
+                activeObject.Origin.Visibility = activeObjectOriginVisibility
+        
+        
+        def attachment(obj):
+            """open attachment dialog if there are selections"""
+            global sketchPlus
+            sketchPlus = obj
+            sel = FreeCADGui.Selection.getCompleteSelection()
+            if not sel and not activeObject:
                 return
-            #make a compound of the picked points
-            part_pts = []
-            for m in picked:
-                p = Part.Point(m)
-                part_pts.append(p.toShape())
-            Part.show(Part.makeCompound(part_pts),"MR_Picked_Points")
-            sk_pts = doc.ActiveObject
-            doc.recompute()
-            FreeCADGui.Selection.clearSelection()
-            FreeCADGui.Selection.addSelection(sk_pts, ["Vertex1", "Vertex2", "Vertex3"])
-            if not "Sketcher_NewSketch" in Gui.listCommands():
-                Gui.activateWorkbench("SketcherWorkbench")
-                Gui.activateWorkbench("MeshRemodelWorkbench")
-            Gui.runCommand("Sketcher_NewSketch")
-            sketch=doc.ActiveObject
-            sketch.Label = 'Picked_Pts_Sketch'
-            sketch.MapReversed = False
-            for ii in range(0,len(sk_pts.Shape.Vertexes)):
-                vname = 'Vertex'+str(ii+1)
-                sketch.addExternal(sk_pts.Name, vname)
-            doc.recompute()
-
-        for o in self.objs:
-            if hasattr(o,"ViewObject"):
-                o.ViewObject.Visibility=False
-
+            if not sel[0].Object.isDerivedFrom("Part::Feature"):
+                FreeCAD.Console.PrintMessage(f"{sketchPlus.Label}: {sel[0].Object.Label} is not a part feature, attachment dialog is being skipped.\n")
+                if activeObject:
+                    activeObject.Origin.ViewObject.Visibility = activeObjectOriginVisibility
+                return
+        
+            import AttachmentEditor.TaskAttachmentEditor as TaskAttachmentEditor
+            taskd = TaskAttachmentEditor.AttachmentEditorTaskPanel(obj,
+                                                                    take_selection= True,
+                                                                    create_transaction= True,
+                                                                    callback_OK = attached,
+                                                                    callback_Cancel = attached,
+                                                                    callback_Apply = None)
+            FreeCADGui.Control.showDialog(taskd)
+            #taskd.getCurrentMode()
+            suggested = None
+            item = None
+            if taskd.last_sugr is not None:
+                if taskd.last_sugr['message'] == 'OK':
+                    suggested = taskd.last_sugr['bestFitMode']
+        
+            if suggested:
+                suggested = taskd.attacher.getModeInfo(suggested)['UserFriendlyName']
+                listOfModes = taskd.form.listOfModes
+                item = listOfModes.findItems(suggested, QtCore.Qt.MatchExactly)
+                if item:
+                    listOfModes.setCurrentItem(item[0])
+        
+        
+        doc = FreeCAD.ActiveDocument if FreeCAD.ActiveDocument else FreeCAD.newDocument()
+        obj = doc.addObject("Sketcher::SketchObjectPython","SketchPlus")
+        addToActiveObject(obj)
+        SketchPlus(obj)
+        SketchPlusVP(obj.ViewObject)
+        sel = FreeCADGui.Selection.getSelection()
+        skipAttach = False
+        if len(sel) == 1:
+            if sel[0].isDerivedFrom("Sketcher::SketchObject"):
+                items = ["Duplicate selected sketch", "Do not duplicate"]
+                item, ok = QtGui.QInputDialog.getItem(FreeCADGui.getMainWindow(), "Duplicate selected sketch", f"Do you wish to duplicate the selected sketch: {sel[0].Label}?", items)
+                if ok and item == items[0]:
+                    skipAttach = True
+                    sk = sel[0]
+                    enumerationList = ["MirrorAxis", "PolarCenter"," ScaleUniformCenter",
+                                        "PointArraySettings","RectangularRotationCenter"]
+                    blacklist = ["Constraints","Geometry","ExpressionEngine","Proxy","Version","Visibility","Label","Label2",
+                                "PolarCenter","ScaleUniformCenter","MirrorAxis","PointArraySettings",
+                                "RectangularRotationCenter", "ExternalGeometry" ]
+                    for prop in sk.PropertiesList:
+                        if prop in blacklist:
+                            continue
+                        if not "ReadOnly" in sk.getEditorMode(prop):
+                            # print(f"copying {prop}")
+                            setattr(obj,prop,getattr(sk,prop))
+                            # print(f"{prop} copied")
+                    doc.recompute()
+                    for geoid,geo in enumerate(sk.Geometry):
+                        obj.addGeometry(geo)
+                        obj.setConstruction(geoid, sk.getConstruction(geoid))
+                    obj.Constraints = sk.Constraints
+                    for prop in enumerationList:
+                        if not hasattr(sk, prop):
+                            continue
+                        if not getattr(sk, prop) in obj.getEnumerationsOfProperty(prop):
+                            setattr(obj, prop, sk.getEnumerationsOfProperty(prop))
+                        setattr(obj,prop, getattr(sk, prop))
+                    doc.recompute()
+                    for extGeo in sk.ExternalGeometry:
+                        link, subs = extGeo
+                        for sub in subs:
+                            obj.addExternal(link.Name, sub)
+                    doc.recompute()
+    
+                if activeObject:
+                    activeObject.Origin.ViewObject.Visibility = activeObjectOriginVisibility
+    
+        if not skipAttach:
+            attachment(obj)
         doc.recompute()
-        return
+
 
     def IsActive(self):
-        if not FreeCAD.ActiveDocument:
-            return False
-        self.objs = Gui.Selection.getSelection()
         return True
 
 # end create sketch class
@@ -5148,7 +6713,10 @@ class MeshRemodelDraftUpgradeCommandClass(object):
 Ctrl+Click to run Draft downgrade\n\
 Tip: this can be used to upgrade connected edges into a wire, a wire \n\
 into a face, or downgrade objects in the other direction.")}
- 
+
+
+
+
     def Activated(self):
         doc = FreeCAD.ActiveDocument
         modifiers = QtGui.QApplication.keyboardModifiers()
@@ -5168,9 +6736,10 @@ into a face, or downgrade objects in the other direction.")}
             for sel in selbackup:
                 FreeCAD.Gui.Selection.addSelection(sel)
         doc.commitTransaction()
-
+        
         #QtGui.QApplication.restoreOverrideCursor()
         return
+
    
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
