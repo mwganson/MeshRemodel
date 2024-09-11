@@ -27,7 +27,7 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2024.09.11"
-__version__ = "1.10.12"
+__version__ = "1.10.13"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -5659,7 +5659,8 @@ or equal to the available number of wires.\n")
 
         discretePoints = []
         for path in paths:
-            discretePoints.append(path.discretize(fp.PathArrayCount + 1))
+            extra = 1 if path.isClosed() else 0
+            discretePoints.append(path.discretize(fp.PathArrayCount + extra))
 
         #not arraying roguePoints for this function
         copies = []
@@ -5669,7 +5670,7 @@ or equal to the available number of wires.\n")
             edges = path.Edges  # Get the edges of the wire
 
 
-            for i, vec in enumerate(pathPts):
+            for i, vec in enumerate(pathPts[extra:]):
                 for wire in patternWires:
                     copy = wire.copy()
                     vector = vec - copy.CenterOfGravity
@@ -6177,8 +6178,8 @@ OK = add selected
     def addExternalLinks(self):
         """add the external links selected by the user"""
         def isSameEdge(edge1, edge2):
-            if edge1.Length != edge2.Length:
-                return False
+            # if edge1.Length != edge2.Length:
+            #     return False
             if len(edge1.Vertexes) != len(edge2.Vertexes):
                 return False
             for idx,vert in enumerate(edge1.Vertexes):
@@ -6627,7 +6628,8 @@ Create a new SketchPlus object\n\
         def attached():
             """a callback for the attachment function, when OK or Cancel is clicked, opens sketch in editor"""
             obj = sketchPlus
-            QtCore.QTimer.singleShot(100, obj.ViewObject.doubleClicked) # give time for other dialog to close
+            if hasattr(obj,"ViewObject"): #might be None
+                QtCore.QTimer.singleShot(100, obj.ViewObject.doubleClicked) # give time for other dialog to close
             if activeObject:
                 activeObject.Origin.Visibility = activeObjectOriginVisibility
         
