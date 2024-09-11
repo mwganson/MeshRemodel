@@ -371,6 +371,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2024.09.11 (1.10.12) -- bug fixes for SketchPlus object, move ghost management to view object proxy
 * 2024.09.10 (1.10.11) -- skip evaluation of "+" as a float in polar array sketch plus dialog
 Use context menu of custom list widget for angle values removing instead of delete key
 * 2024.09.08 (1.10.10) -- add SketchPlus object

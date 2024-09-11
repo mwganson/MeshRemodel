@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.09.10"
-__version__ = "1.10.11"
+__date__    = "2024.09.11"
+__version__ = "1.10.12"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -5913,6 +5913,7 @@ class WireFilterEditorTask:
         self.camera = FreeCADGui.activeView().getCamera()
         FreeCADGui.activeDocument().activeView().viewTop()
         self.ghost = self.fp.Document.addObject("Part::Feature",f"{self.prop}_Ghost")
+        self.fp.ViewObject.Proxy.ghosts.append(self.ghost.Name)
         self.ghost.ViewObject.PointSize = 10
         self.ghost.addProperty("App::PropertyString","Information","Base","information").Information =\
 f"""
@@ -6033,19 +6034,12 @@ deleted upon closing the dialog.
         self.relabel()
 
     def reject(self):
-        try:
-            self.ghost.Document.removeObject(self.ghost.Name)
-        except:
-            pass
         self.fp.ViewObject.Visibility = self.visibility
         FreeCADGui.activeView().setCamera(self.camera)
-        FreeCADGui.Control.closeDialog()
+        self.fp.ViewObject.Proxy.closePanel()
 
     def accept(self):
-        try:
-            self.ghost.Document.removeObject(self.ghost.Name)
-        except:
-            pass
+
         self.fp.ViewObject.Visibility = self.visibility
         FreeCADGui.activeView().setCamera(self.camera)
         FreeCADGui.ActiveDocument.resetEdit()
@@ -6057,8 +6051,7 @@ deleted upon closing the dialog.
         else:
             used = [o for o in self.order if o > 0]
             self.fp.ViewObject.Proxy.selectWires(used)
-        FreeCADGui.Control.closeDialog()
-
+        self.fp.ViewObject.Proxy.closePanel()
 
 class ExecutionOrderTask:
     def __init__(self, fp):
@@ -6142,15 +6135,15 @@ class ExecutionOrderTask:
            self.fp.Document.commitTransaction()
 
     def reject(self):
-        FreeCADGui.Control.closeDialog()
-
+        self.fp.ViewObject.Proxy.closePanel()
+        
     def accept(self):
         FreeCADGui.ActiveDocument.resetEdit()
         self.fp.Document.openTransaction("Edit execution order")
         setattr(self.fp, self.prop, self.order)
         self.fp.Document.recompute()
         self.fp.Document.commitTransaction()
-        FreeCADGui.Control.closeDialog()
+        self.fp.ViewObject.Proxy.closePanel()
         
 class AddExternalTask:
     def __init__(self, fp):
@@ -6218,7 +6211,7 @@ OK = add selected
 
             elif "Face" in subNames[0]:
                 face = s.SubObjects[0]
-                print(f"face = {face}, with {len(face.Edges)} edges")
+                pb = gu.MRProgress(len(face.Edges),"Stop") if len(face.Edges) > 100 else None
                 if len(face.Edges) > 100:
                     pb = gu.MRProgress(len(face.Edges),"Stop")
                 for idx, edge in enumerate(face.Edges):
@@ -6347,14 +6340,14 @@ class FunctionTask:
                 val = prop[3]()
             setattr(self.fp, propName, val)
         self.fp.Document.recompute()
-        QtCore.QTimer().singleShot(10, FreeCADGui.Control.closeDialog)
+        self.fp.ViewObject.Proxy.closePanel()
         
     def reject(self):
         for prop in self.props:
             task = prop[4]
             if hasattr(task, "reject"):
                 task.reject()
-        QtCore.QTimer().singleShot(10, FreeCADGui.Control.closeDialog)
+        self.fp.ViewObject.Proxy.closePanel()
         
     def getPathArrayWires(self):
         """we don't handle patharraywires here because the path array requires
@@ -6374,10 +6367,10 @@ class FunctionTask:
         no_button.setText("Discard")
         result = msg_box.exec_()
         if result == QtWidgets.QMessageBox.Yes:
-            QtCore.QTimer().singleShot(1, self.accept)
+            self.accept()
         else:
-            QtCore.QTimer().singleShot(1, self.reject)
-        QtCore.QTimer().singleShot(150, self.doEdit)
+            self.reject()
+        QtCore.QTimer().singleShot(100, self.doEdit)
         
     def doEdit(self):
         self.fp.ViewObject.Proxy.editWireFilter("PathArrayWires")
@@ -6454,6 +6447,7 @@ class FunctionTask:
 class SketchPlusVP:
     def __init__(self, vobj):
         vobj.Proxy = self
+        self.ghosts = []
 
     def attach(self, vobj):
         self.Object = vobj.Object
@@ -6463,6 +6457,8 @@ class SketchPlusVP:
         def makeWFTrigger(key): return lambda : self.editWireFilter(key)
         def makeFuncTrigger(func): return lambda: self.setupFunction(func)
         fp = self.Object
+        if not hasattr(self,"ghosts"):
+            self.ghosts = []
         
         funcMenu = menu.addMenu("Setup array or function")
         funcs = sorted(["Show","Path", "Point", "Polar", "Rectangular", "Offset", "Scale",
@@ -6493,17 +6489,41 @@ class SketchPlusVP:
         hideDependentAction = menu.addAction("Hide dependencies")
         hideDependentAction.triggered.connect(self.hideDependencies)
         
-
-        
-        
-    def setupFunction(self, funcType):
-
+    def closePanel(self):
         fp = self.Object
-        if not FreeCADGui.Control.activeDialog():
-            panel = FunctionTask(fp, funcType)
+        if hasattr(self, "ghosts"):
+            for ghost in self.ghosts:
+                obj = fp.Document.getObject(ghost)
+                if obj:
+                    fp.Document.removeObject(obj.Name)
+            self.ghosts = []
+        else:
+            print("SketchPlus object has no ghosts")
+        FreeCADGui.Control.closeDialog()
+        
+
+    def openPanel(self, panel):
+        import time
+        start = time.time()
+        timedOut = False
+        while FreeCADGui.Control.activeDialog():
+            FreeCAD.Console.PrintMessage(".")
+            FreeCADGui.updateGui()
+            time.sleep(0.1)
+            now = time.time()
+            if now - start > 15:
+                timedOut = True
+                break
+        if not timedOut and not FreeCADGui.Control.activeDialog():
             FreeCADGui.Control.showDialog(panel)
         else:
             FreeCAD.Console.PrintError("Another task panel is already open\n")
+
+        
+    def setupFunction(self, funcType):
+        fp = self.Object
+        panel = FunctionTask(fp, funcType)
+        self.openPanel(panel)
         
     def hideDependencies(self):
         fp = self.Object
@@ -6513,38 +6533,26 @@ class SketchPlusVP:
         
     def addExternal(self):
         fp = self.Object
-        if not FreeCADGui.Control.activeDialog():
-            panel = AddExternalTask(fp)
-            FreeCADGui.Control.showDialog(panel)
-        else:
-            FreeCAD.Console.PrintError("Another task panel is already open\n")
+        panel = AddExternalTask(fp)
+        self.openPanel(panel)
         
     def editExecutionOrder(self):
         """Edit the execution order string"""
         fp = self.Object
-        if not FreeCADGui.Control.activeDialog():
-            panel = ExecutionOrderTask(fp)
-            FreeCADGui.Control.showDialog(panel)
-        else:
-            FreeCAD.Console.PrintError("Another task panel is already open\n")
+        panel = ExecutionOrderTask(fp)
+        self.openPanel(panel)
 
     def setupWireSelection(self):
         fp = self.Object
         shape = fp.Shape
-        if not FreeCADGui.Control.activeDialog():
-            panel = WireFilterEditorTask(fp, shape, "", selectionMode = True)
-            FreeCADGui.Control.showDialog(panel)
-        else:
-            FreeCAD.Console.PrintError("Another task panel is already open\n")
+        panel = WireFilterEditorTask(fp, shape, "", selectionMode = True)
+        self.openPanel(panel)
 
     def editWireFilter(self, key):
         fp = self.Object
         shape = SketchPlus.wireShapeDict[key]
-        if not FreeCADGui.Control.activeDialog():
-            panel = WireFilterEditorTask(fp, shape, key)
-            FreeCADGui.Control.showDialog(panel)
-        else:
-            FreeCAD.Console.PrintError("Another task panel is already open\n")
+        panel = WireFilterEditorTask(fp, shape, key)
+        self.openPanel(panel)
 
     def selectWires(self, order):
         FreeCADGui.Selection.clearSelection()
