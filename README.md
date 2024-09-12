@@ -313,6 +313,8 @@ In the polar array copies of the wires are made in a circular pattern about eith
 The rectangular array lays out the copies in rows and columns along the X and Y axes, beginning at the locaton of the original wire.  There are properties to determine the count and interval along each axis.  You can also rotate the entire array if desired with the RectangularRotation property.  The center of rotation can be the origin, center of gravity of the array, construction points, circles, or arcs as specified in the RectangularRotationCenter property.
 ### Mirroring
 Mirroring can be done about the X axis, Y axis, both X and Y axes, or about a construction line segment.  If both X and Y are used it becomes basically a 4-element polar array about the origin.  If you connect open ends of edges to the axes the SketchPlus object will attempt to wire them together.
+### Rotate
+Rotate the wires in the shape at the time the Rotate function is called.  RotateWires defines the wires to rotate.  If it is empty, then all the wires will be rotated.  The RotateSettings enumeration controls whether to rotate and the center of the rotation, if any.  Center can be the Origin, the center of gravity of each individual wire, or construction points, circles, or arcs.  RotateAngles defines the angle to use for each wire.  The first angle is for the first wire in the RotateWires property, and so on.  If the number of angles are fewer than the number of wires, then the last angle listed gets used for the remaining wires.  To rotate all wires at 15 degrees, set RotateAngles to [15] and leave RotateWires empty.  Ensure RotateSettings is not set to "No Rotation" or else no rotation will be done.  Note that for this and for all of the IntegerList Wirefilter properties, only the wires available when the function is called will be available for use.  Set the ExecutionOrder property if you need wires created by another function to be available by putting that other function ahead of Rotate in the order.
 ### Scaling
 There are 2 different types of scaling supported: uniform scaling and x/y independent scaling.  Each has advantages and disadvantages.  With uniform scaling you get circles, arcs, and line segment edges, where with the non-uniform scaling you might get bsplines, depending on whether X and Y are the same.  Uniform scaling also allows to provide a center for the scaling.
 ### Offsetting
@@ -371,6 +373,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2024.09.11 (1.10.14) -- add rotate wires function to sketchplus objects
 * 2024.09.11 (1.10.13) -- fix bug in SketchPlus PathArray (adjust discretize based on whether wire is closed)
 * 2024.09.11 (1.10.12) -- bug fixes for SketchPlus object, move ghost management to view object proxy
 * 2024.09.10 (1.10.11) -- skip evaluation of "+" as a float in polar array sketch plus dialog

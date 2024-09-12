@@ -27,7 +27,7 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2024.09.11"
-__version__ = "1.10.13"
+__version__ = "1.10.14"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -5037,8 +5037,9 @@ class SketchPlus:
     PathArraySettingsDefault = ["Normal To Path", "Align To Origin", "Fixed", "Tangent To Path"]
     PointArraySettingsDefault = ["No Point Array","Align To Origin","Fixed"]
     PolarCenterDefault = ["Origin"]
+    RotateSettingsDefault = ["No Rotation", "Center Of Gravity", "Origin"]
     ExecutionOrderDefault = ["Wire Order", "External", "Construction", "Mirroring","Polar Array", \
-        "Point Array", "Rectangular Array", "Path Array", "Scaling","Uniform Scaling", "Offsetting","Face Making", \
+        "Point Array", "Rectangular Array", "Rotate", "Path Array", "Scaling","Uniform Scaling", "Offsetting","Face Making", \
         "Wire Statuses"  ]
     RectangularRotationCenterDefault = ["Origin","Center Of Gravity"]
 
@@ -5067,7 +5068,7 @@ execution, which can be set with the Execution Order property.
 """
         grp = "Additional Plus Properties"
 
-##### Mirroring
+        ##### Mirroring
 
         obj.addProperty("App::PropertyEnumeration","MirrorAxis",grp,\
 """Axis for mirroring sketch elements.  Options are X, Y, X and Y, or Construction
@@ -5084,13 +5085,13 @@ Unused wires remain stationary.  To remove a wire entirely, use the Wire Order p
 """)
         obj.addProperty("App::PropertyString","Version",grp,"Version of MeshRemodel used to create this SketchPlus object").Version = __version__
 
-##### Scaling
+        ##### Scaling
         obj.addProperty("App::PropertyFloat","ScaleX",grp, "Scale in the X direction, converts to bspline curves if scaling is non-uniform").ScaleX = 1
         obj.addProperty("App::PropertyFloat","ScaleY",grp,"Scale in the Y direction, converts to bspline curves if scaling is non-uniform").ScaleY = 1
         obj.addProperty("App::PropertyIntegerList","ScaleWires",grp,"Wires to scale")
 
 
-##### Scale Uniform
+        ##### Scale Uniform
         obj.addProperty("App::PropertyFloat","ScaleUniform",grp,"Scale X and Y uniformly, does not convert to bsplines").ScaleUniform = 1
 
         obj.addProperty("App::PropertyEnumeration","ScaleUniformCenter",grp,\
@@ -5102,7 +5103,7 @@ does not provide that option.""").ScaleUniformCenter = SketchPlus.ScaleUniformCe
         obj.addProperty("App::PropertyIntegerList","ScaleUniformWires",grp,"Wires to scale uniformly")
 
 
-##### Offsetting
+        ##### Offsetting
         obj.addProperty("App::PropertyDistance","Offset",grp,"Offset to be applied to the sketch").Offset = 0
         obj.addProperty("App::PropertyEnumeration","OffsetJoin",grp,"Offset join types").OffsetJoin = ["Arcs","Tangent", "Intersection"]
         obj.addProperty("App::PropertyBool","OffsetFill",grp,"Whether to fill in gap between original and offset").OffsetFill = False
@@ -5140,7 +5141,7 @@ f"""The order of the Wires in the sketch.
 {generalWireInstructions}
 """)
 
-##### Path Array
+        ##### Path Array
         obj.addProperty("App::PropertyIntegerList","PathArrayWires",grp,"""
 Wires to be used in the PathArray as copies""")
         obj.addProperty("App::PropertyIntegerList","PathArrayPath", grp, """
@@ -5151,7 +5152,7 @@ Number of copies of the path array wires to made in the path array, number of el
 
         obj.addProperty("App::PropertyEnumeration","PathArraySettings",grp,"Some settings for the path array").PathArraySettings = SketchPlus.PathArraySettingsDefault
 
-##### Point Array
+        ##### Point Array
         obj.addProperty("App::PropertyIntegerList","PointArrayWires",grp,
 f"""List the Wires to use for the base of the point array here.
 {generalWireInstructions}
@@ -5162,7 +5163,7 @@ f"""List the Wires to use for the base of the point array here.
 the rotation is based on the point's angle relative to the x axis.  If "No Point
 Array" then there will be no point arraying done.
 """).PointArraySettings = SketchPlus.PointArraySettingsDefault
-##### Polar Array
+        ##### Polar Array
         obj.addProperty("App::PropertyIntegerConstraint", "PolarCount",grp, "Numer of elements in the polar array").PolarCount = (0,0,10000,1)
         obj.addProperty("App::PropertyAngle","PolarStart",grp,"Start of Polar array in degrees, default = 0 degrees").PolarStart = 0
         obj.addProperty("App::PropertyAngle","PolarEnd",grp,"End of polar array in degrees, default = 360 degrees").PolarEnd = 360
@@ -5213,7 +5214,7 @@ first oriiginal wire.
 """).ExecutionOrder = SketchPlus.ExecutionOrderDefault
 
 
-##### Rectangular Array
+        ##### Rectangular Array
         obj.addProperty("App::PropertyIntegerConstraint","RectangularCountX",grp,"Count of elements in x direction").RectangularCountX = (3,1,100000,1)
         obj.addProperty("App::PropertyIntegerConstraint","RectangularCountY",grp,"Count of elements in y direction").RectangularCountY = (3,1,100000,1)
         obj.addProperty("App::PropertyDistance","RectangularIntervalX",grp,"Distance between elements in x direction").RectangularIntervalX = 10
@@ -5222,15 +5223,31 @@ first oriiginal wire.
         obj.addProperty("App::PropertyAngle","RectangularRotation",grp,"Angle by which to rotate the rectangular array as a group").RectangularRotation = 0
 
         obj.addProperty("App::PropertyEnumeration","RectangularRotationCenter",grp,"Center of rotation for rectangular array, also supported: construction circles, arcs, and points").RectangularRotationCenter = SketchPlus.RectangularRotationCenterDefault
+        
+        ##### Rotate wires
+        obj.addProperty("App::PropertyIntegerList","RotateWires", grp, "Wires to rotate")
+        obj.addProperty("App::PropertyFloatList","RotateAngles",grp,"Angles to rotate wires")
+        obj.addProperty("App::PropertyEnumeration","RotateSettings",grp,"Rotate settings").RotateSettings = SketchPlus.RotateSettingsDefault
 
         grp = "Additional Status Information"
         obj.addProperty("App::PropertyString", "WireStatuses", grp, "Information about each wire")
 
     def onDocumentRestored(self, fp):
+        
+        #update legacy objects with new properties, if necessary:
+        if not hasattr(fp,"RotateWires"):
+            print("updating legacy object with new rotate properties")
+            grp = "Additional Plus Properties"
+            fp.addProperty("App::PropertyIntegerList","RotateWires", grp, "Wires to rotate")
+            fp.addProperty("App::PropertyFloatList","RotateAngles",grp,"Angles to rotate wires")
+            fp.addProperty("App::PropertyEnumeration","RotateSettings",grp,"Rotate settings").RotateSettings = SketchPlus.RotateSettingsDefault
+            SketchPlus.wireShapeDict["RotateWires"] = Part.Shape()
+
+
         # this updates all the keys in the SketchPlus.wireShapeDict dictionary
         # done in a singleshot because otherwise there is an access violation if 
         # there are links to external geometry in the object
-        QtCore.QTimer().singleShot(100, lambda: self.execute(fp))
+        QtCore.QTimer().singleShot(100, lambda: fp.recompute)
 
     def onChanged(self, fp, prop):
         if prop == "OffsetFill":
@@ -5567,6 +5584,62 @@ first oriiginal wire.
             return wireComp
 
         return shape
+        
+    #rotate wires
+    def handleRotate(self, fp, shape):
+        """Rotate one or more wires """
+        SketchPlus.wireShapeDict["RotateWires"] = shape
+            
+        if shape.isNull():
+            return shape
+
+        if fp.RotateSettings == "No Rotation":
+            return shape
+        
+        if not fp.RotateAngles:
+            return shape
+            
+        roguePoints = self.getRoguePoints(fp, shape)
+
+        patternWires, stationaryWires = self.filterWires(shape, fp.RotateWires)
+        
+        if not fp.RotateWires:
+            patternWires = shape.Wires #use all wires as default if RotateWires is empty
+            stationaryWires = []
+
+        if not patternWires:
+            return shape
+
+        angles = fp.RotateAngles
+        #use the last angle given for the remaining wires, if necessary
+        while len(angles) < len(patternWires):
+            angles.append(angles[-1])
+
+        constructionCircles = self.fetchConstruction(fp, "RotateSettings", SketchPlus.RotateSettingsDefault, filter=["Circle","Point","ArcOfCircle"])
+        center = FreeCAD.Vector() #for default Origin
+        if fp.RotateSettings not in SketchPlus.RotateSettingsDefault:
+            geo = constructionCircles[fp.RotateSettings]
+            center = geo.Location if hasattr(geo, "Location") else FreeCAD.Vector(geo.X, geo.Y, geo.Z)
+        elif fp.RotateSettings == "Origin":
+            center = FreeCAD.Vector()
+
+        copies = []
+        for idx, (angle, wire) in enumerate(zip(angles, patternWires)):
+            copy = wire.copy()
+            if fp.RotateSettings == "Center Of Gravity":
+                center = wire.CenterOfGravity
+            copy.rotate(center, FreeCAD.Vector(0,0,1), angle)
+            copies.append(copy)
+
+        copiesAndStationaryComp = Part.makeCompound(copies + stationaryWires)
+        wires = []
+        edges = copiesAndStationaryComp.Edges
+        if edges:
+            se = Part.sortEdges(edges)
+            wires = [Part.Wire(s) for s in se]
+        finalShape = Part.makeCompound(wires + roguePoints)
+        return finalShape
+        #end handleRotate()
 
     def handlePolar(self, fp, shape):
         """Polar array """
@@ -5874,12 +5947,16 @@ Skipping rectangular array function\n")
                         "Point Array":self.handlePointArray,
                         "Polar Array": self.handlePolar,
                         "Rectangular Array": self.handleRectangularArray,
+                        "Rotate": self.handleRotate,
                         "Scaling": self.handleScaling,
                         "Uniform Scaling": self.handleUniformScaling,
                         "Offsetting": self.handleOffset,
                         "Face Making": self.handleFaceMaker,
                         "Wire Statuses":self.handleWireStatuses, }
 
+        #for legacy objects
+        if not "Rotate" in fp.ExecutionOrder and not "-Rotate" in fp.ExecutionOrder:
+            fp.ExecutionOrder = fp.ExecutionOrder + ["Rotate"]
 
         # do not validate that the func is in the dictionary, but rather
         # just let it throw an exception if it is not
@@ -6235,6 +6312,7 @@ OK = add selected
     def reject(self):
         FreeCADGui.Control.closeDialog()
         
+#for handling app::propertyfloatlist properties in the dialogs
 class CustomListWidget(QtWidgets.QListWidget):
     def __init__(self, parent=None, float_list= []):
         super(CustomListWidget, self).__init__(parent)
@@ -6462,7 +6540,7 @@ class SketchPlusVP:
             self.ghosts = []
         
         funcMenu = menu.addMenu("Setup array or function")
-        funcs = sorted(["Show","Path", "Point", "Polar", "Rectangular", "Offset", "Scale",
+        funcs = sorted(["Show","Path", "Point", "Polar", "Rectangular", "Rotate", "Offset", "Scale",
                 "ScaleUniform","Mirror","FaceMaker"])
         for func in funcs:
             funcAction = funcMenu.addAction(func)
@@ -6501,7 +6579,7 @@ class SketchPlusVP:
         else:
             print("SketchPlus object has no ghosts")
         FreeCADGui.Control.closeDialog()
-        
+        fp.ViewObject.Visibility = True
 
     def openPanel(self, panel):
         import time
@@ -6523,6 +6601,7 @@ class SketchPlusVP:
         
     def setupFunction(self, funcType):
         fp = self.Object
+        fp.Document.recompute()
         panel = FunctionTask(fp, funcType)
         self.openPanel(panel)
         
