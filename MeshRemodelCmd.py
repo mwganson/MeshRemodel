@@ -5038,8 +5038,8 @@ class SketchPlus:
     PointArraySettingsDefault = ["No Point Array","Align To Origin","Fixed"]
     PolarCenterDefault = ["Origin"]
     RotateSettingsDefault = ["No Rotation", "Center Of Gravity", "Origin"]
-    ExecutionOrderDefault = ["Wire Order", "External", "Construction", "Mirroring","Polar Array", \
-        "Point Array", "Rectangular Array", "Rotate", "Path Array", "Scaling","Uniform Scaling", "Offsetting","Face Making", \
+    ExecutionOrderDefault = ["Wire Order", "External", "Construction", "Offsetting", "Mirroring","Polar Array", \
+        "Point Array", "Rectangular Array", "Rotate", "Path Array", "Scaling","Uniform Scaling", "Face Making", \
         "Wire Statuses"  ]
     RectangularRotationCenterDefault = ["Origin","Center Of Gravity"]
 

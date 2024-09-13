@@ -373,6 +373,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2024.09.13 (1.10.18) -- Move offset higher up in the default execution order for SketchPlus objects because often we want to offset a wire before using it as a path array path.
 * 2024.09.13 (1.10.17) -- ExternalGeo attribute introduced with 0.22, so advise users of older versions that the Show External geometry feature is unavailable rather than throwing an exception.
 * 2024.09.13 (1.10.16) -- fix some bugs in SketchPlus object creation related to attachment dialog
 * 2024.09.12 (1.10.15) -- rectangular and path arrays now support arraying points
