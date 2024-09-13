@@ -27,7 +27,7 @@ __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2024.09.13"
-__version__ = "1.10.16"
+__version__ = "1.10.17"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -5559,6 +5559,12 @@ first oriiginal wire.
         """
         if not fp.ShowExternal:
             return shape
+            
+        if not hasattr(fp, "ExternalGeo"):
+            FreeCAD.Console.PrintError(f"{fp.Label}: Show External geometry is unavailable in this version of FreeCAD.  You must update to a newer version to enjoy this feature.  Resetting ShowExternal property to False to prevent further display of this error message.\n")
+            fp.ShowExternal = False
+            return shape
+            
         externalGeometry = []
         externalPoints = []
         wires = []
