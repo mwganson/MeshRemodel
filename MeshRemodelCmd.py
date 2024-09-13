@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.09.11"
-__version__ = "1.10.14"
+__date__    = "2024.09.12"
+__version__ = "1.10.15"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -5215,8 +5215,8 @@ first oriiginal wire.
 
 
         ##### Rectangular Array
-        obj.addProperty("App::PropertyIntegerConstraint","RectangularCountX",grp,"Count of elements in x direction").RectangularCountX = (3,1,100000,1)
-        obj.addProperty("App::PropertyIntegerConstraint","RectangularCountY",grp,"Count of elements in y direction").RectangularCountY = (3,1,100000,1)
+        obj.addProperty("App::PropertyIntegerConstraint","RectangularCountX",grp,"Count of elements in x direction").RectangularCountX = (1,1,100000,1)
+        obj.addProperty("App::PropertyIntegerConstraint","RectangularCountY",grp,"Count of elements in y direction").RectangularCountY = (1,1,100000,1)
         obj.addProperty("App::PropertyDistance","RectangularIntervalX",grp,"Distance between elements in x direction").RectangularIntervalX = 10
         obj.addProperty("App::PropertyDistance","RectangularIntervalY",grp,"Distance between elements in y direction").RectangularIntervalY = 10
         obj.addProperty("App::PropertyIntegerList","RectangularWires",grp,"Wires to use in rectangular array")
@@ -5717,12 +5717,13 @@ first oriiginal wire.
 or equal to the available number of wires.\n")
             return shape
 
+        roguePoints = self.getRoguePoints(fp,shape)
         patternWires, stationaryWires = self.filterWires(shape, fp.PathArrayWires)
         paths, unused = self.filterWires(shape, fp.PathArrayPath)
         if not fp.PathArrayKeepPath:
             stationaryWires = [w for w in stationaryWires if not self.wireInWireList(w, paths)]
 
-        if not patternWires:
+        if not patternWires + roguePoints:
             FreeCAD.Console.PrintError("No pattern wires to use in path array, skipping\n")
             return shape
 
@@ -5737,14 +5738,12 @@ or equal to the available number of wires.\n")
 
         #not arraying roguePoints for this function
         copies = []
-        #each spline is a list of dicretized points here
         for idx, pathPts in enumerate(discretePoints):
-            path = paths[idx]  # spline is a Part.Wire object
+            path = paths[idx]  # path is a Part.Wire object
             edges = path.Edges  # Get the edges of the wire
 
-
             for i, vec in enumerate(pathPts[extra:]):
-                for wire in patternWires:
+                for wire in patternWires + roguePoints:
                     copy = wire.copy()
                     vector = vec - copy.CenterOfGravity
                     # since we discretized the wire and not the edges, we have to figure
@@ -5783,8 +5782,8 @@ or equal to the available number of wires.\n")
 
                     copy.Placement.translate(vector)
                     copies.append(copy)
-        roguePoints = self.getRoguePoints(fp,shape)
-        copiesAndStationaryComp = Part.makeCompound(copies + stationaryWires + roguePoints)
+
+        copiesAndStationaryComp = Part.makeCompound(copies + stationaryWires)
         roguePoints2 = self.getRoguePoints(fp, copiesAndStationaryComp)
 
         wires = []
@@ -5792,7 +5791,7 @@ or equal to the available number of wires.\n")
         if edges:
             se = Part.sortEdges(edges)
             wires = [Part.Wire(s) for s in se]
-        finalShape = Part.makeCompound(wires + roguePoints)
+        finalShape = Part.makeCompound(wires + roguePoints2)
         return finalShape
 
     def handlePointArray(self, fp, shape):
@@ -5855,28 +5854,20 @@ Skipping function\n")
         SketchPlus.wireShapeDict["RectangularWires"] = shape
         if shape.isNull():
             return shape
+            
+        roguePoints = self.getRoguePoints(fp,shape)
         constructionCircles = self.fetchConstruction(fp, "RectangularRotationCenter", SketchPlus.RectangularRotationCenterDefault, filter=["Circle","Point","ArcOfCircle"])
-        if not fp.RectangularWires:
-            return shape
-        if len(fp.RectangularWires) > len(shape.Wires):
-            FreeCAD.Console.PrintError("RectangularWires property must be less than\
-or equal to the available number of wires.\n")
-            return shape
-        if max(fp.RectangularWires) > len(shape.Wires):
-            FreeCAD.Console.PrintError(f"RectangularWires property contains an invalid\
-wire: {max(fp.RectangularyWires)} > the number of available wires: {len(shape.Wires)}.\
-Skipping rectangular array function.\n")
-            return shape
-        if min(fp.RectangularWires) < 1:
-            FreeCAD.Console.PrintError("RectangularWires property can only contain\
-positive integers.  Wire list is 1-based, not 0-based, so 1 = Wire1, etc.\
-Skipping rectangular array function\n")
+
+        if fp.RectangularCountX == 1 and fp.RectangularCountY == 1 and fp.RectangularRotation == 0:
             return shape
 
         patternWires, stationaryWires = self.filterWires(shape, fp.RectangularWires)
         if not patternWires and not fp.RectangularWires:
             patternWires = shape.Wires
             stationaryWires = []
+            
+        if not patternWires + roguePoints:
+            return shape #nothing to pattern
 
         center = FreeCAD.Vector() #assume "Origin" is center for now
         angle = fp.RectangularRotation.Value
@@ -5893,7 +5884,7 @@ Skipping rectangular array function\n")
         yInt = fp.RectangularIntervalY.Value
         for xx in range(fp.RectangularCountX):
             for yy in range(fp.RectangularCountY):
-                for wire in patternWires:
+                for wire in patternWires + roguePoints:
                     copy = wire.copy()
                     target = FreeCAD.Vector(xx*xInt, yy*yInt, 0)
                     copy.Placement.translate(target)
@@ -5905,8 +5896,8 @@ Skipping rectangular array function\n")
             for copy in copies:
                 copy.rotate(center, FreeCAD.Vector(0,0,1), angle)
 
-        roguePoints = self.getRoguePoints(fp,shape)
-        copiesAndStationaryComp = Part.makeCompound(copies + stationaryWires + roguePoints)
+
+        copiesAndStationaryComp = Part.makeCompound(copies + stationaryWires)
         roguePoints2 = self.getRoguePoints(fp, copiesAndStationaryComp)
 
         wires = []
@@ -5914,7 +5905,7 @@ Skipping rectangular array function\n")
         if edges:
             se = Part.sortEdges(edges)
             wires = [Part.Wire(s) for s in se]
-        finalShape = Part.makeCompound(wires + roguePoints)
+        finalShape = Part.makeCompound(wires + roguePoints2)
         return finalShape
 
     def handleWireStatuses(self, fp, shape):
