@@ -373,6 +373,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2024.09.13 (1.10.16) -- fix some bugs in SketchPlus object creation related to attachment dialog
 * 2024.09.12 (1.10.15) -- rectangular and path arrays now support arraying points
 * 2024.09.11 (1.10.14) -- add rotate wires function to sketchplus objects
 * 2024.09.11 (1.10.13) -- fix bug in SketchPlus PathArray (adjust discretize based on whether wire is closed)

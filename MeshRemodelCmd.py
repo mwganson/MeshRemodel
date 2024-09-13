@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.09.12"
-__version__ = "1.10.15"
+__date__    = "2024.09.13"
+__version__ = "1.10.16"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -6659,6 +6659,10 @@ class SketchPlusVP:
 # Make a sketch plus object
 class MeshRemodelCreateSketchCommandClass(object):
     """Create sketch plus object"""
+    #class variables accessed as MeshRemodelCreateSketchCommandClass.sketchPlus, etc.
+    sketchPlus = None
+    activeObject = None
+    activeObjectOriginVisibility = False
 
     def __init__(self):
         self.subs = []
@@ -6671,55 +6675,53 @@ Create a new SketchPlus object\n\
 ")}
 
     def Activated(self):
-
-        sketchPlus = None
-        activeObject = None
-        activeObjectOriginVisibility = False
         
         def addToActiveObject(obj):
             """check for existing active Body or App::Part and add object to it if found"""
-            global activeObject
-            global activeObjectOriginVisibility
+
             body = FreeCADGui.ActiveDocument.ActiveView.getActiveObject("pdbody")
             part = FreeCADGui.ActiveDocument.ActiveView.getActiveObject("part")
+            MeshRemodelCreateSketchCommandClass.activeObject = body if body else part if part else None
             if body:
                 if not obj in body.Group:
                     body.Group += [obj]
-                    activeObjectOriginVisibility = body.Origin.ViewObject.Visibility
+                    MeshRemodelCreateSketchCommandClass.activeObjectOriginVisibility = \
+                                                    body.Origin.ViewObject.Visibility
                     body.Origin.ViewObject.Visibility = True
-                    activeObject = body
             elif part:
                 if not obj in Part.Group:
                     part.Group += [obj]
-                    activeObjectOriginVisibility = part.Origin.ViewObject.Visibility
+                    MeshRemodelCreateSketchCommandClass.activeObjectOriginVisibility = \
+                                                    part.Origin.ViewObject.Visibility
                     part.Origin.ViewObject.Visibility = True
-                    activeObject = part
         
         def attached():
             """a callback for the attachment function, when OK or Cancel is clicked, opens sketch in editor"""
-            obj = sketchPlus
+            obj = MeshRemodelCreateSketchCommandClass.sketchPlus
             if hasattr(obj,"ViewObject"): #might be None
                 QtCore.QTimer.singleShot(100, obj.ViewObject.doubleClicked) # give time for other dialog to close
-            if activeObject:
-                activeObject.Origin.Visibility = activeObjectOriginVisibility
-        
+            if MeshRemodelCreateSketchCommandClass.activeObject:
+                MeshRemodelCreateSketchCommandClass.activeObject.Origin.Visibility = \
+                        MeshRemodelCreateSketchCommandClass.activeObjectOriginVisibility
         
         def attachment(obj):
             """open attachment dialog if there are selections"""
-            global sketchPlus
-            sketchPlus = obj
+            MeshRemodelCreateSketchCommandClass.sketchPlus = obj
+            take_selection = True
             sel = FreeCADGui.Selection.getCompleteSelection()
-            if not sel and not activeObject:
+            if not sel and not MeshRemodelCreateSketchCommandClass.activeObject:
                 return
-            if not sel[0].Object.isDerivedFrom("Part::Feature"):
+            if sel and not hasattr(sel[0].Object,"Shape"):
                 FreeCAD.Console.PrintMessage(f"{sketchPlus.Label}: {sel[0].Object.Label} is not a part feature, attachment dialog is being skipped.\n")
-                if activeObject:
-                    activeObject.Origin.ViewObject.Visibility = activeObjectOriginVisibility
+                if MeshRemodelCreateSketchCommandClass.activeObject:
+                   MeshRemodelCreateSketchCommandClass.activeObject.Origin.ViewObject.Visibility = \
+                        MeshRemodelCreateSketchCommandClass.activeObjectOriginVisibility
                 return
-        
+            if sel and sel[0].Object in obj.InListRecursive:
+                take_selection = False
             import AttachmentEditor.TaskAttachmentEditor as TaskAttachmentEditor
             taskd = TaskAttachmentEditor.AttachmentEditorTaskPanel(obj,
-                                                                    take_selection= True,
+                                                                    take_selection = take_selection,
                                                                     create_transaction= True,
                                                                     callback_OK = attached,
                                                                     callback_Cancel = attached,
@@ -6742,9 +6744,9 @@ Create a new SketchPlus object\n\
         
         doc = FreeCAD.ActiveDocument if FreeCAD.ActiveDocument else FreeCAD.newDocument()
         obj = doc.addObject("Sketcher::SketchObjectPython","SketchPlus")
-        addToActiveObject(obj)
         SketchPlus(obj)
         SketchPlusVP(obj.ViewObject)
+        addToActiveObject(obj)
         sel = FreeCADGui.Selection.getSelection()
         skipAttach = False
         if len(sel) == 1:
@@ -6784,8 +6786,9 @@ Create a new SketchPlus object\n\
                             obj.addExternal(link.Name, sub)
                     doc.recompute()
     
-                if activeObject:
-                    activeObject.Origin.ViewObject.Visibility = activeObjectOriginVisibility
+                if MeshRemodelCreateSketchCommandClass.activeObject:
+                    MeshRemodelCreateSketchCommandClass.activeObject.Origin.ViewObject.Visibility = \
+                            MeshRemodelCreateSketchCommandClass.activeObjectOriginVisibility
     
         if not skipAttach:
             attachment(obj)
