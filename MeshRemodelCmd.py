@@ -6341,7 +6341,9 @@ class CustomListWidget(QtWidgets.QListWidget):
     def showContextMenu(self, pos: QtCore.QPoint):
         # Find the item at the clicked position
         item = self.itemAt(pos)
+
         if item:
+            idx = self.row(item)
             context_menu = QtWidgets.QMenu(self)
             delete_action = QtGui.QAction("Delete", self)
             delete_action.triggered.connect(lambda: self.removeItem(item))
@@ -6350,13 +6352,50 @@ class CustomListWidget(QtWidgets.QListWidget):
             context_menu.addAction(delete_action)
             add_action = context_menu.addAction("Add item")
             add_action.triggered.connect(self.addNewItem)
+            edit_action = context_menu.addAction("Edit item")
+            edit_action.triggered.connect(lambda: self.edit_item_value(item))
+            if item.text() == "+":
+                edit_action.setEnabled(False)
+            move_up_action = context_menu.addAction("Move up")    
+            move_up_action.triggered.connect(lambda: self.move_up(item))
+            if item.text() == "+":
+                move_up_action.setEnabled(False)
+            move_down_action = context_menu.addAction("Move down")
+            move_down_action.triggered.connect(lambda: self.move_down(item))
+            if item.text() == "+":
+                move_down_action.setEnabled(False)
+                
             context_menu.exec_(self.mapToGlobal(pos))
             
     def addNewItem(self):
         new_item = QtWidgets.QListWidgetItem("0.0")
         self.insertItem(self.count() - 1, new_item)
         self.setCurrentItem(new_item)
+        
+    def move_up(self, item):
+        row = self.row(item)
+        if row > 0:
+            previous = row
+        else:
+            row == 0
+            if self.count() > 2:
+                previous = self.count() - 1
+        removed = self.takeItem(row)
+        self.insertItem(previous - 1, removed)
+        
+    def move_down(self, item):
+        row = self.row(item)
+        if row > self.count() - 1:
+            next = 0
+        else:
+            next = row + 1
+            if self.item(next).text() == "+":
+                next = 0
 
+        removed = self.takeItem(row)
+        self.insertItem(next, removed)
+        
+        
     def handle_item_click(self, item):
         if item.text() == "+":
             new_item = QtWidgets.QListWidgetItem("0.0")
@@ -6495,6 +6534,9 @@ class FunctionTask:
                 getter = widget.currentText
             elif propType == "App::PropertyIntegerList":
                 if propName != "PathArrayWires":
+                    if not propName in SketchPlus.wireShapeDict: #doc reloaded
+                        self.fp.recompute()
+                        self.fp.Document.recompute()
                     task = WireFilterEditorTask(self.fp, SketchPlus.wireShapeDict[propName], propName)
                     widget = task.form
                     getter = task.order
@@ -6598,7 +6640,6 @@ class SketchPlusVP:
         
     def setupFunction(self, funcType):
         fp = self.Object
-        fp.Document.recompute()
         panel = FunctionTask(fp, funcType)
         self.openPanel(panel)
         
