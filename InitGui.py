@@ -59,7 +59,7 @@ class MeshRemodelWorkbench(Workbench):
         "This function is executed when FreeCAD starts"
         import MeshRemodelCmd #needed files for FreeCAD commands
         self.list = [
-                    "GroupCommandPointsObjects",
+                    "MeshRemodelGroupCommandPointsObjects",
                   #  "MeshRemodelCreatePointsObject",
                   #  "MeshRemodelCreateWireFrameObject",
                     "MeshRemodelMeshBoundaryWires",
@@ -87,7 +87,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelRotateObject",
                     "MeshRemodelMoveAxial",
                     "MeshRemodelGoBackSelection",
-                    "GroupCommandExtras",
+                    "MeshRemodelGroupCommandExtras",
                     # "MeshRemodelMergeSketches",
                     # "MeshRemodelValidateSketch",
                     # "MeshRemodelPartCheckGeometry",

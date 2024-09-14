@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.09.13"
-__version__ = "1.10.17"
+__date__    = "2024.09.14"
+__version__ = "1.10.20"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -6607,6 +6607,14 @@ class SketchPlusVP:
         hideDependentAction = menu.addAction("Hide dependencies")
         hideDependentAction.triggered.connect(self.hideDependencies)
         
+        oefaction = menu.addAction("Check with OpenEdgeFinder")
+        oefaction.triggered.connect(self.openEdgeFinder)
+        
+    def openEdgeFinder(self):
+        cmd = MeshRemodelOpenEdgeFinderCommandClass()
+        cmd.Activated()
+        self.Object.Document.recompute()
+        
     def closePanel(self):
         fp = self.Object
         if hasattr(self, "ghosts"):
@@ -7652,7 +7660,7 @@ class MeshRemodelOpenEdgeFinderCommandClass:
     def GetResources(self):
         return {'Pixmap'  : os.path.join( iconPath , 'OpenEdgeFinder.svg') ,
             'MenuText': "Open edge finder" ,
-            'ToolTip' : "Check sketches and other objects for open edges, crossed edges, t-sections, and stray points"}
+            'ToolTip' : "Validate sketches and other objects."}
  
     def Activated(self):
     
@@ -7670,6 +7678,7 @@ class MeshRemodelOpenEdgeFinderCommandClass:
                 OpenEdgeFinderVP(fp.ViewObject)
                 fp.Sketch = sk
                 put_in_body(doc, fp, sk)
+            doc.recompute()
    
     def IsActive(self):
         if not FreeCAD.ActiveDocument:
@@ -7686,7 +7695,7 @@ class MeshRemodelOpenEdgeFinderCommandClass:
 
 
 ##################################################################################################
-class GroupCommandPointsObjects:
+class MeshRemodelGroupCommandPointsObjects:
     def GetCommands(self):
         return tuple([
         "MeshRemodelCreatePointsObject",
@@ -7705,7 +7714,7 @@ class GroupCommandPointsObjects:
         return True
 
 
-class GroupCommandExtras:
+class MeshRemodelGroupCommandExtras:
     def GetCommands(self):
         
         return tuple([
@@ -7768,8 +7777,8 @@ def initialize():
         Gui.addCommand("MeshRemodelPartCheckGeometry", MeshRemodelPartCheckGeometryCommandClass())
         Gui.addCommand("MeshRemodelSubShapeBinder", MeshRemodelSubShapeBinderCommandClass())
         Gui.addCommand("MeshRemodelSettings", MeshRemodelSettingsCommandClass())
-        Gui.addCommand("GroupCommandExtras",GroupCommandExtras())
-        Gui.addCommand("GroupCommandPointsObjects", GroupCommandPointsObjects())
+        Gui.addCommand("MeshRemodelGroupCommandExtras",MeshRemodelGroupCommandExtras())
+        Gui.addCommand("MeshRemodelGroupCommandPointsObjects", MeshRemodelGroupCommandPointsObjects())
 
 
 initialize()
