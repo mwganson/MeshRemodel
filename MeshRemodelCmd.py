@@ -5034,7 +5034,7 @@ class SketchPlus:
     wireShapeDict = {}
     ScaleUniformCenterDefault = ["Origin"]
     MirrorAxisDefault = ["None","Sketch X Axis","Sketch Y Axis","Both X and Y"]
-    PathArraySettingsDefault = ["Normal To Path", "Align To Origin", "Fixed", "Tangent To Path"]
+    PathArraySettingsDefault = ["Normal To Path", "Align To Origin", "Fixed", "Tangent To Path", "Normal To Path 3D"]
     PointArraySettingsDefault = ["No Point Array","Align To Origin","Fixed"]
     PolarCenterDefault = ["Origin"]
     RotateSettingsDefault = ["No Rotation", "Center Of Gravity", "Origin"]
@@ -5778,6 +5778,16 @@ or equal to the available number of wires.\n")
                         normal = FreeCAD.Vector(-tangent.y, tangent.x, 0)  #rotate 90 degrees
                         angle = math.degrees(math.atan2(normal.y, normal.x))
                         copy.rotate(copy.CenterOfGravity, FreeCAD.Vector(0, 0, 1), angle)
+                        
+                    elif fp.PathArraySettings == "Normal To Path 3D":
+                        tangent = containing_edge.tangentAt(u)
+                        normal = FreeCAD.Vector(-tangent.y, tangent.x, 0)  #rotate 90 degrees
+                        angle = math.degrees(math.atan2(normal.y, normal.x))
+                        copy.rotate(copy.CenterOfGravity, FreeCAD.Vector(0,1,0),90)
+                        copy.rotate(copy.CenterOfGravity, FreeCAD.Vector(0, 0, 1), angle)
+                        copy.rotate(copy.CenterOfGravity, FreeCAD.Vector(0,0,1),90)
+
+
 
                     elif fp.PathArraySettings == "Tangent To Path":
                         tangent = containing_edge.tangentAt(u)
