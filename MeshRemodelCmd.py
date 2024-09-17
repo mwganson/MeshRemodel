@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.09.14"
-__version__ = "1.10.20"
+__date__    = "2024.09.16"
+__version__ = "1.10.22"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -3786,10 +3786,24 @@ class GridSurface:
     def makeSplines(self, fp, vrows):
         """if fp.Output is "Edges" or "Gordon Template", then the shape becomes the rows of edges instead of a surface
         """
+        def rowsToCols(vrows):
+            if not vrows:
+                return []
+            
+            allSameLen = all(len(row) == len(vrows[0]) for row in vrows)
+            if allSameLen:
+                vcols = [[vrows[row][col] for row in range(len(vrows))] for col in range(len(vrows[0]))]
+            else:
+                #first and last column only if not all are the same length
+                vcols = [
+                    [row[0] for row in vrows],
+                    [row[-1] for row in vrows if row]
+                ]
+            return vcols
 
         splines = []
-        left = [] #left and right edges of gordon template
-        right = []
+        vcols = rowsToCols(vrows)
+
         for row in vrows:
             if len(row) == 1:
                 spline = Part.Vertex(row[0])
@@ -3803,26 +3817,20 @@ class GridSurface:
             elif "Closed Polyline" in fp.RowWireType:
                 spline = Part.makePolygon(row + [row[0]])
             splines.append(spline.toShape() if hasattr(spline, "toShape") else spline)
-            if fp.Output == "Gordon Template":
-                left.append(row[0])
-                right.append(row[-1])
+
         if fp.Output == "Gordon Template":
-            left_spline = Part.BSplineCurve()
-            right_spline = Part.BSplineCurve()
-            if "BSpline" in fp.RowWireType:
-                left_spline.interpolate(left) if left else []
-                right_spline.interpolate(right) if right else []
-                if left_spline:
-                    left_spline = left_spline.toShape()
-                if right_spline:
-                    right_spline = right_spline.toShape()
-                splines = [left_spline, right_spline] + splines
-            elif "Polyline" in fp.RowWireType:
-                left_spline = Part.makePolygon(left) if left else []
-                right_spline = Part.makePolygon(right) if right else []
-                splines = [left_spline] + [right_spline] + splines
-
-
+            colSplines = []
+            for col in vcols:
+                colSpline = Part.BSplineCurve()
+                if "BSpline" in fp.RowWireType:
+                    colSpline.interpolate(col) if col else []
+                    if colSpline:
+                        colSpline = colSpline.toShape()
+                elif "Polyline" in fp.RowWireType:
+                    colSpline = Part.makePolygon(col) if col else []
+                colSplines.append(colSpline)
+                
+            splines = colSplines + splines
 
         fp.Shape = Part.makeCompound(splines)
         return

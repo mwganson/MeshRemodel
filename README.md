@@ -110,7 +110,7 @@ Column Mode is false by default.  The default is row mode, meaning the edges use
 
 Method property has options: Interpolate points, Lofted Edges, or Lofted Edges Ruled.  Note that in column mode the edges are columns, and in row mode they are rows.  Interpolate points makes the surface internally as a Part.BSplineSurface object.  In the Loft modes instead the edges are lofted to form the surface.  This gives a bit more control and is the default.
 
-Output defines whether the GridSurface object shape is a surface, edges, or a Gordon template.  The Gordon template can be the source for a Gordon Surface created in the Curves workbench addon.  Edges mode is mostly useful to help visualize how the surface is generated with the loft.  In some cases you might need to switch from row mode to column mode for better results.
+Output defines whether the GridSurface object shape is a surface, edges, or a Gordon template.  The Gordon template can be the source for a Gordon Surface created in the Curves workbench addon.  If all the rows are of equal length, then you get a grid of all rows and all columns as of version 1.10.22.  Otherwise if not all rows are of the same length (meaning same number of vertices), then you only get the outer edges for the columns.  Edges mode is mostly useful to help visualize how the surface is generated with the loft.  In some cases you might need to switch from row mode to column mode for better results.
 
 Post Wire Edges and Pre Wire Edges.  When working in Loft mode the edges of other objects may be used to form part of the Loft.  This allows to connect the GridSurface object to other objects in a manner that should generally succeed.  Select the property, open the property editor with the [...] button, and select in the 3D view the edges to use.  The Pre Wire Edges are connected to row 0 (or column 0 in column mode) and the Post Wire Edges are connected to the last row or column.
 
@@ -373,6 +373,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2024.09.16 (1.10.22) -- add all vertical lines to grid surface for gordon template, not just outer lines
 * 2024.09.14 (1.10.21) -- add normal to path 3d alignment to patharrays in SketchPlus objects
 * 2024.09.14 (1.10.20) -- add link to openedgefinder command in sketchplus context menu
 * 2024.09.13 (1.10.19) -- improvements to CustomListWidget used to edit floatlist properties in SketchPlus
