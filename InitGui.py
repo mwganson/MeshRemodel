@@ -133,7 +133,7 @@ class MeshRemodelWorkbench(Workbench):
         
         # Example usage
         def update_callback(latest_version):
-            print(f"MeshRemodel {latest_version} is now available in the Addon Manager.")
+            FreeCAD.Console.PrintWarning(f"MeshRemodel {latest_version} is now available in the Addon Manager.\n")
         
         import MeshRemodelCmd
         current_version = MeshRemodelCmd.__version__
