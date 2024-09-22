@@ -5431,7 +5431,11 @@ first oriiginal wire.
 
             try:
                 if fp.OffsetInterimFace:
-                    compOrFace = Part.makeFace(patternWiresComp,"Part::FaceMakerBullseye")
+                    try:
+                        compOrFace = Part.makeFace(patternWiresComp,"Part::FaceMakerBullseye")
+                    except:
+                        FreeCAD.Console.PrintMessage(f"{fp.Label}: unable to make interim face, proceeding without it.\n")
+                        compOrFace = patternWiresComp
                 else:
                     compOrFace = patternWiresComp
                 offsetShape = compOrFace.makeOffset2D(offset, join = join, \
