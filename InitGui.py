@@ -100,19 +100,54 @@ class MeshRemodelWorkbench(Workbench):
         #considered putting the menu inside the Edit menu, but decided against it
         #self.appendMenu(["&Edit","MeshRemodel"],self.list) # appends a submenu to an existing menu
 
-    def callback(self,hasUpdate):
-        if hasUpdate:
-            FreeCAD.Console.PrintMessage("MeshRemodel has an update available via the addon manager.\n")
-        #else:
-            #FreeCAD.Console.PrintMessage("MeshRemodel up to date\n")
  
     def Activated(self):
         "This function is executed when the workbench is activated"
-        #global act
-        #act.setVisible(True)
-        import AddonManager as AM
-        if hasattr(AM,"check_updates"):
-            AM.check_updates("MeshRemodel",self.callback)
+        import requests
+        import xml.etree.ElementTree as ET
+        
+        def get_remote_version(user, repo, branch='master'):
+            # GitHub raw URL for package.xml
+            url = f"https://raw.githubusercontent.com/{user}/{repo}/{branch}/package.xml"
+            try:
+                response = requests.get(url)
+                if response.status_code == 200:
+                    # Parse the XML content
+                    xml_content = response.content
+                    tree = ET.ElementTree(ET.fromstring(xml_content))
+                    root = tree.getroot()
+                    # Find the version element and return its text
+                    version = root.find("version").text
+                    return version
+                else:
+                    print(f"Failed to fetch package.xml: {response.status_code}")
+                    return None
+            except Exception as e:
+                print(f"Error fetching or parsing package.xml: {e}")
+                return None
+        
+        def check_for_update(current_version, user, repo, branch, callback):
+            latest_version = get_remote_version(user, repo, branch)
+            if latest_version and latest_version != current_version:
+                callback(latest_version)
+        
+        # Example usage
+        def update_callback(latest_version):
+            print(f"MeshRemodel {latest_version} is now available in the Addon Manager.")
+        
+        import MeshRemodelCmd
+        current_version = MeshRemodelCmd.__version__
+        user = "mwganson"
+        repo = "MeshRemodel"
+        branch = "master"
+        
+        # Check for updates
+        pg = FreeCAD.ParamGet("User parameter:/Plugins/MeshRemodel")
+        checkUpdates = pg.GetBool("CheckForUpdates", True)
+        #print(f"checkUpdates = {checkUpdates}")
+        if checkUpdates:
+            check_for_update(current_version, user, repo, branch, update_callback)
+
         return
  
     def Deactivated(self):

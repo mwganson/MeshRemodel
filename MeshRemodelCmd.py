@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.09.16"
-__version__ = "1.10.22"
+__date__    = "2024.09.22"
+__version__ = "1.10.24"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -507,17 +507,21 @@ class MeshRemodelSettingsCommandClass(object):
         from PySide import QtGui
         window = QtGui.QApplication.activeWindow()
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        pg.RemInt("SketchRadiusPrecision") #no longer used
         keep = pg.GetBool('KeepToolbar',False)
         point_size = pg.GetFloat("PointSize", 4.0)
         line_width = pg.GetFloat("LineWidth", 5.0)
-        prec = pg.GetInt("SketchRadiusPrecision", 1)
+        checkUpdates = pg.GetBool("CheckForUpdates", True)
+        pg.SetBool("CheckForUpdates", checkUpdates)
         coplanar_tol = pg.GetFloat("CoplanarTolerance",.01)
         wireframe_tol = pg.GetFloat("WireFrameTolerance",.01)
         items=[("","*")[keep]+"Keep the toolbar active",
             ("","*")[not keep]+"Do not keep the toolbar active",
+            ("","*")[checkUpdates]+"Check for updates",
+            ("","*")[not checkUpdates]+"Do not check for updates",
             "Change point size ("+str(point_size)+")",
             "Change line width ("+str(line_width)+")",
-            "Change sketch radius precision ("+str(prec)+")",
+
             "Change coplanar tolerance ("+str(coplanar_tol)+")",
             "Change wireframe tolerance("+str(wireframe_tol)+")",
             "Cancel"]
@@ -530,22 +534,20 @@ class MeshRemodelSettingsCommandClass(object):
         elif ok and item==items[1]:
             keep = False
             pg.SetBool('KeepToolbar', keep)
-        elif ok and item==items[2]:
+        elif ok and item==items[4]:
             new_point_size,ok = QtGui.QInputDialog.getDouble(window,"Point size", "Enter point size", point_size,1,50,2)
             if ok:
                 pg.SetFloat("PointSize", new_point_size)
-        elif ok and item==items[3]:
+        elif ok and item==items[5]:
             new_line_width,ok = QtGui.QInputDialog.getDouble(window,"Line width", "Enter line width", line_width,1,50,2)
             if ok:
                 pg.SetFloat("LineWidth", new_line_width)
-        elif ok and item==items[4]:
-            new_prec, ok = QtGui.QInputDialog.getInt(window,"Sketch Radius Precision", "\n\
--1 = no radius constraints\n\
-0 = radius constraints\n\
-1-12 = decimal points to round to when constraining\n\n\
-Enter new sketch radius precision", prec, -1,12,1,flags=windowFlags)
-            if ok:
-                pg.SetInt("SketchRadiusPrecision", new_prec)
+        elif ok and item==items[2]:
+            checkUpdates = True
+            pg.SetBool("CheckForUpdates", True)
+        elif ok and item==items[3]:
+            checkUpdates = True
+            pg.SetBool("CheckForUpdates", False)
         elif ok and item==items[5]:
             new_coplanar_tol, ok = QtGui.QInputDialog.getDouble(window,"Coplanar tolerance", "Enter coplanar tolerance\n(Used when creating coplanar points.  Increase if some points are missing.)", coplanar_tol,.0000001,1,8)
             if ok:
