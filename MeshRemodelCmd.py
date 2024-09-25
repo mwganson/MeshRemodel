@@ -3304,6 +3304,7 @@ console.  This provides persistent storage for selection blocks.
                 if line.startswith(">>> # Gui.Selection")]
         blocks = self.make_blocks(lines)
         blocks = self.filter_blocks(blocks, FreeCAD.ActiveDocument.Name)
+        blocks = self.parseTextDocuments() + blocks
         if not blocks:
             FreeCAD.Console.PrintError("MeshRemodel: Not enough selection history\n")
             return
@@ -3342,6 +3343,19 @@ console.  This provides persistent storage for selection blocks.
             return dialog.selected_index
         else:
             return -1
+
+    def parseTextDocuments(self):
+        """Check for any text documents created previously and return those as blocks"""
+        doc = FreeCAD.ActiveDocument
+        if not doc:
+            return []
+        textDocs = [obj for obj in doc.Objects if obj.isDerivedFrom("App::TextDocument") and "Selection_block" in obj.Name]
+        blocks = []
+        for td in textDocs:
+            lines = td.Text.split("\n") if td.Text else []
+            lines.reverse() #because make_blocks will reverse again
+            blocks.extend(self.make_blocks(lines))
+        return blocks
             
     def filter_blocks(self, blocks, doc_name):
         """we only want the blocks that reference the current active document 

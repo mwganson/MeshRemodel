@@ -373,6 +373,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2024.09.25 (1.10.25) -- go back selection pulls also from text document objects
 * 2024.09.22 (1.10.24) -- fix addon manager check for udpates after addon manager code change
 * 2024.09.21 (1.10.23) -- make offset interim face inside a try/except block in SketchPlus objects
 * 2024.09.16 (1.10.22) -- add all vertical lines to grid surface for gordon template, not just outer lines
