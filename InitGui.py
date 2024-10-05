@@ -128,7 +128,7 @@ class MeshRemodelWorkbench(Workbench):
         
         def check_for_update(current_version, user, repo, branch, callback):
             latest_version = get_remote_version(user, repo, branch)
-            if latest_version and latest_version != current_version:
+            if latest_version and latest_version > current_version:
                 callback(latest_version)
         
         # Example usage

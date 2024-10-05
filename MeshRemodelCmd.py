@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.09.25"
-__version__ = "1.10.25"
+__date__    = "2024.10.04"
+__version__ = "1.10.26"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -5623,7 +5623,7 @@ first oriiginal wire.
     def handleRotate(self, fp, shape):
         """Rotate one or more wires """
         SketchPlus.wireShapeDict["RotateWires"] = shape
-            
+        constructionCircles = self.fetchConstruction(fp, "RotateSettings", SketchPlus.RotateSettingsDefault, filter=["Circle","Point","ArcOfCircle"])            
         if shape.isNull():
             return shape
 
@@ -5649,7 +5649,6 @@ first oriiginal wire.
         while len(angles) < len(patternWires):
             angles.append(angles[-1])
 
-        constructionCircles = self.fetchConstruction(fp, "RotateSettings", SketchPlus.RotateSettingsDefault, filter=["Circle","Point","ArcOfCircle"])
         center = FreeCAD.Vector() #for default Origin
         if fp.RotateSettings not in SketchPlus.RotateSettingsDefault:
             geo = constructionCircles[fp.RotateSettings]
@@ -5678,6 +5677,7 @@ first oriiginal wire.
     def handlePolar(self, fp, shape):
         """Polar array """
         SketchPlus.wireShapeDict["PolarWires"] = shape
+        constructionCircles = self.fetchConstruction(fp, "PolarCenter", SketchPlus.PolarCenterDefault, filter=["Circle","Point","ArcOfCircle"])
         if shape.isNull():
             return shape
         count = len(fp.PolarAngles) if fp.PolarAngles else fp.PolarCount
@@ -5694,7 +5694,6 @@ first oriiginal wire.
             FreeCAD.Console.PrintError("Nothing to pattern, skipping Polar Pattern function\n")
             return shape
 
-        constructionCircles = self.fetchConstruction(fp, "PolarCenter", SketchPlus.PolarCenterDefault, filter=["Circle","Point","ArcOfCircle"])
         center = FreeCAD.Vector() #for default Origin
         if fp.PolarCenter != "Origin":
             geo = constructionCircles[fp.PolarCenter]
@@ -5896,11 +5895,13 @@ Skipping function\n")
     def handleRectangularArray(self, fp, shape):
         """makes a rectangular array of desired wires"""
         SketchPlus.wireShapeDict["RectangularWires"] = shape
+        constructionCircles = self.fetchConstruction(fp, "RectangularRotationCenter", SketchPlus.RectangularRotationCenterDefault, filter=["Circle","Point","ArcOfCircle"])
+                
         if shape.isNull():
             return shape
             
         roguePoints = self.getRoguePoints(fp,shape)
-        constructionCircles = self.fetchConstruction(fp, "RectangularRotationCenter", SketchPlus.RectangularRotationCenterDefault, filter=["Circle","Point","ArcOfCircle"])
+
 
         if fp.RectangularCountX == 1 and fp.RectangularCountY == 1 and fp.RectangularRotation == 0:
             return shape

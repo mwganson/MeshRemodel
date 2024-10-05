@@ -373,6 +373,8 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:<br/>
+* 2024.10.04 (1.10.26) -- SketchPlus: fix bug in Rotate, Polar, and Rectangular where construction elements were not getting put into the enumeration as an option for the rotation center.
+** fix bug in update checker so that it only warns where the available version is greater than installed version
 * 2024.09.25 (1.10.25) -- go back selection pulls also from text document objects
 * 2024.09.22 (1.10.24) -- fix addon manager check for udpates after addon manager code change
 * 2024.09.21 (1.10.23) -- make offset interim face inside a try/except block in SketchPlus objects
