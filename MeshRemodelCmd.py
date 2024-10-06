@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.10.04"
-__version__ = "1.10.26"
+__date__    = "2024.10.05"
+__version__ = "1.10.276"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -6783,7 +6783,7 @@ Create a new SketchPlus object\n\
                                                     body.Origin.ViewObject.Visibility
                     body.Origin.ViewObject.Visibility = True
             elif part:
-                if not obj in Part.Group:
+                if not obj in part.Group:
                     part.Group += [obj]
                     MeshRemodelCreateSketchCommandClass.activeObjectOriginVisibility = \
                                                     part.Origin.ViewObject.Visibility
@@ -6879,6 +6879,11 @@ Create a new SketchPlus object\n\
                         for sub in subs:
                             obj.addExternal(link.Name, sub)
                     doc.recompute()
+                    skParent = sk.getParentGeoFeatureGroup()
+                    if skParent:
+                        if hasattr(skParent,"Group"):
+                            if not obj in skParent.Group:
+                                skParent.Group = skParent.Group + [obj]
     
                 if MeshRemodelCreateSketchCommandClass.activeObject:
                     MeshRemodelCreateSketchCommandClass.activeObject.Origin.ViewObject.Visibility = \
