@@ -84,6 +84,7 @@ class MeshRemodelWorkbench(Workbench):
                     "MeshRemodelCreateCircle",
                     "MeshRemodelCreateArc",
                     "MeshRemodelCreateWire",
+                    "MeshRemodelCreateTugBoat",
                     "MeshRemodelRotateObject",
                     "MeshRemodelMoveAxial",
                     "MeshRemodelGoBackSelection",

@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.10.05"
-__version__ = "1.10.276"
+__date__    = "2024.10.09"
+__version__ = "1.10.28"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -2871,6 +2871,551 @@ class MeshRemodelFlattenDraftBSplineCommandClass(object):
         return True
 
 # end create BSpline class
+################################################################################
+#TugBoat object
+################################################################################
+import FreeCAD, FreeCADGui, Part
+from PySide import QtCore, QtWidgets, QtGui
+
+class TugBoat:
+    def __init__(self, obj):
+        obj.Proxy = self
+        obj.addExtension("Part::AttachExtensionPython")
+        grp = "TugBoat"
+        obj.addProperty("App::PropertyLinkHidden", "Vessel", grp, "Tow object to be transported")
+        obj.addProperty("App::PropertyLinkHidden", "Destination", grp,"Empty = Origin, global or local depending on GlobalPlacement setting.  Otherwise can be any object with a placement property, preferably another TugBoat serving as destination point.  After the transport this TugBoat will align itself perfectly with destination TugBoat and apply the same transformation to the vessel.")
+        obj.addProperty("App::PropertyEnumeration","Commands", grp, "Sit tight = do nothing, Haul vessel = do transport.  Note that after doing the transport this gets set back to Sit tight automatically.")
+        obj.Commands = ["Sit tight", "Haul vessel","Rotate only","Translate only"]
+        grp = "Tugboat visual"
+        obj.addProperty("App::PropertyFloatConstraint","CircleScale",grp,"Scales the circles").CircleScale = (1,0.1,float("inf"),.01)
+        obj.addProperty("App::PropertyFloatConstraint","LineScale",grp,"Scales the line segment").LineScale = (1,0.1,float("inf"),.01)
+        obj.addProperty("App::PropertyBool","OffsetLines",grp, "Whether to have a small gap between center and axis lines").OffsetLines = True
+        grp = "TugBoat settings"
+        obj.addProperty("App::PropertyBool","GlobalPlacement",grp,"Whether to use global or local coordinate system, tow vessel to local origin or global origin, useful where all objects are not in the same container.").GlobalPlacement = True
+        obj.addProperty("App::PropertyBool","EditAttachmentOffsetWhenMoving",grp,"Whether to adjust the attachment offset of an object in order to complete a haul/move.").EditAttachmentOffsetWhenMoving = True
+        obj.addProperty("App::PropertyBool","AdjustProfileWhenMoving",grp,"Whether to move an unattached profile, such as a subshapebinder or an unattached sketch when hauling a part design feature").AdjustProfileWhenMoving = True
+        obj.addProperty("App::PropertyBool","AdjustSketchAttachmentOffsetWhenMoving",grp,"When moving a PartDesign::Feature object if it is profile based, and if it has a sketch as the profile, and if the sketch is attached, then if this is true, we adjust the sketch's attachment offset property to position the feature.").AdjustSketchAttachmentOffsetWhenMoving = True
+        obj.addProperty("App::PropertyString","Version",grp,"Version used to create this object").Version = __version__
+
+
+    def onChanged(self, fp, prop):
+        if prop == "Commands":
+            if fp.Commands == "Haul vessel" or fp.Commands == "Rotate only" or fp.Commands == "Translate only":
+                self.haulIt(fp)
+        elif bool(prop == "Vessel" or prop == "Destination" or prop == "Placement") and fp.ViewObject:
+            fp.ViewObject.signalChangeIcon()
+
+    def isAttached(self, objToCheck):
+        """checks to see if objToCheck is attached"""
+
+        if not objToCheck.hasExtension('Part::AttachExtension'):
+            return False
+        supportPropertyName = "AttachmentSupport" if hasattr(objToCheck,"AttachmentSupport") else "Support"
+        support = getattr(objToCheck, supportPropertyName)
+        mapMode = objToCheck.MapMode
+        if mapMode == "Deactivated":
+            return False
+        if support:
+            return True
+
+    def adjustProfile(self, fp):
+        """called when a part design feature is being moved and its profile object is not attached
+        this function will then move the profile object"""
+        if not fp.AdjustProfileWhenMoving:
+            return
+        if not fp.Vessel.isDerivedFrom("PartDesign::Feature"):
+            return
+        if not hasattr(fp.Vessel, "Profile"):
+            return
+        if not fp.Vessel.Profile:
+            return
+        sk,subnames = fp.Vessel.Profile #sk might be sketch or binder or None
+        if not sk:
+            return
+        if sk.isDerivedFrom("PartDesign::Feature"):
+            FreeCAD.Console.PrintWarning(f"{fp.Label} captain: We will adjust the placement of {sk.Label} as part of hauling {fp.Vessel.Label}, but it's possible this might be unsuccessful.  We can move unnattached sketches or SubShapeBinders like this when they're used as profiles, but part design features should be hauled separately.")
+        sk.Document.openTransaction(f"{fp.Label} haul {sk.Label}")
+        sk.Placement = fp.Vessel.Placement #vessel has already been moved
+        sk.Document.commitTransaction()
+
+    def adjustSketchAttachmentOffset(self, fp):
+        """ if fp.Vessel is a PartDesign feature and if it has a Profile property
+        and if the profile is a sketch and if the sketch is attached and if
+        fp.AdjustSketchAttachmentOffsetWhenMoving is True, then we move the object
+        by adjusting its sketch's attachment offset property
+        """
+        if not fp.AdjustSketchAttachmentOffsetWhenMoving:
+            return
+        if not fp.Vessel.isDerivedFrom("PartDesign::Feature"):
+            return
+        if not hasattr(fp.Vessel, "Profile"):
+            return
+        if not fp.Vessel.Profile:
+            return
+        sk,subnames = fp.Vessel.Profile
+        if not sk:
+            return
+        if not sk.isDerivedFrom("Sketcher::SketchObject"):
+            return
+        if not self.isAttached(sk):
+            return
+        oldPlm = fp.Vessel.Placement #vessel has already been moved
+
+        att_plm = sk.Attacher.calculateAttachedPlacement(sk.Placement).multiply(sk.AttachmentOffset.inverse())
+
+        att_offset = att_plm.inverse().multiply(oldPlm)
+        sk.Document.openTransaction(f"Haul {fp.Vessel.Label} : {sk.Label} attachment offset")
+        sk.AttachmentOffset = att_offset
+        sk.Document.commitTransaction()
+
+    def adjustAttachmentOffset(self, fp):
+        """ adjusts the attachment offset of fp.Vessel in order to make it stay put,
+        """
+        if not self.isAttached(fp.Vessel) or not fp.EditAttachmentOffsetWhenMoving:
+            return
+
+        # credit to DeepSOIC for the basis of the following code, from a macro
+        # he wrote to modify attachment offsets to keep a sketch  in its current position
+        # I have modified his code to meet my needs here, any mistakes are mine, not his
+        # since this is now being used in a different context
+
+        oldPlm = fp.Vessel.Placement
+
+        att_plm = fp.Vessel.Attacher.calculateAttachedPlacement(fp.Vessel.Placement).multiply(fp.Vessel.AttachmentOffset.inverse())
+
+        att_offset = att_plm.inverse().multiply(oldPlm)
+        fp.Document.openTransaction(f"Edit {fp.Vessel.Label} attachment offset")
+        fp.Vessel.AttachmentOffset = att_offset
+        fp.Document.commitTransaction()
+
+
+    def execute(self, fp):
+        radii = .5
+        radii *= fp.CircleScale if fp.CircleScale else 1
+        lineLength = 2.5
+        lineLength *= fp.LineScale if fp.LineScale else 1
+        pnt = FreeCAD.Vector()
+        axisZ = FreeCAD.Vector(0,0,1)
+        axisX = FreeCAD.Vector(1,0,0)
+        axisY = FreeCAD.Vector(0,1,0)
+        vert = Part.Vertex(pnt)
+        circleZ = Part.makeCircle(radii, pnt, axisZ)
+        circleY = Part.makeCircle(radii, pnt, axisY)
+        circleX = Part.makeCircle(radii, pnt, axisX)
+        offset = lineLength / 20 if fp.OffsetLines else 0
+        upLine = Part.makePolygon([FreeCAD.Vector(0, 0, offset), FreeCAD.Vector(0, 0, lineLength)])
+        rightLine = Part.makePolygon([FreeCAD.Vector(offset, 0, 0), FreeCAD.Vector(lineLength, 0, 0)])
+        backLine = Part.makePolygon([FreeCAD.Vector(0, offset, 0), FreeCAD.Vector(0, lineLength, 0)])
+        comp = Part.makeCompound([vert, circleX, circleY, circleZ, rightLine, backLine, upLine])
+        fp.Shape = comp
+        fp.ViewObject.LineColorArray = [(255,0,0,255),(0,255,0,255),(0,0,255,255)] * 2 #red, green, blue
+        fp.ViewObject.LineWidth = 3
+        fp.ViewObject.PointSize = 5
+        fp.ViewObject.PointColor = (85, 255, 255)
+        fp.positionBySupport()
+
+    def getRecursiveGlobalPlm(self, obj):
+        """ app::part containers might be nested, so recursively calculate the global placement
+        obj is assumed to be a valid object that is the parent container of another object, for
+        example it could be a PartDesign::Body or an App::Part, returns the product of all the
+        parent object's nested placements
+        """
+        assert(obj is not None) #programming logical error if obj is None
+        full = obj.Placement.copy()
+        parent = obj.getParentGeoFeatureGroup()
+        while parent:
+            full = parent.Placement.multiply(full)
+            parent = parent.getParentGeoFeatureGroup()
+        return full
+
+    def haulIt(self, fp):
+        """do the actual move"""
+
+        if fp.Vessel:
+            if not hasattr(fp.Vessel, "Placement"):
+                FreeCAD.Console.PrintError(f"{fp.Label} captain: Nothing to latch onto!  Can't move {fp.Vessel.Label} because it has no Placement property.\n")
+                return
+
+            if fp.Vessel.isDerivedFrom("App::Plane")or fp.Vessel.isDerivedFrom("App::Line") or fp.Vessel.isDerivedFrom("App::Origin"):
+                FreeCAD.Console.PrintError(f"{fp.Label} captain: She won't budge!  Not moving origin object, select the container object instead, e.g. Part Design Body or App::Part object.\n")
+                return
+
+            plmDest = FreeCAD.Placement()
+            if fp.Destination and not fp.GlobalPlacement:
+                vParent = fp.Vessel.getParentGeoFeatureGroup()
+                dParent = fp.Destination.getParentGeoFeatureGroup()
+                if vParent.Name != dParent.Name:
+                    FreeCAD.Console.PrintWarning(f"{fp.Label} captain: Since the vessel is in a different container than the destination, you might want to prefer setting GlobalPlacement to True.\n")
+
+            if fp.Destination and hasattr(fp.Destination, "Placement"):
+                if fp.GlobalPlacement:
+                    plmDest = self.getRecursiveGlobalPlm(fp.Destination).copy()
+                else:
+                    plmDest = fp.Destination.Placement.copy()
+
+            if fp.GlobalPlacement:
+                fpPlm = self.getRecursiveGlobalPlm(fp)
+                vesselPlm = self.getRecursiveGlobalPlm(fp.Vessel)
+            else:
+                fpPlm = fp.Placement.copy()
+                vesselPlm = fp.Vessel.Placement.copy()
+
+            relativePlm = fpPlm.inverse().multiply(vesselPlm) #full transformation if unchanged below
+
+            if fp.Commands == "Translate only":
+                newPlm = fpPlm.copy()
+                newPlm.move(plmDest.Base - fpPlm.Base)
+            elif fp.Commands == "Rotate only":
+                newPlm = fpPlm.copy()
+                newPlm.Rotation = vesselPlm.Rotation.slerp(plmDest.Rotation, 1) #1 means complete rotation
+            else:
+                newPlm = plmDest.multiply(relativePlm) #default full transformation
+
+            #bug in isSame()? -- use the string comparison as a double check
+            if not newPlm.isSame(vesselPlm, Part.Precision.confusion()) or f"{newPlm}" != f"{vesselPlm}":
+                fp.Document.openTransaction(f"TugBoat haul {fp.Vessel.Label}")
+                if fp.GlobalPlacement:
+                    vParent = fp.Vessel.getParentGeoFeatureGroup()
+                    if vParent:
+                        fp.Vessel.Placement = self.getRecursiveGlobalPlm(vParent).inverse().multiply(newPlm)
+                    else:
+                        fp.Vessel.Placement = newPlm
+                else:
+                    fp.Vessel.Placement = newPlm
+
+                if not fp.Vessel.isDerivedFrom("PartDesign::Feature"):
+                    self.adjustAttachmentOffset(fp) # checks user EditAttachmentOffsetWhenMoving boolean
+                else:
+                    self.adjustSketchAttachmentOffset(fp) #simply returns if profile is attached
+                    self.adjustProfile(fp) #handles unattached profiles
+
+                if fp.GlobalPlacement:
+                    # we must undo the parent container's global transformation here if necessary
+                    # check if we have a parent, if so, get the parent's global placement
+                    fpParent = fp.getParentGeoFeatureGroup()
+                    if fpParent:
+                        fp.Placement = self.getRecursiveGlobalPlm(fpParent).inverse().multiply(plmDest)
+                    else:
+                        fp.Placement = plmDest
+                else:
+                    fp.Placement = plmDest
+                fp.Document.commitTransaction()
+        else:
+            FreeCAD.Console.PrintError(f"{fp.Label} captain: No vessel.  Set your vessel and try again.\n")
+
+        fp.Commands = "Sit tight"
+        fp.Document.recompute()
+
+
+class TugBoatVP:
+    def __init__(self, vobj):
+        vobj.Proxy = self
+        self.fpName = vobj.Object.Name
+
+    def doubleClicked(self, vobj):
+        fp = vobj.Object
+        fp.Commands = "Haul vessel"
+        fp.Document.recompute()
+
+    def setupContextMenu(self, vobj, menu):
+        def makePutTrigger(arg): return lambda : self.putInContainer(arg)
+        def makePickTrigger(arg): return lambda : self.pickDestination(arg)
+        def makeVesselTrigger(arg): return lambda : self.pickVessel(arg)
+
+        fp = vobj.Object
+
+        if fp.Vessel:
+            haulMenu = menu.addMenu("Haul commands")
+            haulAction = haulMenu.addAction(f"Haul {fp.Vessel.Label}")
+            haulAction.triggered.connect(lambda : setattr(fp, "Commands", "Haul vessel"))
+            translateAction = haulMenu.addAction(f"Translate only {fp.Vessel.Label}")
+            translateAction.triggered.connect(lambda : setattr(fp, "Commands", "Translate only"))
+            rotateAction = haulMenu.addAction(f"Rotate only {fp.Vessel.Label}")
+            rotateAction.triggered.connect(lambda : setattr(fp, "Commands", "Rotate only"))
+            if fp.Vessel.TypeId == "Part::Feature" or fp.Vessel.TypeId == "Mesh::Feature" or fp.Vessel.TypeId == "Points::Feature":
+                identityAction = menu.addAction(f"Set {fp.Vessel.Label} to identity placment")
+                identityAction.triggered.connect(lambda : self.setToIdentity(FreeCAD.Placement()))
+                fpIdentityAction = menu.addAction(f"Set {fp.Vessel.Label} to {fp.Label} placement")
+                fpIdentityAction.triggered.connect(lambda : self.setToIdentity(fp.Placement.inverse()))
+        else:
+            haulAction = menu.addAction("Haul vessel (no vessel configured) ")
+            haulAction.setEnabled(False)
+
+        fpParent = fp.getParentGeoFeatureGroup()
+        containers = [obj for obj in fp.Document.Objects if obj.isDerivedFrom("App::Part") or obj.isDerivedFrom("PartDesign::Body")]
+        if containers:
+            putMenu = menu.addMenu("Put into container")
+            for container in containers:
+                star = "*" if container == fpParent else ""
+                putAction = putMenu.addAction(f"{star}{container.Label}")
+                putAction.setIcon(container.ViewObject.Icon)
+                putAction.triggered.connect(makePutTrigger(container))
+
+        tugs = [obj for obj in fp.Document.Objects if "TugBoat" in obj.Name and obj != fp]
+        pickMenu = menu.addMenu("Pick destination")
+        if not fp.Destination and not fp.GlobalPlacement:
+            pickAction = pickMenu.addAction("*Local origin")
+            pickAction.setEnabled(False)
+        else:
+            pickAction = pickMenu.addAction("Local origin")
+        pickAction.triggered.connect(makePickTrigger("Local origin"))
+        if not fp.Destination and fp.GlobalPlacement:
+            pickAction = pickMenu.addAction("*Global origin")
+            pickAction.setEnabled(False)
+        else:
+            pickAction = pickMenu.addAction("Global origin")
+        pickAction.triggered.connect(makePickTrigger("Global origin"))
+
+        pickAction = pickMenu.addAction("New TugBoat")
+        pickAction.triggered.connect(makePickTrigger("New TugBoat"))
+
+        for tug in tugs:
+            if fp.Destination == tug:
+                pickAction = pickMenu.addAction(f"*{tug.Label}")
+                pickAction.setEnabled(False)
+            else:
+                pickAction = pickMenu.addAction(tug.Label)
+            pickAction.setIcon(tug.ViewObject.Icon)
+            pickAction.triggered.connect(makePickTrigger(tug))
+
+        vessels = [obj for obj in fp.Document.Objects if
+                    hasattr(obj,"Placement")
+                    and obj!= fp and obj != fp.Destination
+                    and not obj.isDerivedFrom("App::Line")
+                    and not obj.isDerivedFrom("App::Plane")
+                    and not obj.isDerivedFrom("App::Origin")]
+        if vessels:
+            vesselMenu = menu.addMenu("Pick vessel")
+            for vessel in vessels:
+                if fp.Vessel == vessel:
+                    pickVesselAction = vesselMenu.addAction(f"*{vessel.Label}")
+                    pickVesselAction.setEnabled(False)
+                else:
+                    pickVesselAction = vesselMenu.addAction(vessel.Label)
+                pickVesselAction.setIcon(vessel.ViewObject.Icon)
+                pickVesselAction.triggered.connect(makeVesselTrigger(vessel))
+
+    def setToIdentity(self, newPlm):
+        """
+        Here we attempt to reset the internal placement of the object by transforming
+        its geometry.  If newPlm is the identity placement, then the object is at
+        the origin and the user wishes to set this as the new placement, typically.
+        Otherwise, the vessel's internal placement is set to the placement of the TugBoat.
+        """
+        fp = FreeCAD.ActiveDocument.getObject(self.fpName)
+        vessel = fp.Vessel
+        if not fp.Vessel:
+            FreeCAD.Console.PrintError(f"{fp.Label} captain: Can't reset internal placement of nothing.\n")
+            return
+        fp.Document.openTransaction(f"set new placement {fp.Vessel.Label}")
+        if vessel.TypeId == "Points::Feature":
+            pts = vessel.Points
+            if newPlm == FreeCAD.Placement():
+                pts = vessel.Points.copy()
+                points.transformGeometry(vessel.Placement.toMatrix())
+            else:
+                pts = vessel.Points.copy()
+                pts.transformGeometry(newPlm.toMatrix())
+            vessel.Points = pts
+            vessel.Placement = newPlm.inverse()
+            fp.Document.recompute()
+        elif vessel.TypeId == "Mesh::Feature":
+            if newPlm == FreeCAD.Placement():
+                mesh = vessel.Mesh.copy()
+                mesh.transform(vessel.Placement.toMatrix())
+            else:
+                mesh = vessel.Mesh.copy()
+                mesh.transform(newPlm.toMatrix())
+            vessel.Mesh = mesh
+            vessel.Placement = newPlm.inverse()
+        elif vessel.TypeId == "Part::Feature":
+            if newPlm == FreeCAD.Placement():
+                shape = vessel.Shape.copy().transformShape(vessel.Placement.toMatrix(), True)
+            else:
+                shape = vessel.Shape.copy().transformShape(newPlm.toMatrix(), True)
+            vessel.Shape = shape
+            vessel.Placement = newPlm.inverse()
+        else:
+            FreeCAD.Console.PrintError(f"{fp.Label} captain: Unsupported vessel type for resetting internal placement, can't work with objects of type: {vessel.TypeId}\n")
+            fp.Document.abortTransaction()
+        fp.Document.commitTransaction()
+        fp.Document.recompute()
+
+
+    def pickVessel(self, vessel):
+        fp = FreeCAD.ActiveDocument.getObject(self.fpName)
+        fp.Vessel = vessel
+        fp.Document.recompute()
+
+    def pickDestination(self, destination):
+        fp = FreeCAD.ActiveDocument.getObject(self.fpName)
+
+        if destination == "Local origin":
+            fp.Destination = None
+            fp.GlobalPlacement = False
+        elif destination == "Global origin":
+            fp.Destination = None
+            fp.GlobalPlacement = True
+        elif destination == "New TugBoat":
+            tug = fp.Document.addObject("Part::FeaturePython","TugBoat")
+            TugBoat(tug)
+            TugBoatVP(tug.ViewObject)
+            fp.Destination = tug
+            fpParent = fp.getParentGeoFeatureGroup()
+            if fpParent:
+                fpParent.Group = fpParent.Group + [tug]
+        else:
+            fp.Destination = destination
+        fp.Document.recompute()
+
+    def putInContainer(self, container):
+        fp = FreeCAD.ActiveDocument.getObject(self.fpName)
+        if fp in container.Group:
+            return
+        container.Group = container.Group + [fp]
+        fp.Document.recompute()
+
+    def getIcon(self):
+        fp = FreeCAD.ActiveDocument.getObject(self.fpName)
+        icon = TugBoatVP.__icon__
+        if fp.Vessel:
+            icon = icon.replace("none","darkgray")
+            icon = icon.replace("red","blue")
+        if fp.Destination:
+            icon = icon.replace("burgundy", "green")
+            if "TugBoat" in fp.Destination.Name:
+                if fp.Destination.ViewObject:
+                    fp.Destination.ViewObject.signalChangeIcon()
+        tugs = [obj for obj in fp.Document.Objects if "TugBoat" in obj.Name and fp == obj.Destination]
+        if tugs:
+            icon = icon.replace("none","orange")
+            for tug in tugs:
+                if tug.ViewObject:
+                    tug.ViewObject.signalChangeIcon()
+        return icon
+
+    __icon__ = """/* XPM */
+static char *dummy[]={
+"64 64 4 1",
+". c none",
+"# c burgundy",
+"b c red",
+"a c None",
+"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"..............................aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"..............................aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"...............................aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"...............................aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"...............................aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaa.........................aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaa..................aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaa.................aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaa................aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaa..............aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaa..............aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaa.............aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaa...........aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaa............aaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaa...........aaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaa...........aaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaaa..........aaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaaa..........aaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaaa..........aaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaaaa.........aaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaaaa.........aaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaaaaa........aaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaaaaaa.......aaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaaaaaa.......aaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaaaaaa.......aaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaaaaaa.......aaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaa#################aaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaa###################aaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaa#####################aaaaaaaaaaaa#aaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaa#####################aaaaaaaaaaa###aaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaa###bbbbbbbbbbbbbbb###aaaaaaaaaa#####aaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaa###bbbbbbbbbbbbbbb###aaaaaaaaaa#####aaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaa###bbbbbbbbbbbbbbb###aaaaaaaaa######aaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaa###bbbbbbbbbbbbbbb###aaaaaaaaa######aaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaa###bbbbbbbbbbbbbbb###aaaaaaaa#######aaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaa###bbbbbbbbbbbbbbb###aaaaaaa########aaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaa###bbbbbbbbbbbbbbb###aaaaaa#########aaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaa###bbbbbbbbbbbbbbb###aaaaa##########aaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaa###bbbbbbbbbbbbbbb###aaaa###bbbbb###aaaaaa",
+"aaaaaaaaaaaaa############bbbbbbbbbbbbbbb###aa#####bbbbb###aaaaaa",
+"aaaaaaaaaaaa#############bbbbbbbbbbbbbbb###a#####bbbbbb###aaaaaa",
+"aaaaaaaaaaa##############bbbbbbbbbbbbbbb########bbbbbbb###aaaaaa",
+"aaaaaaaaaaa#############bbbbbbbbbbbbbbbb######bbbbbbbbb###aaaaaa",
+"aaaaaaaaaaa############bbbbbbbbbbbbbbbbb#####bbbbbbbbbb###aaaaaa",
+"aaaaaaaaaaa###bbbbbbbbbbbbbbbbbbbbbbbbbb###bbbbbbbbbbbb###aaaaaa",
+"aaaaaaaaaaa###bbbbbbbbbbbbbbbbbbbbbbbbbbb#bbbbbbbbbbbbb###aaaaaa",
+"aaaaaaaaaaa###bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb####aaaaaaa",
+"aaaaaaaaaaa###bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb#####aaaaaaaa",
+"aaaaaaaaaaa###bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb######aaaaaaaaa",
+"aaaaaaaaaaa###bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb#######aaaaaaaaaa",
+"aaaaaaaaaaa###bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb########aaaaaaaaaaa",
+"aaaaaaaaaaa###bbbbbbbbbbbbbbbbbbbbbbbbbbbb#########aaaaaaaaaaaaa",
+"aaaaaaaaaaa###bbbbbbbbbbbbbbbbbbbbbbbbb##########aaaaaaaaaaaaaaa",
+"aaaaaaaaaaa###bbbbbbbbbbbbbbbbbbbb#############aaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaa###################################aaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaa################################aaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaa############################aaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaa########################aaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaa##################aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"};
+"""
+
+class MeshRemodelCreateTugBoatCommandClass:
+    """TugBoat object for hauling objects around"""
+    
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'TugBoat.svg') ,
+            'MenuText': "TugBoat" ,
+            'ToolTip' : \
+"""Use the tugboat to haul other objects around in FreeCAD.  Works on any type
+of object as long as it has a Placement property, including meshes, points,
+and shapes.
+
+Usage: Create the TugBoat object.  Use the context menu to configure the vessel
+and the destination.  If destination is not set, then the global origin is the
+default.  Move the tugboat to the position on the vessel where you want it to 
+latch onto.  The tugboat can be attached to the vessel or not, should work either
+way.  Use the haul vessel option from the context menu or doubleclick the tugboat
+to do the haul.
+"""}
+
+    def Activated(self):
+        
+        doc = FreeCAD.ActiveDocument if FreeCAD.ActiveDocument else FreeCAD.newDocument()
+
+        doc.openTransaction("Create TugBoat")
+        fp = doc.addObject("Part::FeaturePython","TugBoat")
+        TugBoat(fp)
+        TugBoatVP(fp.ViewObject)
+        doc.commitTransaction()
+        sel = Gui.Selection.getSelection()
+        if len(sel) == 1:
+            if "TugBoat" in sel[0].Name:
+                #duplicate all properties
+                tug = sel[0]
+                blacklist = ["PropertiesList","ExpressionEngine","Label","Label2"]
+                props = [p for p in tug.PropertiesList if not p in blacklist]
+                for prop in props:
+                    setattr(fp, prop, getattr(tug, prop))
+            elif hasattr(sel[0], "Placement"):
+                fp.Vessel = sel[0]
+            vParent = sel[0].getParentGeoFeatureGroup()
+            if vParent:
+                vParent.Group = vParent.Group + [fp]
+        doc.recompute()
+
+    def IsActive(self):
+        if FreeCAD.ActiveDocument:
+            return True
+        return False
+
 ################################################################################
 
 # rotate an object in place
@@ -7810,6 +8355,7 @@ def initialize():
         Gui.addCommand("MeshRemodelCreateCircle", MeshRemodelCreateCircleCommandClass())
         Gui.addCommand("MeshRemodelCreateArc", MeshRemodelCreateArcCommandClass())
         Gui.addCommand("MeshRemodelCreateWire", MeshRemodelCreateWireCommandClass())
+        Gui.addCommand("MeshRemodelCreateTugBoat", MeshRemodelCreateTugBoatCommandClass())
         Gui.addCommand("MeshRemodelMoveAxial", MeshRemodelMoveAxialCommandClass())
         Gui.addCommand("MeshRemodelRotateObject", MeshRemodelRotateObjectCommandClass())
         Gui.addCommand("MeshRemodelGoBackSelection", MeshRemodelGoBackSelectionCommandClass())
