@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.10.10"
-__version__ = "1.10.29"
+__date__    = "2024.10.11"
+__version__ = "1.10.30"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -2896,7 +2896,10 @@ class TugBoat:
         obj.addProperty("App::PropertyBool","AdjustProfileWhenMoving",grp,"Whether to move an unattached profile, such as a subshapebinder or an unattached sketch when hauling a part design feature").AdjustProfileWhenMoving = True
         obj.addProperty("App::PropertyBool","AdjustSketchAttachmentOffsetWhenMoving",grp,"When moving a PartDesign::Feature object if it is profile based, and if it has a sketch as the profile, and if the sketch is attached, then if this is true, we adjust the sketch's attachment offset property to position the feature.").AdjustSketchAttachmentOffsetWhenMoving = True
         obj.addProperty("App::PropertyString","Version",grp,"Version used to create this object").Version = __version__
-
+        grp = "TugBoat Circle Angles"
+        obj.addProperty("App::PropertyAngle", "RedAngle", grp, "Angle of the red circle (X Axis -> YZ Plane), useful when other objects are attached concentrically to the circle as this provides an easy way to rotate them.")
+        obj.addProperty("App::PropertyAngle", "BlueAngle", grp, "Angle of the blue circle (Z Axis -> XY Plane), useful when other objects are attached concentrically to the circle as this provides an easy way to rotate them.")
+        obj.addProperty("App::PropertyAngle", "GreenAngle", grp, "Angle of the green circle (Y Axis -> XZ Plane), useful when other objects are attached concentrically to the circle as this provides an easy way to rotate them.")
 
     def onChanged(self, fp, prop):
         if prop == "Commands":
@@ -2904,7 +2907,7 @@ class TugBoat:
                 self.haulIt(fp)
         elif bool(prop == "Vessel" or prop == "Destination" or prop == "Placement") and fp.ViewObject:
             fp.ViewObject.signalChangeIcon()
-
+    
     def isAttached(self, objToCheck):
         """checks to see if objToCheck is attached"""
 
@@ -2990,6 +2993,7 @@ class TugBoat:
 
 
     def execute(self, fp):
+
         radii = .5
         radii *= fp.CircleScale if fp.CircleScale else 1
         lineLength = 2.5
@@ -3002,6 +3006,19 @@ class TugBoat:
         circleZ = Part.makeCircle(radii, pnt, axisZ)
         circleY = Part.makeCircle(radii, pnt, axisY)
         circleX = Part.makeCircle(radii, pnt, axisX)
+        
+        # update legacy objects version < 1.10.30
+        try:
+            circleZ.rotate(pnt, axisZ, fp.BlueAngle.Value)
+        except AttributeError as err:
+            grp = "TugBoat Circle Angles"
+            fp.addProperty("App::PropertyAngle", "RedAngle", grp, "Angle of the red circle (X Axis -> YZ Plane)")
+            fp.addProperty("App::PropertyAngle", "BlueAngle", grp, "Angle of the blue circle (Z Axis -> XY Plane)")
+            fp.addProperty("App::PropertyAngle", "GreenAngle", grp, "Angle of the green circle (Y Axis -> XZ Plane)")
+            circleZ.rotate(pnt, axisZ, fp.BlueAngle.Value)
+            
+        circleY.rotate(pnt, axisY, fp.GreenAngle.Value)
+        circleX.rotate(pnt, axisX, fp.RedAngle.Value)
         offset = lineLength / 20 if fp.OffsetLines else 0
         upLine = Part.makePolygon([FreeCAD.Vector(0, 0, offset), FreeCAD.Vector(0, 0, lineLength)])
         rightLine = Part.makePolygon([FreeCAD.Vector(offset, 0, 0), FreeCAD.Vector(lineLength, 0, 0)])

@@ -265,6 +265,9 @@ Default = True.  When moving a part design object that has a Profile property, i
 ### Edit Attachment Offset When Moving
 Default = True.  This differs from the above in that it is related to the objects own attachment offset property, and not that of its profile object, such as a sketch or subshapebinder.  This only applies if the object being hauled is attached to another object.  Obviously, if the object is moved and its attachment offset is not edited, then the object will just move back to where it was originally on the next recompute.  Note that Part Design primitives fall into this category of objects that do not have profile objects, but that can be directly attached to other objects.  Part workbench objects and Draft objects also fall into this catgory, and so do sketches.  You can use a tugboat to haul a sketch even if it is attached.
 
+### Circle Angles (added in 1.10.30)
+The circles can be rotated about their own axes with these properties.  This could be useful where you have something attached to one of the circles as a convenient way to rotate the object about this axis.
+
 ### Global Placement (boolean)
 Default = True.  Tugboats are container-aware.  If the tugboat and the vessel are in the same container, such as in the same PartDesign::Body or in the same App::Part, then you can set this to False to use the local coordinate system for the haul placement calculations.  On the other hand, if you want to move the vessel to the global origin (and leave it in the container) you can set Global Placement = True to achieve that.
 
@@ -410,7 +413,8 @@ Checks git repo for updates and notifies user in the report view as a warning me
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might actually be coplanar.  But even if they're not coplanar they'll be forced into coplanarity starting with v1.81.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
-#### Release notes:<
+#### Release notes:
+* 2024.10.11 (1.10.30) -- add angle properties to TugBoat circles to allow for easy rotation of objects attached to them
 * 2024.10.10 (1.10.29) -- fix minor typo in TugBoat context menu
 * 2024.10.09 (1.10.28) -- add TugBoat object
 * 2024.10.05 (1.10.27) -- fix minor typo in SketchPlus creation where Part should be part.
