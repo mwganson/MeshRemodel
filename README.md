@@ -410,7 +410,9 @@ Checks git repo for updates and notifies user in the report view as a warning me
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might actually be coplanar.  But even if they're not coplanar they'll be forced into coplanarity starting with v1.81.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
-#### Release notes:<br/>
+#### Release notes:<
+* 2024.10.10 (1.10.29) -- fix minor typo in TugBoat context menu
+* 2024.10.09 (1.10.28) -- add TugBoat object
 * 2024.10.05 (1.10.27) -- fix minor typo in SketchPlus creation where Part should be part.
 ** put sketchplus in same parent group if we are copying an existing sketch on creation
 * 2024.10.04 (1.10.26) -- SketchPlus: fix bug in Rotate, Polar, and Rectangular where construction elements were not getting put into the enumeration as an option for the rotation center.

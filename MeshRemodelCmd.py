@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.10.09"
-__version__ = "1.10.28"
+__date__    = "2024.10.10"
+__version__ = "1.10.29"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -3133,7 +3133,7 @@ class TugBoatVP:
             rotateAction = haulMenu.addAction(f"Rotate only {fp.Vessel.Label}")
             rotateAction.triggered.connect(lambda : setattr(fp, "Commands", "Rotate only"))
             if fp.Vessel.TypeId == "Part::Feature" or fp.Vessel.TypeId == "Mesh::Feature" or fp.Vessel.TypeId == "Points::Feature":
-                identityAction = menu.addAction(f"Set {fp.Vessel.Label} to identity placment")
+                identityAction = menu.addAction(f"Set {fp.Vessel.Label} to identity placement")
                 identityAction.triggered.connect(lambda : self.setToIdentity(FreeCAD.Placement()))
                 fpIdentityAction = menu.addAction(f"Set {fp.Vessel.Label} to {fp.Label} placement")
                 fpIdentityAction.triggered.connect(lambda : self.setToIdentity(fp.Placement.inverse()))
