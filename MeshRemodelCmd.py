@@ -3009,7 +3009,7 @@ class TugBoat:
         
         # update legacy objects version < 1.10.30
         try:
-            circleZ.rotate(pnt, axisZ, fp.BlueAngle.Value)
+            circleZ.rotate(pnt, axisZ, math.radians(fp.BlueAngle.Value))
         except AttributeError as err:
             grp = "TugBoat Circle Angles"
             fp.addProperty("App::PropertyAngle", "RedAngle", grp, "Angle of the red circle (X Axis -> YZ Plane)")
@@ -3167,8 +3167,8 @@ class TugBoatVP:
                 putAction = putMenu.addAction(f"{star}{container.Label}")
                 putAction.setIcon(container.ViewObject.Icon)
                 putAction.triggered.connect(makePutTrigger(container))
-
-        tugs = [obj for obj in fp.Document.Objects if "TugBoat" in obj.Name and obj != fp]
+        supportedTypes = ["PartDesign::CoordinateSystem"]
+        tugs = [obj for obj in fp.Document.Objects if obj.TypeId in supportedTypes or bool("TugBoat" in obj.Name and obj != fp)]
         pickMenu = menu.addMenu("Pick destination")
         if not fp.Destination and not fp.GlobalPlacement:
             pickAction = pickMenu.addAction("*Local origin")

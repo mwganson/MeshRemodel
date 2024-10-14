@@ -414,6 +414,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:
+* 2024.10.14 (1.10.31) -- add PartDesign::CoordinateSystem to destination options in context menu (TugBoat class), add framework to support additional TypeIds later.
 * 2024.10.11 (1.10.30) -- add angle properties to TugBoat circles to allow for easy rotation of objects attached to them
 * 2024.10.10 (1.10.29) -- fix minor typo in TugBoat context menu
 * 2024.10.09 (1.10.28) -- add TugBoat object
