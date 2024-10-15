@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.10.14"
-__version__ = "1.10.31"
+__date__    = "2024.10.15"
+__version__ = "1.10.32"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -3229,7 +3229,7 @@ class TugBoatVP:
             pts = vessel.Points
             if newPlm == FreeCAD.Placement():
                 pts = vessel.Points.copy()
-                points.transformGeometry(vessel.Placement.toMatrix())
+                pts.transformGeometry(vessel.Placement.toMatrix())
             else:
                 pts = vessel.Points.copy()
                 pts.transformGeometry(newPlm.toMatrix())
