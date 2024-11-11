@@ -386,6 +386,12 @@ Select 2 or more objects to enable this command.  It uses Draft.upgrade() to con
 ## Open Edge Finder tool
 <img src="Resources/icons/OpenEdgeFinder.svg" alt = "open edge finder icon"><br/>
 This is a sketch validation tool.  It looks for open edges, crossed edges, and T-Sections.  The issues will be depicted visually as red spheres on the screen at the problematic vertex locations.  The object can be deleted once the issues are corrected.
+## Parametric Mesh
+<img src="Resources/icons/ParametricMesh.svg" alt = "parametric mesh icon"><br/>
+Creates a parametric mesh from the selected shape object, or you can edit the Shape property to point to an object after creating the ParametricMesh object.  It uses the standard mesher only.  When the original object changes, the ParametricMesh object automatically updates.  There is a property to disable recomputes.<br/>
+<br/>
+I have noticed a rendering issue can sometimes occur when the original shape object contains bsplines.  I don't know the cause of this bug, and it might be hardware-related, and not something you will experience.  The workaround for me is to close and reopen the document to reset the rendering back to normal.<br/>
+
 ## Merge Sketches
 <img src="Resources/icons/MergeSketches.svg" alt = "merge sketches"><br/>
 Select 2 or more sketches to enable this command.  This uses Sketcher workbench merge sketches command.  It is here as a convenience.
@@ -414,7 +420,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:
-
+* 2024.11.10 (1.10.33) -- add parametric mesh object
 * 2024.10.15 (1.10.32) -- fix typo bug in TugBoat set points object to identity placement
 * 2024.10.14 (1.10.31) -- add PartDesign::CoordinateSystem to destination options in context menu (TugBoat class), add framework to support additional TypeIds later.
 * 2024.10.11 (1.10.30) -- add angle properties to TugBoat circles to allow for easy rotation of objects attached to them

@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.10.15"
-__version__ = "1.10.32"
+__date__    = "2024.11.10"
+__version__ = "1.10.33"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -8296,9 +8296,132 @@ class MeshRemodelOpenEdgeFinderCommandClass:
             return True
         return False
 
+##################################################################################################
+class ParametricMesh:
+
+    def __init__(self, obj):
+        obj.Proxy = self
+        grp = "Parametric Mesh"
+        obj.addProperty("App::PropertyLink", "Shape", grp, "Source object to use for this mesh")
+        obj.addProperty("App::PropertyFloat", "LinearDeflection",grp,"""
+Specifies the maximum allowable deviation between the original shape and the 
+generated mesh. Lower values produce a finer, more detailed mesh, while higher
+values create a coarser mesh.""").LinearDeflection = 0.1
+        obj.addProperty("App::PropertyAngle", "AngularDeflection",grp,"""
+Sets the maximum allowable angle deviation between adjacent mesh facets, in 
+radians.  Smaller values improve the smoothness of curved surfaces but increase
+mesh complexity.""").AngularDeflection = 10
+        obj.addProperty("App::PropertyBool", "Relative", grp, """
+When set to True, LinearDeflection is scaled relative to the overall bounding box
+size of the Shape, creating a proportional level of detail regardless of the shape's
+absolute size.""").Relative = False
+        obj.addProperty("App::PropertyBool","Segments",grp,"""
+Enables segmentation of the mesh if set to True, which might help retain the 
+segmentation from the original shape's topology.""").Segments = False
+        obj.addProperty("App::PropertyBool","DisableRecomputes",grp,"""
+Recomputing the mesh can sometimes take a long time, introducing delays in
+recomputing the overall model.  Set this to False temporarily until you are
+ready to export the mesh if want to reduce recompute times.""").DisableRecomputes = False
+        obj.addProperty("App::PropertyString","Version",grp,"Version of MeshRemodel used to create this object").Version = __version__
+
+            
+    def execute(self, fp):
+        if fp.DisableRecomputes:
+            return
+        if not fp.Shape:
+            fp.Mesh = Mesh.Mesh()
+            return
+        shape = Part.getShape(fp.Shape)
+        if shape.isNull():
+            fp.Mesh = Mesh.Mesh()
+            return
+        fp.Mesh = MeshPart.meshFromShape(shape, 
+                LinearDeflection = fp.LinearDeflection,
+                AngularDeflection = math.radians(fp.AngularDeflection.Value),
+                Relative = fp.Relative,
+                Segments = fp.Segments)
+                
+    def evaluate(self, fp):
+        """evaluate the Source object in mesh workbench"""
+        curWB = Gui.activeWorkbench().name()
+        Gui.activateWorkbench("MeshWorkbench")
+        Gui.activateWorkbench(curWB)
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(fp)
+        Gui.runCommand("Mesh_Evaluation", 0)
+        
+                                    
+class ParametricMeshVP:        
+    def __init__(self, obj):
+        obj.Proxy = self
+        obj.addProperty("App::PropertyString","AMessage","Display Options").AMessage =\
+"""If rendering looks strange,
+close and reopen your
+document to fix it."""
+    
+    def attach(self, obj):
+        pass
+        
+    def setupContextMenu(self, vobj, menu):
+        def toggle_recomputes(enable):
+            vobj.Object.DisableRecomputes = not enable
+    
+        if vobj.Object.DisableRecomputes:
+            refresh_action = menu.addAction("Enable recomputes")
+            refresh_action.triggered.connect(lambda: toggle_recomputes(True))
+        else:
+            refresh_action = menu.addAction("Disable recomputes")
+            refresh_action.triggered.connect(lambda: toggle_recomputes(False)) 
+             
+        evaluate_action = menu.addAction(f"Evaluate {vobj.Object.Label} for defects")
+        evaluate_action.triggered.connect(lambda: vobj.Object.Proxy.evaluate(vobj.Object))
+
+        
+    def updateData(self, fp, prop):
+        '''If a property of the handled feature has changed we have the chance to handle this here'''
+        # fp is the handled feature, prop is the name of the property that has changed
+        pass
+
+    def setDisplayMode(self,mode):
+        '''Map the display mode defined in attach with those defined in getDisplayModes.\
+                Since they have the same names nothing needs to be done. This method is optional'''
+        return mode
+ 
+    def onChanged(self, vp, prop):
+        '''Here we can do something when a single property got changed'''
+        pass
+        
+    def getIcon(self):
+        return os.path.join( iconPath , 'ParametricMesh.svg')
 
 
+class MeshRemodelParametricMeshCommandClass:
+    
+    def __init__(self):
+        pass
 
+    def GetResources(self):
+        return {'Pixmap'  : os.path.join( iconPath , 'ParametricMesh.svg') ,
+            'MenuText': "Parametric mesh" ,
+            'ToolTip' : "Parametric mesh from a shape."}
+ 
+    def Activated(self):
+        doc = FreeCAD.ActiveDocument
+        fp = doc.addObject("Mesh::FeaturePython","ParametricMesh")
+        ParametricMesh(fp)
+        ParametricMeshVP(fp.ViewObject)
+        sel = Gui.Selection.getSelection()
+        doc.recompute()
+        if len(sel) == 1:
+            if not Part.getShape(sel[0]).isNull():
+                fp.Shape = sel[0]
+                doc.recompute()
+            else:
+                FreeCAD.Console.PrintError(f"{fp.Label}: error {sel[0].Label} has a null shape, not setting as Shape property\n")
+    def IsActive(self):
+        if not FreeCAD.ActiveDocument:
+            return False
+        return True
 
 ##################################################################################################
 class MeshRemodelGroupCommandPointsObjects:
@@ -8329,6 +8452,7 @@ class MeshRemodelGroupCommandExtras:
                     "MeshRemodelMergeSketches",
                     "MeshRemodelFlattenDraftBSpline",
                     "MeshRemodelOpenEdgeFinder",
+                    "MeshRemodelParametricMesh",
                     "MeshRemodelValidateSketch",
                     "MeshRemodelPartCheckGeometry",
                     "MeshRemodelSubShapeBinder",
@@ -8381,6 +8505,7 @@ def initialize():
         Gui.addCommand("MeshRemodelMergeSketches", MeshRemodelMergeSketchesCommandClass())
         Gui.addCommand("MeshRemodelValidateSketch", MeshRemodelValidateSketchCommandClass())
         Gui.addCommand("MeshRemodelOpenEdgeFinder",MeshRemodelOpenEdgeFinderCommandClass())
+        Gui.addCommand("MeshRemodelParametricMesh", MeshRemodelParametricMeshCommandClass())
         Gui.addCommand("MeshRemodelPartCheckGeometry", MeshRemodelPartCheckGeometryCommandClass())
         Gui.addCommand("MeshRemodelSubShapeBinder", MeshRemodelSubShapeBinderCommandClass())
         Gui.addCommand("MeshRemodelSettings", MeshRemodelSettingsCommandClass())
