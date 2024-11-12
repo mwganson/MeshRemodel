@@ -31,6 +31,7 @@ global main_meshremodelWB_Icon
 
 main_meshremodelWB_Icon = os.path.join(meshremodelWB_icons_path , 'CreatePointsObject.svg')
 
+
 #def myFunc(string):
 #    print (string)
 #    global act
@@ -159,6 +160,49 @@ class MeshRemodelWorkbench(Workbench):
         from PySide import QtCore
         QtCore.QTimer.singleShot(2000, self.showMenu)
         return 
+
+    def askAboutToolbar(self):
+        try:
+            from PySide import QtWidgets
+        except:
+            from PySide import QtGui
+            QtWidgets = QtGui
+        parent=FreeCADGui.getMainWindow()
+        title = "Keep toolbar active?"
+        message = \
+"""
+In MeshRemodel we can keep the toolbar active
+when leaving the workbench.  Would you like to
+enable this 'keep the toolbar active' feature?
+
+If you choose Enable always or Disable always
+you can re-enable this popup question in the
+MeshRemodel settings dialog.
+"""        
+        msgBox = QtWidgets.QMessageBox(parent)
+        msgBox.setWindowTitle(title)
+        msgBox.setText(message)
+    
+        enableAlwaysButton = msgBox.addButton("Enable always", QtWidgets.QMessageBox.AcceptRole)
+        enableOnceButton = msgBox.addButton("Enable this time", QtWidgets.QMessageBox.RejectRole)
+        disableAlwaysButton = msgBox.addButton("Disable always", QtWidgets.QMessageBox.AcceptRole)
+        disableOnceButton = msgBox.addButton("Disable this time", QtWidgets.QMessageBox.AcceptRole)
+        msgBox.setDefaultButton(enableOnceButton)
+    
+        msgBox.exec_()
+        
+        if msgBox.clickedButton() == enableAlwaysButton:
+            clickedButton = "Enable always"
+        elif msgBox.clickedButton() == enableOnceButton:
+            clickedButton = "Enable once"
+        elif msgBox.clickedButton() == disableAlwaysButton:
+            clickedButton = "Disable always"
+        elif msgBox.clickedButton() == disableOnceButton:
+            clickedButton = "Disable once"
+        else:
+            clickedButton = None
+    
+        return clickedButton
         
     def showMenu(self):
         from PySide import QtGui
@@ -166,7 +210,25 @@ class MeshRemodelWorkbench(Workbench):
         #freecad hides wb toolbars on leaving wb, we unhide ours here to keep it around
         #if the user has it set in parameters to do so
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        ask = pg.GetBool("AskToolbar", True)
         keep = pg.GetBool('KeepToolbar',True)
+        if ask:
+            response = self.askAboutToolbar()
+            if response == "Disable once":
+                ask = True
+                keep = False
+            elif response == "Enable always":
+                ask = False
+                keep = True
+            elif response == "Enable once":
+                ask = True
+                keep = True
+            elif response == "Disable always":
+                ask = False
+                keep = False
+            pg.SetBool("KeepToolbar", keep)
+            pg.SetBool("AskToolbar", ask)
+
         if not keep:
             return
         tb = window.findChildren(QtGui.QToolBar) if window else []

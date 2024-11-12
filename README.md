@@ -406,20 +406,25 @@ Opens Sketch workbench validate sketch tool.  Enabled only if you have 1 sketch 
 ### Keep toolbar active
 This setting will keep the toolbar active after leaving the workbench, but you have to open the workbench at least once each session.  After that, if this is enabled, when you leave the workbench the toolbar will appear in the new workbench after a couple seconds.  This can be a great time saver as you would often use this tool in conjunction with Part workbench in remodeling a mesh.  This would prevent the need to switch back and forth between workbenches.<br/>
 <br/>
+### Ask about toolbar
+This setting determines whether to ask about keeping the toolbar active when leaving the workbench.  It will also popup when FreeCAD starts if you have in the preferences MeshRemodel set to automatically load on startup.  If the setting is to not ask, then the current keep toolbar setting is used without asking.  There are 4 options in the dialog: Enable always, Enable once, Disable once, and  Disable always.  Either of the always options prevents the popup from appearing again.  Closing the dialog without pressing a button is treated as Enable once.  This setting to ask about the toolbar is here so you can re-enable the popup later if you decide to after using one of the always options.<br/>
+<br/>
+### Check for updates
+Checks git repo for updates and notifies user in the report view as a warning message if an update is available.<br/>
+<br/>
 ### Point size
 This sets the point size on all points created with the workbench.  It does not affect objects already created after the setting is changed, only those created after the setting is changed.  Does not affect wire objects or sketch objects, only the centers of arcs, circles, and polygons, and the midpoints of lines.  Default 4.0<br/>
 <br/>
 ### Line width
 This sets the line width on all lines created with the workbench.  It does not affect objects already created after the setting is changed, only those created after the setting is changed.  Does not affect wire objects or sketch objects, only the edges of arcs, circles, lines, and polygons.  Default: 5.0<br/>
 <br/>
-### Check for updates
-Checks git repo for updates and notifies user in the report view as a warning message if an update is available.<br/>
-<br/>
+
 ### Coplanar tolerance
 This sets the tolerance to use when determining which points lie on the same plane as the 3 selected points that define the plane.  Higher numbers mean less restrictive results, producing more points, not all of which might actually be coplanar.  But even if they're not coplanar they'll be forced into coplanarity starting with v1.81.  The tolerance number represents the volume of a tetrahedron created using the 3 selected points and the point currently under consideration in cubic mm.  It's also used in creating a wireframe object, but should rarely need to be changed for that purpose.  If you find some edges of the wireframe are missing, try making this smaller.  Default: 0.001 mm^3
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:
+* 2024.11.11 (1.10.34) -- add option to ask about toolbar settings, user will have options to enable the toolbar always, enable once and keep asking each time, or to disable always
 * 2024.11.10 (1.10.33) -- add parametric mesh object
 * 2024.10.15 (1.10.32) -- fix typo bug in TugBoat set points object to identity placement
 * 2024.10.14 (1.10.31) -- add PartDesign::CoordinateSystem to destination options in context menu (TugBoat class), add framework to support additional TypeIds later.

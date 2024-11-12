@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.11.10"
-__version__ = "1.10.33"
+__date__    = "2024.11.11"
+__version__ = "1.10.34"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -508,51 +508,72 @@ class MeshRemodelSettingsCommandClass(object):
         window = QtGui.QApplication.activeWindow()
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         pg.RemInt("SketchRadiusPrecision") #no longer used
-        keep = pg.GetBool('KeepToolbar',False)
+        keep = pg.GetBool('KeepToolbar',True)
+        ask = pg.GetBool("AskToolbar",True)
         point_size = pg.GetFloat("PointSize", 4.0)
         line_width = pg.GetFloat("LineWidth", 5.0)
         checkUpdates = pg.GetBool("CheckForUpdates", True)
         pg.SetBool("CheckForUpdates", checkUpdates)
         coplanar_tol = pg.GetFloat("CoplanarTolerance",.01)
         wireframe_tol = pg.GetFloat("WireFrameTolerance",.01)
-        items=[("","*")[keep]+"Keep the toolbar active",
-            ("","*")[not keep]+"Do not keep the toolbar active",
-            ("","*")[checkUpdates]+"Check for updates",
-            ("","*")[not checkUpdates]+"Do not check for updates",
-            "Change point size ("+str(point_size)+")",
-            "Change line width ("+str(line_width)+")",
-
-            "Change coplanar tolerance ("+str(coplanar_tol)+")",
-            "Change wireframe tolerance("+str(wireframe_tol)+")",
-            "Cancel"]
+        #items 0 = keep tb active
+        #items 1 = do not keep active
+        #items 2 = ask about toolbar
+        #items 3 = do not ask about toolbar
+        #items 4 = check for updates
+        #items 5 = do not check for updates
+        #items 6 = change point size
+        #items 7 = change line width
+        #items 8 = change coplanar tolerance
+        #items 9 = wireframe tolerance
+        #items 10 = cancel
+        items=[("","*")[keep]+"Keep the toolbar active", #0
+            ("","*")[not keep]+"Do not keep the toolbar active", #1
+            ("","*")[ask]+"Ask about toolbar", #2
+            ("","*")[not ask]+"Do not ask about toolbar", #3
+            ("","*")[checkUpdates]+"Check for updates", #4
+            ("","*")[not checkUpdates]+"Do not check for updates", #5
+            "Change point size ("+str(point_size)+")", #6
+            "Change line width ("+str(line_width)+")", #7
+            "Change coplanar tolerance ("+str(coplanar_tol)+")", #8
+            "Change wireframe tolerance("+str(wireframe_tol)+")", #9
+            "Cancel" #10
+            ]
         item,ok = QtGui.QInputDialog.getItem(window,'Mesh Remodel v'+__version__,'Settings\n\nSelect the settings option\n',items,0,False,windowFlags)
         if ok and item == items[-1]:
             return
         elif ok and item == items[0]:
             keep = True
             pg.SetBool('KeepToolbar', keep)
-        elif ok and item==items[1]:
+        elif ok and item == items[1]:
             keep = False
             pg.SetBool('KeepToolbar', keep)
-        elif ok and item==items[4]:
+        elif ok and item == items[2]:
+            ask = True
+            pg.SetBool("AskToolbar", ask)
+        elif ok and item == items[3]:
+            ask = False
+            pg.SetBool("AskToolbar", ask)
+        elif ok and item == items[4]:
+            checkUpdates = True
+            pg.SetBool("CheckForUpdates", True)
+        elif ok and item == items[5]:
+            checkUpdates = False
+            pg.SetBool("CheckForUpdates", False)
+        elif ok and item == items[6]:
             new_point_size,ok = QtGui.QInputDialog.getDouble(window,"Point size", "Enter point size", point_size,1,50,2)
             if ok:
                 pg.SetFloat("PointSize", new_point_size)
-        elif ok and item==items[5]:
+        elif ok and item == items[7]:
             new_line_width,ok = QtGui.QInputDialog.getDouble(window,"Line width", "Enter line width", line_width,1,50,2)
             if ok:
                 pg.SetFloat("LineWidth", new_line_width)
-        elif ok and item==items[2]:
-            checkUpdates = True
-            pg.SetBool("CheckForUpdates", True)
-        elif ok and item==items[3]:
-            checkUpdates = True
-            pg.SetBool("CheckForUpdates", False)
-        elif ok and item==items[5]:
+
+        elif ok and item == items[8]:
             new_coplanar_tol, ok = QtGui.QInputDialog.getDouble(window,"Coplanar tolerance", "Enter coplanar tolerance\n(Used when creating coplanar points.  Increase if some points are missing.)", coplanar_tol,.0000001,1,8)
             if ok:
                 pg.SetFloat("CoplanarTolerance", new_coplanar_tol)
-        elif ok and item==items[6]:
+        elif ok and item == items[9]:
             new_wireframe_tol, ok = QtGui.QInputDialog.getDouble(window,"Wireframe tolerance", "Enter wireframe tolerance\n(Used when creating wireframes to check if 2 points are the same.)", wireframe_tol,.0000001,1,8)
             if ok:
                 pg.SetFloat("WireFrameTolerance", new_wireframe_tol)
