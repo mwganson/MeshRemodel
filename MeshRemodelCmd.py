@@ -38,7 +38,10 @@ except:
 import Draft, DraftGeomUtils, DraftVecUtils, Mesh, MeshPart
 import time
 import numpy as np
-import shiboken2 as shiboken
+try:
+    import shiboken6 as shiboken
+except:
+    import shiboken2 as shiboken
 
 
 if FreeCAD.GuiUp:
