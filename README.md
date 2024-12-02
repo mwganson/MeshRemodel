@@ -424,6 +424,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:
+* 2024.12.02 (1.10.35) -- accept PR from wiritchi (shiboken is shiboken6 in pyside6)
 * 2024.11.11 (1.10.34) -- add option to ask about toolbar settings, user will have options to enable the toolbar always, enable once and keep asking each time, or to disable always
 * 2024.11.10 (1.10.33) -- add parametric mesh object
 * 2024.10.15 (1.10.32) -- fix typo bug in TugBoat set points object to identity placement
