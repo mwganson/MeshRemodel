@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2024.12.02"
-__version__ = "1.10.35"
+__date__    = "2025.01.25"
+__version__ = "1.10.36"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -38,11 +38,15 @@ except:
 import Draft, DraftGeomUtils, DraftVecUtils, Mesh, MeshPart
 import time
 import numpy as np
-try:
-    import shiboken6 as shiboken
-except:
-    import shiboken2 as shiboken
+import PySide
 
+SHIBOKEN = False
+if PySide.__version_info__[0] == 5:
+    import shiboken2 as shiboken
+    SHIBOKEN=True
+elif PySide.__version_info__[0] == 6:
+    import shiboken6 as shiboken
+    SHIBOKEN=True
 
 if FreeCAD.GuiUp:
     from FreeCAD import Gui
@@ -4765,7 +4769,7 @@ class GridSurfaceVP:
         def selectColTrigger(col): return lambda: self.selectCol(col)
         def outputMode(mode): return lambda: self.switchOutput(mode)
         def methodMode(mode): return lambda: self.switchMethod(mode)
-        if not shiboken.isValid(menu):
+        if SHIBOKEN and not shiboken.isValid(menu):
             FreeCAD.Console.PrintMessage(f"{self.FP.Name}: cannot create context menu.  You may try restarting FreeCAD.\n")
             return
         fp = vobj.Object
