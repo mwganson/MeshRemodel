@@ -26,8 +26,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2025.01.25"
-__version__ = "1.10.36"
+__date__    = "2025.02.28"
+__version__ = "1.10.37"
 
 import FreeCAD, FreeCADGui, Part, os, math
 from PySide import QtCore, QtGui
@@ -41,10 +41,10 @@ import numpy as np
 import PySide
 
 SHIBOKEN = False
-if PySide.__version_info__[0] == 5:
+if int(PySide.QtCore.qVersion().split(".")[0]) == 5:
     import shiboken2 as shiboken
     SHIBOKEN=True
-elif PySide.__version_info__[0] == 6:
+elif int(PySide.QtCore.qVersion().split(".")[0]) == 6:
     import shiboken6 as shiboken
     SHIBOKEN=True
 

@@ -424,6 +424,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:
+* 2025.02.28 (1.10.37) -- avoid using __*__ functions in checking python version
 * 2025.01.25 (1.10.36) -- fix crash where user is on PySide2, but also has shiboken6 installed
 * 2024.12.02 (1.10.35) -- accept PR from wiritchi (shiboken is shiboken6 in pyside6)
 * 2024.11.11 (1.10.34) -- add option to ask about toolbar settings, user will have options to enable the toolbar always, enable once and keep asking each time, or to disable always
