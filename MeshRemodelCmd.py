@@ -1251,7 +1251,7 @@ after pressing Shift+E to get into box selection mode.)
         self.pts = []
         for idx,s in enumerate(sel):
             #usage: select from mesh first, then select destination mesh, then select
-            #points/edges to duplicate from sourc to destination
+            #points/edges to duplicate from source to destination
             if idx == 0:
                 self.mesh1 = self.getMesh(s)
             if idx == 1:
@@ -5778,7 +5778,7 @@ the rotation is based on the point's angle relative to the x axis.  If "No Point
 Array" then there will be no point arraying done.
 """).PointArraySettings = SketchPlus.PointArraySettingsDefault
         ##### Polar Array
-        obj.addProperty("App::PropertyIntegerConstraint", "PolarCount",grp, "Numer of elements in the polar array").PolarCount = (0,0,10000,1)
+        obj.addProperty("App::PropertyIntegerConstraint", "PolarCount",grp, "Number of elements in the polar array").PolarCount = (0,0,10000,1)
         obj.addProperty("App::PropertyAngle","PolarStart",grp,"Start of Polar array in degrees, default = 0 degrees").PolarStart = 0
         obj.addProperty("App::PropertyAngle","PolarEnd",grp,"End of polar array in degrees, default = 360 degrees").PolarEnd = 360
         obj.addProperty("App::PropertyFloatList", "PolarAngles",grp,
@@ -6154,7 +6154,7 @@ first oriiginal wire.
         list.
         """
         #user might have deleted some wires from sketch, so we make sure
-        #to filter ot any unavailable wire indices
+        #to filter any unavailable wire indices
         available = [idx + 1 for idx in range(len(shape.Wires))]
         available += [-d for d in available]
 
