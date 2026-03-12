@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
+<!-- SPDX-FileNotice: Part of the Mesh Remodel addon. -->
 <package format="1">
   <name>MeshRemodel</name>
   <description>Workbench for aid in remodeling mesh objects into FreeCAD format</description>

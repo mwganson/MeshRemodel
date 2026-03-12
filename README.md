@@ -1,3 +1,6 @@
+<!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
+<!-- SPDX-FileNotice: Part of the Mesh Remodel addon. -->
+
 # MeshRemodel Workbench
 <img src="Resources/icons/CreatePointsObject.svg" alt="icon">
 <br/>

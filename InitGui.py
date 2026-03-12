@@ -1,9 +1,11 @@
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: 2019 Mark Ganson <mwganson@gmail.com>
+# SPDX-FileNotice: Part of the Mesh Remodel addon.
+
 # -*- coding: utf-8 -*-
 ###################################################################################
 #
 #  InitGui.py
-#  
-#  Copyright 2019 Mark Ganson <TheMarkster> mwganson at gmail
 #  
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
