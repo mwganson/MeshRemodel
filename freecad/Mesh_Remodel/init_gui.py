@@ -19,7 +19,7 @@
 #                                                                              #
 ################################################################################
 
-import meshremodelwb_locator
+import freecad.Mesh_Remodel.meshremodelwb_locator as meshremodelwb_locator
 meshremodelWBPath = os.path.dirname(meshremodelwb_locator.__file__)
 meshremodelWB_icons_path = os.path.join(meshremodelWBPath,'Resources','icons')
 
@@ -54,7 +54,7 @@ class MeshRemodelWorkbench(Workbench):
 
     def Initialize(self):
         "This function is executed when FreeCAD starts"
-        import MeshRemodelCmd #needed files for FreeCAD commands
+        import freecad.Mesh_Remodel.MeshRemodelCmd as MeshRemodelCmd #needed files for FreeCAD commands
         self.list = [
                     "MeshRemodelGroupCommandPointsObjects",
                   #  "MeshRemodelCreatePointsObject",
@@ -133,7 +133,7 @@ class MeshRemodelWorkbench(Workbench):
         def update_callback(latest_version):
             FreeCAD.Console.PrintWarning(f"MeshRemodel {latest_version} is now available in the Addon Manager.\n")
         
-        import MeshRemodelCmd
+        import freecad.Mesh_Remodel.MeshRemodelCmd as MeshRemodelCmd
         current_version = MeshRemodelCmd.__version__
         user = "mwganson"
         repo = "MeshRemodel"
