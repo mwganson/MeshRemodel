@@ -19,17 +19,8 @@
 #                                                                              #
 ################################################################################
 
-import freecad.Mesh_Remodel.meshremodelwb_locator as meshremodelwb_locator
 from FreeCAD import Gui , Console , ParamGet
-from os.path import dirname , join
-
-meshremodelWBPath = dirname(meshremodelwb_locator.__file__)
-meshremodelWB_icons_path = join(meshremodelWBPath,'Resources','icons')
-
-global main_meshremodelWB_Icon
-
-main_meshremodelWB_Icon = join(meshremodelWB_icons_path , 'CreatePointsObject.svg')
-
+from .Misc import asIcon
 
 #def myFunc(string):
 #    print (string)
@@ -42,22 +33,18 @@ main_meshremodelWB_Icon = join(meshremodelWB_icons_path , 'CreatePointsObject.sv
 #mw.workbenchActivated.connect(myFunc)
 
 ####################################################################################
-# Initialize the workbench 
+# Initialize the workbench
 class MeshRemodelWorkbench(Gui.Workbench):
- 
-
-    global main_meshremodelWB_Icon
 
     MenuText = "Mesh Remodel"
     ToolTip = "MeshRemodel workbench"
-    Icon = main_meshremodelWB_Icon #defined in package.xml
-    
+    Icon = asIcon('CreatePointsObject')
+
     def __init__(self):
         pass
 
     def Initialize(self):
         "This function is executed when FreeCAD starts"
-        import freecad.Mesh_Remodel.MeshRemodelCmd as MeshRemodelCmd #needed files for FreeCAD commands
         self.list = [
                     "MeshRemodelGroupCommandPointsObjects",
                   #  "MeshRemodelCreatePointsObject",
@@ -94,19 +81,19 @@ class MeshRemodelWorkbench(Gui.Workbench):
                     # "MeshRemodelPartCheckGeometry",
                     # "MeshRemodelSubShapeBinder",
                     # "MeshRemodelSettings",
-                    
+
                     ] # A list of command names created in the line above
         self.appendToolbar("MeshRemodel Commands",self.list) # leave settings, validate sketch and merge sketch off toolbar
         self.appendMenu("Mesh&Remodel",self.list) # creates a new menu
         #considered putting the menu inside the Edit menu, but decided against it
         #self.appendMenu(["&Edit","MeshRemodel"],self.list) # appends a submenu to an existing menu
 
- 
+
     def Activated(self):
         "This function is executed when the workbench is activated"
         import requests
         import xml.etree.ElementTree as ET
-        
+
         def get_remote_version(user, repo, branch='master'):
             # GitHub raw URL for package.xml
             url = f"https://raw.githubusercontent.com/{user}/{repo}/{branch}/package.xml"
@@ -126,22 +113,21 @@ class MeshRemodelWorkbench(Gui.Workbench):
             except Exception as e:
                 print(f"Error fetching or parsing package.xml: {e}")
                 return None
-        
+
         def check_for_update(current_version, user, repo, branch, callback):
             latest_version = get_remote_version(user, repo, branch)
             if latest_version and latest_version > current_version:
                 callback(latest_version)
-        
+
         # Example usage
         def update_callback(latest_version):
             Console.PrintWarning(f"MeshRemodel {latest_version} is now available in the Addon Manager.\n")
-        
-        import freecad.Mesh_Remodel.MeshRemodelCmd as MeshRemodelCmd
-        current_version = MeshRemodelCmd.__version__
+
+        from .MeshRemodelCmd import __version__ as current_version
         user = "mwganson"
         repo = "MeshRemodel"
         branch = "master"
-        
+
         # Check for updates
         pg = ParamGet("User parameter:/Plugins/MeshRemodel")
         checkUpdates = pg.GetBool("CheckForUpdates", True)
@@ -150,7 +136,7 @@ class MeshRemodelWorkbench(Gui.Workbench):
             check_for_update(current_version, user, repo, branch, update_callback)
 
         return
- 
+
     def Deactivated(self):
         "This function is executed when the workbench is deactivated"
 
@@ -158,10 +144,10 @@ class MeshRemodelWorkbench(Gui.Workbench):
         #to unhide them once FreeCAD is finished, 2 seconds later
         from .Qt import Core as QtCore
         QtCore.QTimer.singleShot(2000, self.showMenu)
-        return 
+        return
 
     def askAboutToolbar(self):
-        
+
         from .Qt import Widgets as QtWidgets
 
         parent=Gui.getMainWindow()
@@ -175,19 +161,19 @@ enable this 'keep the toolbar active' feature?
 If you choose Enable always or Disable always
 you can re-enable this popup question in the
 MeshRemodel settings dialog.
-"""        
+"""
         msgBox = QtWidgets.QMessageBox(parent)
         msgBox.setWindowTitle(title)
         msgBox.setText(message)
-    
+
         enableAlwaysButton = msgBox.addButton("Enable always", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
         enableOnceButton = msgBox.addButton("Enable this time", QtWidgets.QMessageBox.ButtonRole.RejectRole)
         disableAlwaysButton = msgBox.addButton("Disable always", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
         disableOnceButton = msgBox.addButton("Disable this time", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
         msgBox.setDefaultButton(enableOnceButton)
-    
+
         msgBox.exec_()
-        
+
         if msgBox.clickedButton() == enableAlwaysButton:
             clickedButton = "Enable always"
         elif msgBox.clickedButton() == enableOnceButton:
@@ -198,9 +184,9 @@ MeshRemodel settings dialog.
             clickedButton = "Disable once"
         else:
             clickedButton = None
-    
+
         return clickedButton
-        
+
     def showMenu(self):
         from .Qt import Widgets as QtWidgets
         window = QtWidgets.QApplication.activeWindow()
@@ -237,8 +223,8 @@ MeshRemodel settings dialog.
         "This is executed whenever the user right-clicks on screen"
         # "recipient" will be either "view" or "tree"
         self.appendContextMenu("MeshRemodel",self.list) # add commands to the context menu
- 
-    def GetClassName(self): 
+
+    def GetClassName(self):
         # this function is mandatory if this is a full python workbench
         return "Gui::PythonWorkbench"
 wb = MeshRemodelWorkbench()

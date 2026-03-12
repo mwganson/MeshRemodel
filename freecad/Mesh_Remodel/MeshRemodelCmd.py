@@ -25,8 +25,9 @@ __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2025.07.30"
 __version__ = "1.10.38"
 
-import FreeCAD , os, math
+import FreeCAD , math
 
+from .Misc import asIcon
 from .Qt import QtWidgets , QtCore , QtGui
 
 from FreeCAD import Gui
@@ -43,8 +44,6 @@ if int(QtCore.qVersion().split(".")[0]) == 6:
 if FreeCAD.GuiUp:
     from FreeCAD import Gui
 
-__dir__ = os.path.dirname(__file__)
-iconPath = os.path.join( __dir__, 'Resources', 'icons' )
 keepToolbar = False
 windowFlags = QtCore.Qt.WindowType.WindowTitleHint | QtCore.Qt.WindowType.WindowCloseButtonHint #no ? in title bar
 global_picked = [] #picked points list for use with selection by preselection observer
@@ -497,7 +496,7 @@ class MeshRemodelSettingsCommandClass(object):
         pass
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'Settings.svg') , # the name of an icon file available in the resources
+        return {'Pixmap'  : asIcon('Settings') , # the name of an icon file available in the resources
             'MenuText': "&Settings" ,
             'ToolTip' : "Workbench settings dialog"}
  
@@ -707,7 +706,7 @@ class PointsObjectVP:
         vobj.Proxy = self
     
     def getIcon(self):
-        return os.path.join( iconPath , 'CreatePointsObject.svg')
+        return asIcon('CreatePointsObject')
         
     def attach(self, vobj):
         self.Object = vobj.Object
@@ -753,7 +752,7 @@ class MeshRemodelCreatePointsObjectCommandClass(object):
         self.mesh = None
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreatePointsObject.svg') ,
+        return {'Pixmap'  : asIcon('CreatePointsObject') ,
             'MenuText': "Create points &object" ,
             'ToolTip' : 
 """Create a parametric PointsObject linked to the selected mesh object.  The points
@@ -871,7 +870,7 @@ class WireFrameObjectVP(PointsObjectVP):
         super(WireFrameObjectVP, self).__init__(vobj)
             
     def getIcon(self):
-        return os.path.join( iconPath , 'CreateWireFrameObject.svg')
+        return asIcon('CreateWireFrameObject')
     
    
 class MeshRemodelCreateWireFrameObjectCommandClass(object):
@@ -885,7 +884,7 @@ class MeshRemodelCreateWireFrameObjectCommandClass(object):
         self.bCanceled = False
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateWireFrameObject.svg') ,
+        return {'Pixmap'  : asIcon('CreateWireFrameObject') ,
             'MenuText': "Create Wire&Frame object" ,
             'ToolTip' : \
 """Create a parametric WireFrame object.  The wireframe will be bound to the mesh
@@ -933,7 +932,7 @@ class MeshRemodelMeshBoundaryWiresCommandClass(object):
         self.mesh = None
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'MeshBoundaryWires.svg'),
+        return {'Pixmap'  : asIcon('MeshBoundaryWires') ,
             'MenuText': "Makes boundary wire objects from meshes with holes in them" ,
             'ToolTip' : \
 """Makes boundary wire objects from meshes with holes in them.  The wires produced
@@ -1013,7 +1012,7 @@ class MeshRemodelMeshSimpleCopyCommandClass(object):
         self.mesh = None
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'MeshSimpleCopy.svg'),
+        return {'Pixmap'  : asIcon('MeshSimpleCopy') ,
             'MenuText': "Create a simple copy of a mesh object or a new empty mesh" ,
             'ToolTip' : \
 """Create a simple copy of a mesh object.  If no mesh is selected, then a new
@@ -1110,7 +1109,7 @@ class OffsetMeshVP:
         #FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
         
     def getIcon(self):
-        return os.path.join( iconPath , 'OffsetMesh.svg')
+        return asIcon('OffsetMesh')
     
     def __getstate__(self):
         '''When saving the document this object gets stored using Python's json module.\
@@ -1131,7 +1130,7 @@ class MeshRemodelOffsetMeshCommandClass(object):
         self.mesh = None
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'OffsetMesh.svg'),
+        return {'Pixmap'  : asIcon('OffsetMesh') ,
             'MenuText': "Offset a mesh" ,
             'ToolTip' : \
 """Offset a mesh
@@ -1181,7 +1180,7 @@ class MeshRemodelDuplicateSelectedFacetsCommandClass(object):
         self.pts = []
         
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'DuplicateSelectedFacets.svg'),
+        return {'Pixmap'  : asIcon('DuplicateSelectedFacets') ,
             'MenuText': "Duplicated selected facets" ,
             'ToolTip' : \
 """Duplicate selected facets.
@@ -1276,7 +1275,7 @@ class MeshRemodelRemovePointCommandClass(object):
         self.picked = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'RemovePoint.svg') ,
+        return {'Pixmap'  : asIcon('RemovePoint') ,
             'MenuText': "Remove a point from (or add a point to) a mesh object" ,
             'ToolTip' : \
 """Remove a point from (or add a point to) a mesh object.
@@ -1564,7 +1563,7 @@ class MeshRemodelMovePointCommandClass(object):
         self.pts = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'MovePoint.svg') ,
+        return {'Pixmap'  : asIcon('MovePoint') ,
             'MenuText': "Move a point in a mesh object" ,
             'ToolTip' : \
 """
@@ -1669,7 +1668,7 @@ class MeshRemodelAddOrRemoveFacetCommandClass(object):
         self.pts = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'AddOrRemoveFacet.svg') ,
+        return {'Pixmap'  : asIcon('AddOrRemoveFacet') ,
             'MenuText': "Add or remove facet(s) to or from a mesh object" ,
             'ToolTip' : \
 """Add or remove facet(s) to or from a mesh object.  Select the mesh, select the
@@ -1960,7 +1959,7 @@ class MeshExpanderVP:
         #FreeCAD.Console.PrintMessage("Change property: " + str(prop) + "\n")
         
     def getIcon(self):
-        return os.path.join( iconPath , 'ExpandMesh.svg')
+        return asIcon('ExpandMesh')
     
     def __getstate__(self):
         '''When saving the document this object gets stored using Python's json module.\
@@ -1984,7 +1983,7 @@ class MeshRemodelExpandedMeshCommandClass(object):
         self.mesh = None
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'ExpandMesh.svg') ,
+        return {'Pixmap'  : asIcon('ExpandMesh') ,
             'MenuText': "Expand a mesh with a plane" ,
             'ToolTip' : \
 """Expands a mesh with a plane.  This function creates a mesh python object
@@ -2041,7 +2040,7 @@ class MeshRemodelCreateCrossSectionsCommandClass(object):
         self.mesh = None
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateCrossSections.svg') ,
+        return {'Pixmap'  : asIcon('CreateCrossSections') ,
             'MenuText': "Create cross-sections ob&ject..." ,
             'ToolTip' : "Create the cross-sections object \
 Convenience link to the Mesh Design workbench cross-sections tool \
@@ -2078,7 +2077,7 @@ class MeshRemodelPartSolidCommandClass(object):
         pass
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'PartSolid.svg') ,
+        return {'Pixmap'  : asIcon('PartSolid') ,
             'MenuText': "Part Sol&id" ,
             'ToolTip' : fixTip("Perform a Part Solid command:\n\n\
 No Modifier = Extrude\n\
@@ -2231,7 +2230,7 @@ class MeshRemodelCreatePointObjectCommandClass(object):
         self.obj = None
         self.pts = None
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreatePointObject.svg') ,
+        return {'Pixmap'  : asIcon('CreatePointObject') ,
             'MenuText': "Create poin&t object" ,
             'ToolTip' : "Create a single point from the selected point"}
  
@@ -2518,7 +2517,7 @@ class MeshRemodelCreateCoplanarPointsObjectCommandClass(object):
         self.vertexNames = [] #for attaching a part::plane
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateCoplanar.svg') ,
+        return {'Pixmap'  : asIcon('CreateCoplanar') ,
             'MenuText': "Create copla&nar points object" ,
             'ToolTip' : """\
 Filters the vertices in the selected object based on the first 3 vertices
@@ -2603,7 +2602,7 @@ class MeshRemodelCreateLineCommandClass(object):
         self.pts = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateLine.svg') ,
+        return {'Pixmap'  : asIcon('CreateLine') ,
             'MenuText': "Create &line" ,
             'ToolTip' : fixTip("Create a line from 2 selected points\n\
 (Ctrl+Click to add midpoint)\n\
@@ -2683,7 +2682,7 @@ class MeshRemodelCreatePolygonCommandClass(object):
         self.edges = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreatePolygon.svg') ,
+        return {'Pixmap'  : asIcon('CreatePolygon') ,
             'MenuText': "Create &Polygon" ,
             'ToolTip' : fixTip("\
 Create a Polygon from 3 or more selected points or 2 or more selected edges\n\
@@ -2787,7 +2786,7 @@ class MeshRemodelCreateBSplineCommandClass(object):
         self.pts = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateBSpline.svg') ,
+        return {'Pixmap'  : asIcon('CreateBSpline') ,
             'MenuText': "Create &BSpline" ,
             'ToolTip' : fixTip("Create a BSPline from 3 or more selected points\n\
 (Ctrl+Click to not flatten bspline)\n\
@@ -2856,7 +2855,7 @@ class MeshRemodelFlattenDraftBSplineCommandClass(object):
         self.spline = None
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'FlattenDraftBSpline.svg') ,
+        return {'Pixmap'  : asIcon('FlattenDraftBSpline') ,
             'MenuText': "Flatt&en BSpline" ,
             'ToolTip' : fixTip("Flatten an existing Draft BSpline\n")}
 
@@ -3405,7 +3404,7 @@ class MeshRemodelCreateTugBoatCommandClass:
     """TugBoat object for hauling objects around"""
     
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'TugBoat.svg') ,
+        return {'Pixmap'  : asIcon('TugBoat') ,
             'MenuText': "TugBoat" ,
             'ToolTip' : \
 """Use the tugboat to haul other objects around in FreeCAD.  Works on any type
@@ -3463,7 +3462,7 @@ class MeshRemodelRotateObjectCommandClass(object):
         self.angle = None
         
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'RotateObject.svg') ,
+        return {'Pixmap'  : asIcon('RotateObject') ,
             'MenuText': "Rotate object" ,
             'ToolTip' : \
 """Rotate an object about a selected subobject
@@ -3666,7 +3665,7 @@ class MeshRemodelMoveAxialCommandClass(object):
         self.distance = None
         
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'MoveAxial.svg') ,
+        return {'Pixmap'  : asIcon('MoveAxial') ,
             'MenuText': "Move A&xial" ,
             'ToolTip' :\
 """
@@ -3851,7 +3850,7 @@ class MeshRemodelGoBackSelectionCommandClass(object):
         self.pc = None
     
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'GoBackSelection.svg') ,
+        return {'Pixmap'  : asIcon('GoBackSelection') ,
             'MenuText': "Go back selection" ,
             'ToolTip' :\
 """
@@ -4239,7 +4238,7 @@ class MeshRemodelSubObjectLoftCommandClass(object):
         self.vertex_count = 0
     
     def GetResources(self):
-        return {'Pixmap': os.path.join(iconPath, "SubObjectLoft.svg"),
+        return {'Pixmap': asIcon('SubObjectLoft') ,
                 "MenuText": "SubObject Loft",
                 "ToolTip":\
 """Loft between selected subobjects.
@@ -5018,7 +5017,7 @@ class MeshRemodelCreateGridSurfaceCommandClass:
         pass
     
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateGridSurface.svg') ,
+        return {'Pixmap'  : asIcon('CreateGridSurface') ,
             'MenuText': "Create GridSurfacee" ,
             'ToolTip' : fixTip("""
 Create a GridSurface object.
@@ -5083,7 +5082,7 @@ class MeshRemodelCreateWireCommandClass(object):
         self.shapes = [] #can be full shapes or subobjects
         
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateWire.svg') ,
+        return {'Pixmap'  : asIcon('CreateWire') ,
             'MenuText': "Create &Wire" ,
             'ToolTip' : fixTip("\
 Create a flattened wire from selected subobjects.  Nonplanar objects\n\
@@ -5360,7 +5359,7 @@ class MeshRemodelCreatePlaneCommandClass(object):
         
     def GetResources(self):
         return {
-            'Pixmap'  : os.path.join( iconPath , 'CreatePlane.svg') ,
+            'Pixmap'  : asIcon('CreatePlane') ,
             'MenuText': "Create plane" ,
             'ToolTip' : fixTip(\
 """Create a 50 x 50 Part::Plane object.  Position it on the plane defined
@@ -5443,7 +5442,7 @@ class MeshRemodelCreateCircleCommandClass(object):
         self.pts = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateCircle.svg') ,
+        return {'Pixmap'  : asIcon('CreateCircle') ,
             'MenuText': "Create &circle" ,
             'ToolTip' : fixTip("Create a circle from first 3 selected points\n\
 (Ctrl+Click to include Center point)\n\
@@ -5535,7 +5534,7 @@ class MeshRemodelCreateCircleCommandClass(object):
 class MeshRemodelCreateArcCommandClass(object):
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateArc.svg') ,
+        return {'Pixmap'  : asIcon('CreateArc') ,
             'MenuText': "Create &arc" ,
             'ToolTip' : fixTip("Create an arc from first 3 selected points\n\
 (Ctrl+Click to include Center point)\n\
@@ -7341,7 +7340,7 @@ class MeshRemodelCreateSketchCommandClass(object):
         self.subs = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CreateSketch.svg') ,
+        return {'Pixmap'  : asIcon('CreateSketch') ,
             'MenuText': "Create s&ketch plus" ,
             'ToolTip' : fixTip("\
 Create a new SketchPlus object\n\
@@ -7487,7 +7486,7 @@ class MeshRemodelDraftUpgradeCommandClass(object):
         self.objs = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'DraftUpgrade.svg') ,
+        return {'Pixmap'  : asIcon('DraftUpgrade') ,
             'MenuText': "Draft upgrade or downgrade" ,
             'ToolTip' : fixTip("Run Draft upgrade on selected objects\n\
 Ctrl+Click to run Draft downgrade\n\
@@ -7690,7 +7689,7 @@ class MeshRemodelAddSelectionObserverCommandClass(object):
         self.bar = None
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'AddSelectionObserver.svg') ,
+        return {'Pixmap'  : asIcon('AddSelectionObserver') ,
             'MenuText': "Add Selection &Observer" ,
             'ToolTip' : \
 """
@@ -7769,7 +7768,7 @@ class MeshRemodelMergeSketchesCommandClass(object):
         self.objs = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'MergeSketches.svg') ,
+        return {'Pixmap'  : asIcon('MergeSketches') ,
             'MenuText': "&Merge sketches" ,
             'ToolTip' : "Merge selected sketches with sketcher merge sketches tool"}
  
@@ -7818,7 +7817,7 @@ class MeshRemodelValidateSketchCommandClass(object):
         self.objs = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'ValidateSketch.svg') ,
+        return {'Pixmap'  : asIcon('ValidateSketch') ,
             'MenuText': "&Validate sketch" ,
             'ToolTip' : "Validate selected sketch with sketcher validate sketch tool"}
  
@@ -7858,7 +7857,7 @@ class MeshRemodelPartCheckGeometryCommandClass(object):
         self.objs = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'CheckGeometry.svg') ,
+        return {'Pixmap'  : asIcon('CheckGeometry') ,
             'MenuText': "Part CheckGeometry" ,
             'ToolTip' : "Execute Part workbench CheckGeometry tool"}
  
@@ -7898,7 +7897,7 @@ class MeshRemodelSubShapeBinderCommandClass(object):
         self.objs = []
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'SubShapeBinder.svg') ,
+        return {'Pixmap'  : asIcon('SubShapeBinder') ,
             'MenuText': "PartDesign SubShapeBinder" ,
             'ToolTip' : "Create a PartDesign SubShapeBinder object"}
  
@@ -8281,7 +8280,7 @@ class MeshRemodelOpenEdgeFinderCommandClass:
         pass
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'OpenEdgeFinder.svg') ,
+        return {'Pixmap'  : asIcon('OpenEdgeFinder') ,
             'MenuText': "Open edge finder" ,
             'ToolTip' : "Validate sketches and other objects."}
  
@@ -8409,7 +8408,7 @@ document to fix it."""
         pass
         
     def getIcon(self):
-        return os.path.join( iconPath , 'ParametricMesh.svg')
+        return asIcon('ParametricMesh')
 
 
 class MeshRemodelParametricMeshCommandClass:
@@ -8418,7 +8417,7 @@ class MeshRemodelParametricMeshCommandClass:
         pass
 
     def GetResources(self):
-        return {'Pixmap'  : os.path.join( iconPath , 'ParametricMesh.svg') ,
+        return {'Pixmap'  : asIcon('ParametricMesh') ,
             'MenuText': "Parametric mesh" ,
             'ToolTip' : "Parametric mesh from a shape."}
  
