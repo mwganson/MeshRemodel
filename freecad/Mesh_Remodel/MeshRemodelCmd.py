@@ -25,22 +25,18 @@ __url__     = "https://github.com/mwganson/MeshRemodel"
 __date__    = "2025.07.30"
 __version__ = "1.10.38"
 
-import FreeCAD, FreeCADGui, Part, os, math
-from PySide import QtCore, QtGui
-try:
-    from PySide import QtWidgets
-except:
-    QtWidgets = QtGui
-import Draft, DraftGeomUtils, DraftVecUtils, Mesh, MeshPart
+import FreeCAD , os, math
+
+from .Qt import QtWidgets , QtCore , QtGui
+
+from FreeCAD import Gui
+
+import Draft, DraftGeomUtils, DraftVecUtils, Mesh, MeshPart , Part
 import time
 import numpy as np
-import PySide
 
 SHIBOKEN = False
-if int(PySide.QtCore.qVersion().split(".")[0]) == 5:
-    import shiboken2 as shiboken
-    SHIBOKEN=True
-elif int(PySide.QtCore.qVersion().split(".")[0]) == 6:
+if int(QtCore.qVersion().split(".")[0]) == 6:
     import shiboken6 as shiboken
     SHIBOKEN=True
 
@@ -50,7 +46,7 @@ if FreeCAD.GuiUp:
 __dir__ = os.path.dirname(__file__)
 iconPath = os.path.join( __dir__, 'Resources', 'icons' )
 keepToolbar = False
-windowFlags = QtCore.Qt.WindowTitleHint | QtCore.Qt.WindowCloseButtonHint #no ? in title bar
+windowFlags = QtCore.Qt.WindowType.WindowTitleHint | QtCore.Qt.WindowType.WindowCloseButtonHint #no ? in title bar
 global_picked = [] #picked points list for use with selection by preselection observer
 FC_VERSION = float(FreeCAD.Version()[0]) + float(FreeCAD.Version()[1]) #e.g. 0.20, 0.18, 1.??
 epsilon = Part.Precision.confusion() #1e-07
@@ -79,17 +75,17 @@ class MeshRemodelGeomUtils(object):
             self.bCanceled = False
             self.value = 0
             self.total = 0
-            self.mw = FreeCADGui.getMainWindow()
+            self.mw = Gui.getMainWindow()
             self.lastUpdate = time.time()
             if total:
                 return self.makeProgressBar(total, buttonText = txt if txt else "Cancel")
 
         def makeProgressBar(self,total=0,buttonText = "Cancel",tooltip = "Cancel current operation",updateInterval = .5):
             """total is max value for progress bar, mod = number of updates you want"""
-            self.btn = QtGui.QPushButton(buttonText)
+            self.btn = QtWidgets.QPushButton(buttonText)
             self.btn.setToolTip(tooltip)
             self.btn.clicked.connect(self.on_clicked)
-            self.pb = QtGui.QProgressBar()
+            self.pb = QtWidgets.QProgressBar()
             self.bar = self.mw.statusBar()
             self.bar.addWidget(self.pb)
             self.bar.addWidget(self.btn)
@@ -115,7 +111,7 @@ class MeshRemodelGeomUtils(object):
             if timeNow - self.lastUpdate >= self.updateInterval:
                 self.lastUpdate = timeNow
                 self.pb.setValue(self.value)
-                FreeCADGui.updateGui()
+                Gui.updateGui()
             if self.mw.isHidden() or self.value >= self.total:
                 self.bCanceled = True
                 self.killProgressBar()
@@ -136,8 +132,8 @@ class MeshRemodelGeomUtils(object):
 
     def getFloatFromUser(self, title, msg, value, min=-float("inf"), max=float("inf"), flags=None, step=0.1):
         """Open a dialog and get a floating point value from the user"""
-        val,ok = QtGui.QInputDialog.getDouble(FreeCADGui.getMainWindow(), title, 
-                msg, value, min, max, 8,FreeCADGui.getMainWindow().windowFlags(), step)
+        val,ok = QtWidgets.QInputDialog.getDouble(Gui.getMainWindow(), title, 
+                msg, value, min, max, 8,Gui.getMainWindow().windowFlags(), step)
         return val if ok else None
 
     def getFacetsFromFacetIndices(self, facet_indices, mesh):
@@ -399,7 +395,7 @@ component objects before attempting modifications.\n")
             determine whether vectors A,B,C are colinear """
         return DraftVecUtils.isColinear([A,B,C])
 
-    def incenter(A,B,C):
+    def incenter(self,A,B,C):
         """ incenter(A, B, C)
             return incenter (vector) of triangle at vectors A,B,C 
             incenter is center of circle fitting inside the triangle
@@ -507,8 +503,7 @@ class MeshRemodelSettingsCommandClass(object):
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
-        from PySide import QtGui
-        window = QtGui.QApplication.activeWindow()
+        window = QtWidgets.QApplication.activeWindow()
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         pg.RemInt("SketchRadiusPrecision") #no longer used
         keep = pg.GetBool('KeepToolbar',True)
@@ -542,7 +537,7 @@ class MeshRemodelSettingsCommandClass(object):
             "Change wireframe tolerance("+str(wireframe_tol)+")", #9
             "Cancel" #10
             ]
-        item,ok = QtGui.QInputDialog.getItem(window,'Mesh Remodel v'+__version__,'Settings\n\nSelect the settings option\n',items,0,False,windowFlags)
+        item,ok = QtWidgets.QInputDialog.getItem(window,'Mesh Remodel v'+__version__,'Settings\n\nSelect the settings option\n',items,0,False,windowFlags)
         if ok and item == items[-1]:
             return
         elif ok and item == items[0]:
@@ -564,20 +559,20 @@ class MeshRemodelSettingsCommandClass(object):
             checkUpdates = False
             pg.SetBool("CheckForUpdates", False)
         elif ok and item == items[6]:
-            new_point_size,ok = QtGui.QInputDialog.getDouble(window,"Point size", "Enter point size", point_size,1,50,2)
+            new_point_size,ok = QtWidgets.QInputDialog.getDouble(window,"Point size", "Enter point size", point_size,1,50,2)
             if ok:
                 pg.SetFloat("PointSize", new_point_size)
         elif ok and item == items[7]:
-            new_line_width,ok = QtGui.QInputDialog.getDouble(window,"Line width", "Enter line width", line_width,1,50,2)
+            new_line_width,ok = QtWidgets.QInputDialog.getDouble(window,"Line width", "Enter line width", line_width,1,50,2)
             if ok:
                 pg.SetFloat("LineWidth", new_line_width)
 
         elif ok and item == items[8]:
-            new_coplanar_tol, ok = QtGui.QInputDialog.getDouble(window,"Coplanar tolerance", "Enter coplanar tolerance\n(Used when creating coplanar points.  Increase if some points are missing.)", coplanar_tol,.0000001,1,8)
+            new_coplanar_tol, ok = QtWidgets.QInputDialog.getDouble(window,"Coplanar tolerance", "Enter coplanar tolerance\n(Used when creating coplanar points.  Increase if some points are missing.)", coplanar_tol,.0000001,1,8)
             if ok:
                 pg.SetFloat("CoplanarTolerance", new_coplanar_tol)
         elif ok and item == items[9]:
-            new_wireframe_tol, ok = QtGui.QInputDialog.getDouble(window,"Wireframe tolerance", "Enter wireframe tolerance\n(Used when creating wireframes to check if 2 points are the same.)", wireframe_tol,.0000001,1,8)
+            new_wireframe_tol, ok = QtWidgets.QInputDialog.getDouble(window,"Wireframe tolerance", "Enter wireframe tolerance\n(Used when creating wireframes to check if 2 points are the same.)", wireframe_tol,.0000001,1,8)
             if ok:
                 pg.SetFloat("WireFrameTolerance", new_wireframe_tol)
         return
@@ -966,8 +961,8 @@ take a long time, so save your work first in case you have to force restart.)
         wires = MeshPart.wireFromMesh(copy)
         FreeCAD.Console.PrintMessage(f"MeshRemodel: {len(wires)} wires created\n")
         doc = self.mesh.Document
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        if modifiers & QtCore.Qt.ShiftModifier:
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier:
             makeFilledFaces = True
         else:
             makeFilledFaces = False
@@ -976,7 +971,7 @@ take a long time, so save your work first in case you have to force restart.)
         doc.openTransaction("Mesh boundary wires")
         for idx,wire in enumerate(wires):
             FreeCAD.Console.PrintMessage(f"Making face from wire {idx+1} of {len(wires)}\n")
-            FreeCADGui.updateGui()
+            Gui.updateGui()
             obj = doc.addObject("Part::Feature", f"{self.mesh.Label}_BoundaryWire")
             obj.Shape = wire
             plane = wire.findPlane()
@@ -1298,8 +1293,8 @@ the edge was selected).  There must be at least one facet containing that edge.
     def Activated(self):
         if global_picked:
             self.picked = global_picked
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        if modifiers & QtCore.Qt.AltModifier:
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if modifiers & QtCore.Qt.KeyboardModifier.AltModifier:
             if self.edge:
                 pts = [v.Point for v in self.edge.Vertexes]
                 pt_indices = gu.getPointIndicesInMesh(pts, self.mesh.Mesh)
@@ -1411,10 +1406,10 @@ f"""MeshRemodel Error: Facet not found in {self.mesh.Label}. Select an edge from
 ################################################################################
 #move a point in a mesh object
 
-class VectorEditor(QtGui.QDialog):
+class VectorEditor(QtWidgets.QDialog):
     def __init__(self, cmd, pt, normal):
         super(VectorEditor, self).__init__()
-        self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
+        self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowType.WindowStaysOnTopHint)
         self.ptBase = pt #before moving in normal direction
         self.pt = pt
         self.normalDir = normal.normalize()
@@ -1426,7 +1421,7 @@ class VectorEditor(QtGui.QDialog):
         self.setGeometry(100, 100, 300, 200)
         self.layout = QtGui.QVBoxLayout(self)
 
-        self.label = QtGui.QLabel()
+        self.label = QtWidgets.QLabel()
         self.layout.addWidget(self.label)
         self.label.setText(\
 """Normal is the distance to move the vector in its normal direction.  This overrides
@@ -1449,7 +1444,7 @@ Use Undo to undo the changes if desired.
         self.spinner_z = self.create_spinner("Z:", self.pt.z)
         self.spinner_normal = self.create_spinner("Normal:", 0.0)
         
-        buttonbox = QtGui.QDialogButtonBox(QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel, self)
+        buttonbox = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel, self)
         buttonbox.accepted.connect(self.accept)
         buttonbox.rejected.connect(self.reject)
         self.layout.addWidget(buttonbox)
@@ -1488,19 +1483,19 @@ Use Undo to undo the changes if desired.
     def create_spinner(self, label_text, val):
         def trigger(value,spinner): return lambda value, spinner=spinner: self.spinner_value_changed(value,spinner)
         
-        spinner = QtGui.QDoubleSpinBox(self)
+        spinner = QtWidgets.QDoubleSpinBox(self)
         spinner.setObjectName(f"{label_text[:-1]}") #no colon
         spinner.setValue(val)
         spinner.setRange(-1000,1000)
         spinner.setSingleStep(0.1)
 
-        label = QtGui.QLabel(label_text)
+        label = QtWidgets.QLabel(label_text)
         spinner.valueChanged.connect(trigger(val, spinner))
-        layout = QtGui.QVBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
         layout.addWidget(label)
         layout.addWidget(spinner)
 
-        widget = QtGui.QWidget()
+        widget = QtWidgets.QWidget()
         widget.setLayout(layout)
         self.layout.addWidget(widget)
         return spinner
@@ -1632,7 +1627,7 @@ to the affected edges, and then converting back to a mesh.
         dlg = VectorEditor(self, self.pts[0], normal)
         dlg.show()
         while not dlg.finished:
-            FreeCADGui.updateGui()
+            Gui.updateGui()
         pt = dlg.pt
         dlg.deleteLater()
         return pt
@@ -1718,10 +1713,10 @@ of working on the original.
         doc = self.mesh.Document
         if len(global_picked) > 2:
             self.pts = global_picked 
-        modifiers = QtGui.QApplication.keyboardModifiers()
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
         mesh = self.mesh.Mesh.copy()
         if len(self.pts) == 3:
-            if modifiers & QtCore.Qt.AltModifier:
+            if modifiers & QtCore.Qt.KeyboardModifier.AltModifier:
                 #remove facet
                 removed = self.removeFacet(mesh, self.pts)
                 doc.openTransaction("Remove facet")
@@ -1730,7 +1725,7 @@ of working on the original.
                 doc.recompute()
                 return
             
-            if modifiers & QtCore.Qt.ControlModifier:
+            if modifiers & QtCore.Qt.KeyboardModifier.ControlModifier:
                 mesh.addFacet(self.pts[2],self.pts[1],self.pts[0])
                 print(f"MeshRemodel: facet added: {self.pts[2], self.pts[1], self.pts[0]}")
             else:
@@ -1739,7 +1734,7 @@ of working on the original.
             doc.openTransaction("Add facet")
             self.mesh.Mesh = mesh
             doc.commitTransaction()
-        elif QtCore.Qt.AltModifier & modifiers:
+        elif QtCore.Qt.KeyboardModifier.AltModifier & modifiers:
             #remove multiple facets
             point_indices = gu.getPointIndicesInMesh(self.pts, mesh)
             facet_indices = gu.getFacetIndicesFromPointIndices(point_indices, mesh)
@@ -1755,7 +1750,7 @@ of working on the original.
         else:
             anchor = self.pts[0]
             for cur,next in zip(self.pts[1:-1], self.pts[2:]):
-                if modifiers & QtCore.Qt.ControlModifier:
+                if modifiers & QtCore.Qt.KeyboardModifier.ControlModifier:
                     mesh.addFacet(next, cur, anchor)
                     print(f"MeshRemodel: facet added: {next, cur, anchor}")
                 else:
@@ -2056,8 +2051,8 @@ creating wires using the Mesh Remodel workbench as with the Points and WireFrame
  
     def Activated(self):
         gu.checkComponents(self.mesh.Mesh)
-        import MeshPartGui, FreeCADGui
-        FreeCADGui.runCommand('MeshPart_CrossSections')
+        import MeshPartGui
+        Gui.runCommand('MeshPart_CrossSections')
         return
    
     def IsActive(self):
@@ -2094,22 +2089,22 @@ Alt + Click = Revolution \n\
  
     def Activated(self):
         doc = FreeCAD.ActiveDocument
-        selobj = FreeCADGui.Selection.getSelectionEx()
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        if not modifiers == (QtCore.Qt.ControlModifier & QtCore.Qt.ShiftModifier & QtCore.Qt.AltModifier): #one or more modifiers
-            if modifiers == QtCore.Qt.ControlModifier: #sweep
+        selobj = Gui.Selection.getSelectionEx()
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if not modifiers == (QtCore.Qt.KeyboardModifier.ControlModifier & QtCore.Qt.KeyboardModifier.ShiftModifier & QtCore.Qt.KeyboardModifier.AltModifier): #one or more modifiers
+            if modifiers == QtCore.Qt.KeyboardModifier.ControlModifier: #sweep
                 sections = [obj.Object for obj in selobj if obj.HasSubObjects == False]
                 if len(selobj) < 1+len(sections) or not sections: #user did not select an edge to use for the spline
                     FreeCAD.Console.PrintMessage("Running Sweep command using the Gui\n")
                     FreeCAD.Console.PrintMessage("Note: you can bypass the Gui if you select one or more profiles **in the tree view**\n")
                     FreeCAD.Console.PrintMessage("and one or more edges (of a single object) in the 3D view to use as a spine,\n")
                     FreeCAD.Console.PrintMessage("and then run this command.\n")
-                    FreeCADGui.runCommand("Part_Sweep",0)
+                    Gui.runCommand("Part_Sweep",0)
                     return
                 if len(selobj) > len(sections) + 1: #need a subshapebinder
-                    window = QtGui.QApplication.activeWindow()
+                    window = QtWidgets.QApplication.activeWindow()
                     items=["Make detached (nonparametric) SubShapeBinder","Make synchronized (parametric) SubShapeBinder","Cancel"]
-                    item,ok = QtGui.QInputDialog.getItem(window,'Mesh Remodel v'+__version__,
+                    item,ok = QtWidgets.QInputDialog.getItem(window,'Mesh Remodel v'+__version__,
 'Part::Sweep requires Spine edges all be from the same object.\n\
 If you like a SubShapeBinder can be created for this purpose.\n\
 You will need to do the sweep again, this time selecting the \n\
@@ -2135,9 +2130,9 @@ the edges of the wire as this ensures they are connected.\n\
                             binder.ClaimChildren = True
                         doc.commitTransaction()
                         doc.recompute()
-                        FreeCADGui.Selection.clearSelection()
+                        Gui.Selection.clearSelection()
                         for sec in sections:
-                            FreeCADGui.Selection.addSelection(doc.Name,sec.Name)
+                            Gui.Selection.addSelection(doc.Name,sec.Name)
                     return
                 doc.openTransaction("Part Sweep")
                 f = doc.addObject("Part::Sweep","Sweep")
@@ -2149,12 +2144,12 @@ the edges of the wire as this ensures they are connected.\n\
                 selobj[len(f.Sections)].Object.ViewObject.Visibility = False
                 f.Solid = self.checkClosed(selobj[0].Object)
                 doc.commitTransaction()
-            elif modifiers == QtCore.Qt.ShiftModifier: #loft
+            elif modifiers == QtCore.Qt.KeyboardModifier.ShiftModifier: #loft
                 if len(selobj)<2:
                     FreeCAD.Console.PrintMessage("Running Loft command using the Gui\n")
                     FreeCAD.Console.PrintMessage("Note: you can bypass the Gui if you select two or more profiles,\n")
                     FreeCAD.Console.PrintMessage("and then run this command.\n")
-                    FreeCADGui.runCommand("Part_Loft",0)
+                    Gui.runCommand("Part_Loft",0)
                     return
                 sections = [obj.Object for obj in selobj]
                 doc.openTransaction("Part Loft")
@@ -2164,7 +2159,7 @@ the edges of the wire as this ensures they are connected.\n\
                     sec.ViewObject.Visibility = False
                 f.Solid = self.checkClosed(selobj[0].Object)
                 doc.commitTransaction()
-            elif modifiers == QtCore.Qt.AltModifier: #revolution
+            elif modifiers == QtCore.Qt.KeyboardModifier.AltModifier: #revolution
                 doc.openTransaction("Part Revolve")
                 f = doc.addObject("Part::Revolution","Revolve")
                 f.Source = selobj[0].Object #profile
@@ -2334,7 +2329,7 @@ class CoplanarPoints:
             self.inhibitRecomputes = False;
             return
         doc = FreeCAD.ActiveDocument
-        #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        #QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         candidates = []
         if fp.BasePointsObject:
             candidates = fp.BasePointsObject.Shape.Vertexes
@@ -2563,8 +2558,8 @@ the original mesh object.
         cp.Trio = (self.obj,self.vertexNames)
         cp.BasePointsObject.ViewObject.Visibility = False
         doc.commitTransaction()
-        FreeCADGui.Selection.clearSelection()
-        FreeCADGui.Selection.addSelection(doc.Name,cp.Name)
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(doc.Name,cp.Name)
         doc.recompute()
         return
 
@@ -2619,16 +2614,16 @@ class MeshRemodelCreateLineCommandClass(object):
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         line_width = pg.GetFloat("LineWidth",5.0)
         point_size = pg.GetFloat("PointSize",4.0)
-        modifiers = QtGui.QApplication.keyboardModifiers()
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
         #ctrl + click to include midpoint
         #ctrl + shift + click to include only the midpoint
-        #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        #QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         doc.openTransaction("Create line")
         if len(global_picked) == 2:
             self.pts = global_picked #use preselect-picked points
         line = Part.makeLine(self.pts[0],self.pts[1])
         lineName = "MR_Ref"
-        if not modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
+        if not modifiers == QtCore.Qt.KeyboardModifier.ControlModifier.__or__(QtCore.Qt.KeyboardModifier.ShiftModifier):
             #Part.show(line,"MR_Line")
             l = Draft.makeLine(line.Vertexes[0].Point, line.Vertexes[1].Point)
             l.Label="MR_"+l.Label
@@ -2637,7 +2632,7 @@ class MeshRemodelCreateLineCommandClass(object):
             Gui.Selection.clearSelection()
             Gui.Selection.addSelection(doc.getObject(lineName))
             FreeCAD.Console.PrintMessage(lineName+": length = "+str(line.Length)+"\n  midpoint at "+str(gu.midpoint(line.firstVertex().Point,line.lastVertex().Point))+"\n")
-        if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
+        if modifiers == QtCore.Qt.KeyboardModifier.ControlModifier or modifiers == QtCore.Qt.KeyboardModifier.ControlModifier.__or__(QtCore.Qt.KeyboardModifier.ShiftModifier):
             pv = doc.addObject("Part::Vertex",lineName+"_Mid")
             pv.Placement.Base.x, pv.Placement.Base.y, pv.Placement.Base.z = gu.midpoint(line.firstVertex().Point,line.lastVertex().Point)
             doc.ActiveObject.ViewObject.PointSize = point_size
@@ -2705,16 +2700,16 @@ or all points, but not a combination of the 2 object types\n\
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         line_width = pg.GetFloat("LineWidth",5.0)
         point_size = pg.GetFloat("PointSize",4.0)
-        #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        #QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         if len(global_picked) > 2:
             self.pts = global_picked #use preselect-picked points
         doc.openTransaction("Create polygon")
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        if modifiers != QtCore.Qt.ShiftModifier and modifiers != QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.AltModifier):
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if modifiers != QtCore.Qt.KeyboardModifier.ShiftModifier and modifiers != QtCore.Qt.KeyboardModifier.ShiftModifier.__or__(QtCore.Qt.KeyboardModifier.AltModifier):
             if len(self.pts) > 0:
                 self.pts.append(self.pts[0]) #don't close polygon on shift+click
 
-        if modifiers == QtCore.Qt.AltModifier.__or__(QtCore.Qt.ShiftModifier) or modifiers == QtCore.Qt.AltModifier:
+        if modifiers == QtCore.Qt.KeyboardModifier.AltModifier.__or__(QtCore.Qt.KeyboardModifier.ShiftModifier) or modifiers == QtCore.Qt.KeyboardModifier.AltModifier:
             lineList = self.makePolygon(gu.sortPoints(self.pts))
         else:
             lineList = self.makePolygon(self.pts)
@@ -2733,7 +2728,7 @@ or all points, but not a combination of the 2 object types\n\
 
         doc.commitTransaction()
 
-        #QtGui.QApplication.restoreOverrideCursor()
+        #QtWidgets.QApplication.restoreOverrideCursor()
         return
 
     def makePolygon(self,pts):
@@ -2806,12 +2801,12 @@ class MeshRemodelCreateBSplineCommandClass(object):
         point_size = pg.GetFloat("PointSize",4.0)
         if len(global_picked) > 2:
             self.pts = global_picked #use preselect-picked points
-        #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        #QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         doc.openTransaction("Create BSpline")
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        is_periodic = not modifiers & QtCore.Qt.ShiftModifier
-        do_sort = modifiers & QtCore.Qt.AltModifier
-        do_flatten = not modifiers & QtCore.Qt.ControlModifier
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        is_periodic = not modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier
+        do_sort = modifiers & QtCore.Qt.KeyboardModifier.AltModifier
+        do_flatten = not modifiers & QtCore.Qt.KeyboardModifier.ControlModifier
         if do_flatten:
             self.pts = gu.projectPointsToPlane(self.pts)
         if do_sort:
@@ -2821,7 +2816,7 @@ class MeshRemodelCreateBSplineCommandClass(object):
         bs.ViewObject.LineWidth=line_width
         doc.recompute()
         doc.commitTransaction()
-        #QtGui.QApplication.restoreOverrideCursor()
+        #QtWidgets.QApplication.restoreOverrideCursor()
         return
 
     def IsActive(self):
@@ -2898,8 +2893,6 @@ class MeshRemodelFlattenDraftBSplineCommandClass(object):
 ################################################################################
 #TugBoat object
 ################################################################################
-import FreeCAD, FreeCADGui, Part
-from PySide import QtCore, QtWidgets, QtGui
 
 class TugBoat:
     def __init__(self, obj):
@@ -3500,14 +3493,14 @@ temporarily, and then back to Through after completing the rotation.
     def Activated(self):
         #FreeCAD.Console.PrintMessage(f"obj: {self.obj.Label}, normal: {self.normal}\n")
         angle = self.angle if self.angle != None else 1
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        if modifiers & QtCore.Qt.ControlModifier:
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if modifiers & QtCore.Qt.KeyboardModifier.ControlModifier:
             angle *= 0.1
-        if modifiers & QtCore.Qt.ShiftModifier:
+        if modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier:
             angle *= 15.0
-        if modifiers & QtCore.Qt.AltModifier:
+        if modifiers & QtCore.Qt.KeyboardModifier.AltModifier:
             angle *= -1.0
-        if modifiers & QtCore.Qt.ControlModifier and modifiers & QtCore.Qt.ShiftModifier:
+        if modifiers & QtCore.Qt.KeyboardModifier.ControlModifier and modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier:
             angle = self.angle if self.angle != None else 1
             angle = gu.getFloatFromUser("Rotate", "Enter value for angle:", value=angle, step=0.1)
             if angle == None:
@@ -3535,7 +3528,7 @@ attachment.
         self.normal = None
         self.center = None
         self.angle = None
-        sel = FreeCADGui.Selection.getCompleteSelection()
+        sel = Gui.Selection.getCompleteSelection()
         if len(sel) == 0 or len(sel) > 3:
             return False
         if len(sel) == 2:
@@ -3708,14 +3701,14 @@ temporarily, and then back to Through after completing the move.
     def Activated(self):
         #FreeCAD.Console.PrintMessage(f"obj: {self.obj.Label}, normal: {self.normal}\n")
         distance = 1 if self.distance == None else self.distance
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        if modifiers & QtCore.Qt.ControlModifier:
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if modifiers & QtCore.Qt.KeyboardModifier.ControlModifier:
             distance *= 0.1
-        if modifiers & QtCore.Qt.ShiftModifier:
+        if modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier:
             distance *= 10.0
-        if modifiers & QtCore.Qt.AltModifier:
+        if modifiers & QtCore.Qt.KeyboardModifier.AltModifier:
             distance *= -1.0
-        if modifiers & QtCore.Qt.ControlModifier and modifiers & QtCore.Qt.ShiftModifier:
+        if modifiers & QtCore.Qt.KeyboardModifier.ControlModifier and modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier:
             distance = self.distance if self.distance != None else 1
             distance = gu.getFloatFromUser("Move Axial", "Enter value for distance:", value=distance, step=0.1)
             if distance == None:
@@ -3737,7 +3730,7 @@ attachment.
         doc.commitTransaction()
         
     def IsActive(self):
-        sel = FreeCADGui.Selection.getCompleteSelection()
+        sel = Gui.Selection.getCompleteSelection()
         self.distance = None
         if len(sel) > 2 or len(sel) == 0:
             return False
@@ -3793,7 +3786,7 @@ attachment.
 # end Move Axial command class
 ################################################################################
 
-class BlockSelectorDialog(QtGui.QDialog):
+class BlockSelectorDialog(QtWidgets.QDialog):
     def __init__(self, blocks, parent=None):
         def trigger(idx): 
             return lambda: self.on_block_selected(idx)
@@ -3804,29 +3797,29 @@ class BlockSelectorDialog(QtGui.QDialog):
         self.selected_index = None
 
         self.setWindowTitle('Go back to a previous selection')
-        self.setWindowFlags(QtCore.Qt.Dialog | QtCore.Qt.WindowCloseButtonHint)
+        self.setWindowFlags(QtCore.Qt.WindowType.Dialog | QtCore.Qt.WindowType.WindowCloseButtonHint)
         self.setModal(True)
 
-        layout = QtGui.QVBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
 
         # Create a scroll area
-        scroll_area = QtGui.QScrollArea()
+        scroll_area = QtWidgets.QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_content = QtGui.QWidget()
-        scroll_layout = QtGui.QVBoxLayout(scroll_content)
-        scroll_layout.addWidget(QtGui.QLabel("Tooltip for each button shows the selection objects\nDeleted objects will not appear."))
+        scroll_content = QtWidgets.QWidget()
+        scroll_layout = QtWidgets.QVBoxLayout(scroll_content)
+        scroll_layout.addWidget(QtWidgets.QLabel("Tooltip for each button shows the selection objects\nDeleted objects will not appear."))
 
         # Create buttons for each block
         for i, block in enumerate(blocks):
-            button_row_layout = QtGui.QHBoxLayout()
+            button_row_layout = QtWidgets.QHBoxLayout()
             
-            button = QtGui.QPushButton(f'Block {i + 1}')
+            button = QtWidgets.QPushButton(f'Block {i + 1}')
             tooltip_text = "\n".join(block)
             button.setToolTip(tooltip_text)
             button.clicked.connect(trigger(i+1))
             button_row_layout.addWidget(button)
             
-            report_button = QtGui.QPushButton(f"> text document")
+            report_button = QtWidgets.QPushButton(f"> text document")
             report_button.setToolTip("send contents to a new text document object")
             report_button.clicked.connect(report_trigger(tooltip_text))
             button_row_layout.addWidget(report_button)
@@ -3883,7 +3876,7 @@ console.  This provides persistent storage for selection blocks.
 
     def Activated(self):
         mw = Gui.getMainWindow()
-        self.pc = mw.findChild(QtGui.QPlainTextEdit,"Python console")
+        self.pc = mw.findChild(QtWidgets.QPlainTextEdit,"Python console")
         txt = self.pc.toPlainText()
         txtLines = txt.split('\n')
         lines = [line[6:] for line in txtLines \
@@ -3924,7 +3917,7 @@ console.  This provides persistent storage for selection blocks.
         dialog = BlockSelectorDialog(blocks)
         result = dialog.exec_()
         
-        if result == QtGui.QDialog.Accepted:
+        if result == QtWidgets.QDialog.DialogCode.Accepted:
             print(f"returning {dialog.selected_index}")
             return dialog.selected_index
         else:
@@ -4276,7 +4269,7 @@ Alt+Click = reverses references to reverse object for all but SubObjectLofts
 
         elif self.vertex_count == 2:
             loft = doc.addObject("Part::FeaturePython","ParametricLine")
-            if not QtCore.Qt.AltModifier & QtGui.QApplication.keyboardModifiers():
+            if not QtCore.Qt.KeyboardModifier.AltModifier & QtWidgets.QApplication.keyboardModifiers():
                 ParametricLine(loft, self.subs[0], self.subs[1])
             else:
                 ParametricLine(loft, self.subs[1], self.subs[0])
@@ -4288,7 +4281,7 @@ Alt+Click = reverses references to reverse object for all but SubObjectLofts
             binder1.Support = [self.subs[0]]
             binder2 = doc.addObject("PartDesign::SubShapeBinder","Binder")
             binder2.Support = [self.subs[1]]
-            if not QtCore.Qt.AltModifier & QtGui.QApplication.keyboardModifiers():
+            if not QtCore.Qt.KeyboardModifier.AltModifier & QtWidgets.QApplication.keyboardModifiers():
                 loft.Sections = [binder1, binder2]
             else:
                 loft.Sections = [binder2, binder1]
@@ -4305,7 +4298,7 @@ Alt+Click = reverses references to reverse object for all but SubObjectLofts
         self.vertex_count = 0
         if not FreeCAD.ActiveDocument:
             return False
-        sel = FreeCADGui.Selection.getCompleteSelection()
+        sel = Gui.Selection.getCompleteSelection()
         for s in sel:
             if not s.Object.isDerivedFrom("Part::Feature"):
                 return False
@@ -4596,21 +4589,21 @@ class GridSurface:
         if not hasattr(vert,"GS_Ignore"):
             vert.addProperty("App::PropertyBool","GS_Ignore","GridSurface").GS_Ignore = False
         val=0
-        FreeCADGui.Selection.clearSelection()
-        FreeCADGui.Selection.addSelection(fp.Document.Name, vert.Name)
-        row,ok = QtGui.QInputDialog.getInt(FreeCADGui.getMainWindow(), "Row input", f"Enter row for this vertex {vert.Label} at {(vert.X, vert.Y, vert.Z)}",\
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(fp.Document.Name, vert.Name)
+        row,ok = QtWidgets.QInputDialog.getInt(Gui.getMainWindow(), "Row input", f"Enter row for this vertex {vert.Label} at {(vert.X, vert.Y, vert.Z)}",\
                                     val, minValue = 0, step=1)
         if not ok:
             return vert
         else:
-            col,ok = QtGui.QInputDialog.getInt(FreeCADGui.getMainWindow(), "Column input", f"Enter column for this vertex {vert.Label} at {(vert.X, vert.Y, vert.Z)}",\
+            col,ok = QtWidgets.QInputDialog.getInt(Gui.getMainWindow(), "Column input", f"Enter column for this vertex {vert.Label} at {(vert.X, vert.Y, vert.Z)}",\
                                     val, minValue = 0, step=1)
         if ok:
             if not fp.ColumnMode:
                 row_list = [v for v in fp.Vertices if hasattr(v, "Row") and hasattr(v, "Column") and v.Column >= col and v != vert]
                 highest_col = 0
                 items = ["yes, shift them all","yes, but only this row", "no, do not shift"]
-                item, ok = QtGui.QInputDialog.getItem(FreeCADGui.getMainWindow(),"Shift vertices?", \
+                item, ok = QtWidgets.QInputDialog.getItem(Gui.getMainWindow(),"Shift vertices?", \
                             "Shift remaining vertices over one column?",items,0)
                 if ok and item != items[2]:
                     for r in row_list:
@@ -4629,7 +4622,7 @@ class GridSurface:
                 column_list = [v for v in fp.Vertices if hasattr(v, "Row") and hasattr(v, "Column") and v != vert and v.Row >= row]
                 highest_row = 0
                 items = ["yes, shift them all","yes, but only this column", "no, do not shift"]
-                item, ok = QtGui.QInputDialog.getItem(FreeCADGui.getMainWindow(),"Shift vertices?", \
+                item, ok = QtWidgets.QInputDialog.getItem(Gui.getMainWindow(),"Shift vertices?", \
                             "Shift remaining vertices over one row?",items,0)
                 if ok and item != items[2]:
                     for c in column_list:
@@ -4825,7 +4818,7 @@ class GridSurfaceVP:
         columnModeAction = menu.addAction(f"Switch to {mode}")
         columnModeAction.triggered.connect(self.toggleColumnMode)
         
-        body = FreeCADGui.ActiveDocument.ActiveView.getActiveObject("pdbody")
+        body = Gui.ActiveDocument.ActiveView.getActiveObject("pdbody")
         if body and not fp in body.Group:
             bodyAction = menu.addAction(f"Add to {body.Label}")
             bodyAction.triggered.connect(self.addToBody)
@@ -4873,9 +4866,9 @@ grid.  You can also click Cancel or simply delete this object to cancel"""
         ghost.ViewObject.PointSize = fp.PointSize
         ghost.ViewObject.PointColor = (255,0,0)
         ghost.Document.recompute()
-        FreeCADGui.Selection.clearSelection()
-        FreeCADGui.Selection.addSelection(fp.Document.Name, ghost.Name)
-        FreeCADGui.runCommand("Std_TransformManip",0)
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(fp.Document.Name, ghost.Name)
+        Gui.runCommand("Std_TransformManip",0)
         fp.ViewObject.Visibility = False
 
      
@@ -4913,7 +4906,7 @@ grid.  You can also click Cancel or simply delete this object to cancel"""
                 
     def addToBody(self, checked):
         fp = self.FP
-        body = FreeCADGui.ActiveDocument.ActiveView.getActiveObject("pdbody")
+        body = Gui.ActiveDocument.ActiveView.getActiveObject("pdbody")
         if not fp in body.Group:
             body.Group += [fp]
             for vert in fp.Vertices:
@@ -4923,7 +4916,7 @@ grid.  You can also click Cancel or simply delete this object to cancel"""
         
     def removeFromBody(self, checked):
         fp = self.FP
-        body = FreeCADGui.ActiveDocument.ActiveView.getActiveObject("pdbody")
+        body = Gui.ActiveDocument.ActiveView.getActiveObject("pdbody")
         if fp in body.Group:
             to_remove = [obj for obj in body.Group if obj == fp or obj in fp.Vertices]
             to_remain = [obj for obj in body.Group if obj not in to_remove]
@@ -4943,7 +4936,7 @@ grid.  You can also click Cancel or simply delete this object to cancel"""
     def selectForGordonTemplate(self, checked):
         """select the edges in proper order to make a Gordon surface object in Curves workbench"""
         fp = self.FP
-        sel = FreeCADGui.Selection
+        sel = Gui.Selection
         sel.clearSelection()
         for idx,edge in enumerate(fp.Shape.Edges):
             sel.addSelection(fp.Document.Name, fp.Name, f"Edge{idx + 1}")
@@ -4967,17 +4960,17 @@ grid.  You can also click Cancel or simply delete this object to cancel"""
 
     def selectRow(self, row):
         fp = self.FP
-        FreeCADGui.Selection.clearSelection()
+        Gui.Selection.clearSelection()
         for vert in fp.Vertices:
             if vert.Row == row:
-                FreeCADGui.Selection.addSelection(fp.Document.Name, vert.Name)
+                Gui.Selection.addSelection(fp.Document.Name, vert.Name)
 
     def selectCol(self, col):
         fp = self.FP
-        FreeCADGui.Selection.clearSelection()
+        Gui.Selection.clearSelection()
         for vert in fp.Vertices:
             if vert.Column == col:
-                FreeCADGui.Selection.addSelection(fp.Document.Name, vert.Name)
+                Gui.Selection.addSelection(fp.Document.Name, vert.Name)
 
     def claimChildren(self):
         fp = self.FP
@@ -5049,7 +5042,7 @@ the edges in the GridSurface object.
     def Activated(self):
 
         doc = FreeCAD.ActiveDocument if FreeCAD.ActiveDocument else FreeCAD.newDocument()
-        sel = FreeCADGui.Selection.getCompleteSelection()
+        sel = Gui.Selection.getCompleteSelection()
         picked = global_picked if global_picked else []
         if not picked:
             for s in sel:
@@ -5110,8 +5103,8 @@ Alt+Click = Use camera orientation for plane normal (circles become bsplines)\n"
             """used for printing display only"""
             return FreeCAD.Vector(round(vector.x,6), round(vector.y,6), round(vector.z,6))
         useCameraOrientation = False
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        if modifiers & QtCore.Qt.AltModifier:
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if modifiers & QtCore.Qt.KeyboardModifier.AltModifier:
             useCameraOrientation = True
         plm = FreeCAD.Placement()
         if not useCameraOrientation:
@@ -5129,7 +5122,7 @@ Alt+Click = Use camera orientation for plane normal (circles become bsplines)\n"
                 base,normal = gu.planeFromPoints(keypts)
         else:
             #get from camera orientation
-            rot = FreeCADGui.ActiveDocument.ActiveView.getCameraOrientation()
+            rot = Gui.ActiveDocument.ActiveView.getCameraOrientation()
             base = self.shapes[0].Vertex1.Point
             normal = rot.multVec(FreeCAD.Vector(0,0,1))
 
@@ -5385,7 +5378,7 @@ no selection = xy plane at origin
     def Activated(self):
         doc = FreeCAD.ActiveDocument
         self.subs = []
-        sel = FreeCADGui.Selection.getCompleteSelection()
+        sel = Gui.Selection.getCompleteSelection()
         count_vertices = 0
         count_faces = 0
         count_edges = 0
@@ -5461,7 +5454,7 @@ class MeshRemodelCreateCircleCommandClass(object):
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         line_width = pg.GetFloat("LineWidth",5.0)
         point_size = pg.GetFloat("PointSize",4.0)
-        #QtGui.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        #QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
 
 
         #add_varargs_method("makeCircle",&Module::makeCircle,
@@ -5469,7 +5462,7 @@ class MeshRemodelCreateCircleCommandClass(object):
         #    "By default pnt=Vector(0,0,0), dir=Vector(0,0,1), angle1=0 and angle2=360"
         #);
 
-        modifiers = QtGui.QApplication.keyboardModifiers()
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
         if len(global_picked) > 2:
             self.pts = global_picked
         poly = Part.makePolygon(self.pts)
@@ -5489,7 +5482,7 @@ class MeshRemodelCreateCircleCommandClass(object):
         doc.openTransaction("Create circle")
         circle = Part.makeCircle(radius, center, normal)
         circName="MR_Ref"
-        if not modifiers == QtCore.Qt.ShiftModifier.__or__(QtCore.Qt.ControlModifier):
+        if not modifiers == QtCore.Qt.KeyboardModifier.ShiftModifier.__or__(QtCore.Qt.KeyboardModifier.ControlModifier):
             #Part.show(circle,"MR_Circle")
             c = Draft.makeCircle(circle)
             c.Label="MR_"+c.Label
@@ -5498,7 +5491,7 @@ class MeshRemodelCreateCircleCommandClass(object):
             FreeCAD.Console.PrintMessage(circName+": radius = "+str(radius)+"\n  center at "+str(center)+"\n")
             Gui.Selection.clearSelection()
             Gui.Selection.addSelection(doc.getObject(circName))
-        if modifiers == QtCore.Qt.ControlModifier or modifiers==QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
+        if modifiers == QtCore.Qt.KeyboardModifier.ControlModifier or modifiers==QtCore.Qt.KeyboardModifier.ControlModifier.__or__(QtCore.Qt.KeyboardModifier.ShiftModifier):
             #show the center point on ctrl click or shift+ctrl click
             vert = doc.addObject("Part::Vertex", circName+"_Ctr")
             vert.Placement.Base.x, vert.Placement.Base.y, vert.Placement.Base.z = center
@@ -5506,7 +5499,7 @@ class MeshRemodelCreateCircleCommandClass(object):
 
         doc.recompute()
         doc.commitTransaction()
-        #QtGui.QApplication.restoreOverrideCursor()
+        #QtWidgets.QApplication.restoreOverrideCursor()
         return
 
 
@@ -5558,7 +5551,7 @@ are not getting the arc orientation you were expecting -- will need to delete un
         pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
         line_width = pg.GetFloat("LineWidth",5.0)
         point_size = pg.GetFloat("PointSize",4.0)
-        modifiers = QtGui.QApplication.keyboardModifiers()
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
         if len(global_picked) > 2:
             self.pts = global_picked
         poly = Part.makePolygon(self.pts)
@@ -5578,11 +5571,11 @@ are not getting the arc orientation you were expecting -- will need to delete un
         #arc = Part.ArcOfCircle(A,B,C)
         #on ctrl+shift click we only show center
         arcName="MR_Ref"
-        if not modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier) or modifiers == QtCore.Qt.AltModifier:
+        if not modifiers == QtCore.Qt.KeyboardModifier.ControlModifier.__or__(QtCore.Qt.KeyboardModifier.ShiftModifier) or modifiers == QtCore.Qt.KeyboardModifier.AltModifier:
             #Part.show(arc.toShape(),"MR_Arc")
             a = Draft.make_arc_3points([A,B,C])
             a.Label = "MR_"+a.Label
-            if modifiers == QtCore.Qt.AltModifier:
+            if modifiers == QtCore.Qt.KeyboardModifier.AltModifier:
                 a = Draft.make_arc_3points([A,C,B])
                 a.Label = "MR_"+a.Label
                 a = Draft.make_arc_3points([B,C,A])
@@ -5598,14 +5591,14 @@ are not getting the arc orientation you were expecting -- will need to delete un
             FreeCAD.Console.PrintMessage(arcName+": radius = "+str(radius)+"\n  center at "+str(center)+"\n")
             Gui.Selection.clearSelection()
             Gui.Selection.addSelection(a)
-        if modifiers == QtCore.Qt.ControlModifier or modifiers == QtCore.Qt.ControlModifier.__or__(QtCore.Qt.ShiftModifier):
+        if modifiers == QtCore.Qt.KeyboardModifier.ControlModifier or modifiers == QtCore.Qt.KeyboardModifier.ControlModifier.__or__(QtCore.Qt.KeyboardModifier.ShiftModifier):
             #Part.show(Part.Point(center).toShape(),arcName+"_Ctr") #show the center point
             pv = doc.addObject("Part::Vertex",arcName+"_Ctr")
             pv.Placement.Base.x, pv.Placement.Base.y, pv.Placement.Base.z = center
             doc.ActiveObject.ViewObject.PointSize = point_size
         doc.recompute()
         doc.commitTransaction()
-        #QtGui.QApplication.restoreOverrideCursor()
+        #QtWidgets.QApplication.restoreOverrideCursor()
         return
 
     def IsActive(self):
@@ -6610,8 +6603,8 @@ class WireFilterEditorTask:
         self.prop = prop
         self.selectionMode = selectionMode
         self.visibility = self.fp.ViewObject.Visibility
-        self.camera = FreeCADGui.activeView().getCamera()
-        FreeCADGui.activeDocument().activeView().viewTop()
+        self.camera = Gui.activeView().getCamera()
+        Gui.activeDocument().activeView().viewTop()
         self.ghost = self.fp.Document.addObject("Part::Feature",f"{self.prop}_Ghost")
         self.fp.ViewObject.Proxy.ghosts.append(self.ghost.Name)
         self.ghost.ViewObject.PointSize = 10
@@ -6623,7 +6616,7 @@ object.  It can be deleted if the dialog is closed, but it should be automatical
 deleted upon closing the dialog.
 """
         self.fp.ViewObject.Visibility = False
-        self.form = QtGui.QWidget()
+        self.form = QtWidgets.QWidget()
         if not self.selectionMode:
             self.form.setWindowTitle(f"Edit {prop}")
             self.order = self.fixOrder(getattr(fp,prop))
@@ -6633,7 +6626,7 @@ deleted upon closing the dialog.
 
         defaultsBtn = QtWidgets.QPushButton("Defaults")
         defaultsBtn.clicked.connect(self.setDefaults)
-        layout = QtGui.QGridLayout()
+        layout = QtWidgets.QGridLayout()
         self.form.setLayout(layout)
         layout.addWidget(defaultsBtn,0,0,1,1)
         noneBtn = QtWidgets.QPushButton("None")
@@ -6646,19 +6639,19 @@ deleted upon closing the dialog.
         self.cbs = []
         for idx, wire in enumerate(shape.Wires):
             wireNumber = self.order[idx] if self.order[idx] > 0 else -1 * self.order[idx]
-            cb = QtGui.QCheckBox(f"Wire{wireNumber}")
+            cb = QtWidgets.QCheckBox(f"Wire{wireNumber}")
             cb.setObjectName(f"{wireNumber}")
             cb.setChecked(wireNumber in self.order)
             self.cbs.append(cb)
             cb.clicked.connect(triggerChecked(idx))
-            layout.addWidget(cb, idx+2, 1,alignment=QtCore.Qt.AlignCenter)
-            up = QtGui.QPushButton()
-            up.setIcon(QtGui.QIcon(FreeCADGui.getIcon("button_up")))
+            layout.addWidget(cb, idx+2, 1,alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
+            up = QtWidgets.QPushButton()
+            up.setIcon(QtGui.QIcon(Gui.getIcon("button_up")))
             up.clicked.connect(triggerUp(idx))
             if not self.selectionMode:
                 layout.addWidget(up, idx+2, 0)
-            down = QtGui.QPushButton()
-            down.setIcon(QtGui.QIcon(FreeCADGui.getIcon("button_down")))
+            down = QtWidgets.QPushButton()
+            down.setIcon(QtGui.QIcon(Gui.getIcon("button_down")))
             down.clicked.connect(triggerDown(idx))
             if not self.selectionMode:
                 layout.addWidget(down, idx+2, 2)
@@ -6735,14 +6728,14 @@ deleted upon closing the dialog.
 
     def reject(self):
         self.fp.ViewObject.Visibility = self.visibility
-        FreeCADGui.activeView().setCamera(self.camera)
+        Gui.activeView().setCamera(self.camera)
         self.fp.ViewObject.Proxy.closePanel()
 
     def accept(self):
 
         self.fp.ViewObject.Visibility = self.visibility
-        FreeCADGui.activeView().setCamera(self.camera)
-        FreeCADGui.ActiveDocument.resetEdit()
+        Gui.activeView().setCamera(self.camera)
+        Gui.ActiveDocument.resetEdit()
         if not self.selectionMode:
             self.fp.Document.openTransaction(f"edit {self.prop}")
             setattr(self.fp, self.prop, self.order)
@@ -6761,35 +6754,35 @@ class ExecutionOrderTask:
         self.fp = fp
         self.prop = "ExecutionOrder"
         self.default = SketchPlus.ExecutionOrderDefault
-        self.form = QtGui.QWidget()
+        self.form = QtWidgets.QWidget()
         self.form.setWindowTitle(f"Edit execution order")
         #self.order will be a list of strings
         self.order = getattr(self.fp, self.prop)
 
         defaultsBtn = QtWidgets.QPushButton("Defaults")
         defaultsBtn.clicked.connect(self.setDefaults)
-        layout = QtGui.QGridLayout()
+        layout = QtWidgets.QGridLayout()
         self.form.setLayout(layout)
         layout.addWidget(defaultsBtn,0,0,1,1)
         self.cbs = []
         for idx, funcName in enumerate(self.order):
-            cb = QtGui.QCheckBox(funcName)
+            cb = QtWidgets.QCheckBox(funcName)
             cb.setChecked(not funcName.startswith("-"))
             self.cbs.append(cb)
             cb.clicked.connect(triggerChecked(idx))
-            layout.addWidget(cb, idx+1, 1,alignment=QtCore.Qt.AlignCenter)
-            up = QtGui.QPushButton()
-            up.setIcon(QtGui.QIcon(FreeCADGui.getIcon("button_up")))
+            layout.addWidget(cb, idx+1, 1,alignment=QtCore.Qt.AlignmentFlag.AlignCenter)
+            up = QtWidgets.QPushButton()
+            up.setIcon(QtGui.QIcon(Gui.getIcon("button_up")))
             up.clicked.connect(triggerUp(idx))
             layout.addWidget(up, idx+1, 0)
-            down = QtGui.QPushButton()
-            down.setIcon(QtGui.QIcon(FreeCADGui.getIcon("button_down")))
+            down = QtWidgets.QPushButton()
+            down.setIcon(QtGui.QIcon(Gui.getIcon("button_down")))
             down.clicked.connect(triggerDown(idx))
             layout.addWidget(down, idx+1, 2)
         self.relabel()
 
     def getStandardButtons(self):
-        return (QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel | QtWidgets.QDialogButtonBox.Apply)
+        return (QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel | QtWidgets.QDialogButtonBox.StandardButton.Apply)
 
     def setDefaults(self):
         self.order = SketchPlus.ExecutionOrderDefault
@@ -6828,7 +6821,7 @@ class ExecutionOrderTask:
         self.relabel()
 
     def clicked(self, button):
-        if button == QtWidgets.QDialogButtonBox.Apply:
+        if button == QtWidgets.QDialogButtonBox.StandardButton.Apply:
            self.fp.Document.openTransaction("Apply execution order edit")
            self.fp.ExecutionOrder = self.order
            self.fp.Document.recompute()
@@ -6838,7 +6831,7 @@ class ExecutionOrderTask:
         self.fp.ViewObject.Proxy.closePanel()
         
     def accept(self):
-        FreeCADGui.ActiveDocument.resetEdit()
+        Gui.ActiveDocument.resetEdit()
         self.fp.Document.openTransaction("Edit execution order")
         setattr(self.fp, self.prop, self.order)
         self.fp.Document.recompute()
@@ -6864,7 +6857,7 @@ OK = add selected
         label = QtWidgets.QLabel(msg)
         layout.addWidget(label)
         self.form.setLayout(layout)
-        FreeCADGui.Selection.clearSelection()
+        Gui.Selection.clearSelection()
         
     def addExternalLink(self, objName, subName):
         """add the external link"""
@@ -6886,7 +6879,7 @@ OK = add selected
                     return False
             return True
                 
-        sel = FreeCADGui.Selection.getCompleteSelection()
+        sel = Gui.Selection.getCompleteSelection()
         if not sel:
             return
         pbOuter = gu.MRProgress(len(sel)) if len(sel) > 100 else None
@@ -6929,10 +6922,10 @@ OK = add selected
         self.fp.Document.openTransaction("Add external links")
         self.addExternalLinks()
         self.fp.Document.commitTransaction()
-        FreeCADGui.Control.closeDialog()
+        Gui.Control.closeDialog()
 
     def reject(self):
-        FreeCADGui.Control.closeDialog()
+        Gui.Control.closeDialog()
         
 #for handling app::propertyfloatlist properties in the dialogs
 class CustomListWidget(QtWidgets.QListWidget):
@@ -6941,13 +6934,13 @@ class CustomListWidget(QtWidgets.QListWidget):
         self.add_default_items(float_list)
         self.itemClicked.connect(self.handle_item_click)
         self.itemDoubleClicked.connect(self.edit_item_value)
-        self.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self.showContextMenu)
         
     def edit_item_value(self, item):
         if item.text() != "+":
             current_value = float(item.text())
-            new_value, ok = QtGui.QInputDialog.getDouble(self, "Edit Value", 
+            new_value, ok = QtWidgets.QInputDialog.getDouble(self, "Edit Value", 
                                                    "Enter new value:", 
                                                    current_value, 
                                                    -10000, 10000, 2)
@@ -6960,7 +6953,7 @@ class CustomListWidget(QtWidgets.QListWidget):
             self.addItem(item)
        
         plus_item = QtWidgets.QListWidgetItem("+")
-        plus_item.setFlags(plus_item.flags() & ~QtCore.Qt.ItemIsSelectable)
+        plus_item.setFlags(plus_item.flags() & ~QtCore.Qt.ItemFlag.ItemIsSelectable)
         self.addItem(plus_item)
 
     def showContextMenu(self, pos: QtCore.QPoint):
@@ -7097,16 +7090,16 @@ class FunctionTask:
     def editPathArrayWires(self):
         msg_box = QtWidgets.QMessageBox()
         msg_box.setWindowTitle("Exiting dialog")
-        msg_box.setIcon(QtWidgets.QMessageBox.Question)
+        msg_box.setIcon(QtWidgets.QMessageBox.Icon.Question)
         msg_box.setText("Apply any changes to the SketchPlus object properties before closing?")
-        msg_box.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-        msg_box.setDefaultButton(QtWidgets.QMessageBox.No)
-        yes_button = msg_box.button(QtWidgets.QMessageBox.Yes)
-        no_button = msg_box.button(QtWidgets.QMessageBox.No)
+        msg_box.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
+        msg_box.setDefaultButton(QtWidgets.QMessageBox.StandardButton.No)
+        yes_button = msg_box.button(QtWidgets.QMessageBox.StandardButton.Yes)
+        no_button = msg_box.button(QtWidgets.QMessageBox.StandardButton.No)
         yes_button.setText("Apply")
         no_button.setText("Discard")
         result = msg_box.exec_()
-        if result == QtWidgets.QMessageBox.Yes:
+        if result == QtWidgets.QMessageBox.StandardButton.Yes:
             self.accept()
         else:
             self.reject()
@@ -7250,23 +7243,23 @@ class SketchPlusVP:
             self.ghosts = []
         else:
             print("SketchPlus object has no ghosts")
-        FreeCADGui.Control.closeDialog()
+        Gui.Control.closeDialog()
         fp.ViewObject.Visibility = True
 
     def openPanel(self, panel):
         import time
         start = time.time()
         timedOut = False
-        while FreeCADGui.Control.activeDialog():
+        while Gui.Control.activeDialog():
             FreeCAD.Console.PrintMessage(".")
-            FreeCADGui.updateGui()
+            Gui.updateGui()
             time.sleep(0.1)
             now = time.time()
             if now - start > 15:
                 timedOut = True
                 break
-        if not timedOut and not FreeCADGui.Control.activeDialog():
-            FreeCADGui.Control.showDialog(panel)
+        if not timedOut and not Gui.Control.activeDialog():
+            Gui.Control.showDialog(panel)
         else:
             FreeCAD.Console.PrintError("Another task panel is already open\n")
 
@@ -7306,7 +7299,7 @@ class SketchPlusVP:
         self.openPanel(panel)
 
     def selectWires(self, order):
-        FreeCADGui.Selection.clearSelection()
+        Gui.Selection.clearSelection()
         for o in order:
             self.selectWire(self.Object, o-1)
 
@@ -7322,7 +7315,7 @@ class SketchPlusVP:
                     subnames.append(f"Edge{ii+1}")
 
         for subname in subnames:
-            FreeCADGui.Selection.addSelection(fp.Document.Name, fp.Name, subname)
+            Gui.Selection.addSelection(fp.Document.Name, fp.Name, subname)
 
     def __getstate__(self):
         '''When saving the document this object gets stored using Python's json module.\
@@ -7359,8 +7352,8 @@ Create a new SketchPlus object\n\
         def addToActiveObject(obj):
             """check for existing active Body or App::Part and add object to it if found"""
 
-            body = FreeCADGui.ActiveDocument.ActiveView.getActiveObject("pdbody")
-            part = FreeCADGui.ActiveDocument.ActiveView.getActiveObject("part")
+            body = Gui.ActiveDocument.ActiveView.getActiveObject("pdbody")
+            part = Gui.ActiveDocument.ActiveView.getActiveObject("part")
             MeshRemodelCreateSketchCommandClass.activeObject = body if body else part if part else None
             if body:
                 if not obj in body.Group:
@@ -7388,7 +7381,7 @@ Create a new SketchPlus object\n\
             """open attachment dialog if there are selections"""
             MeshRemodelCreateSketchCommandClass.sketchPlus = obj
             take_selection = True
-            sel = FreeCADGui.Selection.getCompleteSelection()
+            sel = Gui.Selection.getCompleteSelection()
             if not sel and not MeshRemodelCreateSketchCommandClass.activeObject:
                 return
             if sel and not hasattr(sel[0].Object,"Shape"):
@@ -7406,7 +7399,7 @@ Create a new SketchPlus object\n\
                                                                     callback_OK = attached,
                                                                     callback_Cancel = attached,
                                                                     callback_Apply = None)
-            FreeCADGui.Control.showDialog(taskd)
+            Gui.Control.showDialog(taskd)
             #taskd.getCurrentMode()
             suggested = None
             item = None
@@ -7417,7 +7410,7 @@ Create a new SketchPlus object\n\
             if suggested:
                 suggested = taskd.attacher.getModeInfo(suggested)['UserFriendlyName']
                 listOfModes = taskd.form.listOfModes
-                item = listOfModes.findItems(suggested, QtCore.Qt.MatchExactly)
+                item = listOfModes.findItems(suggested, QtCore.Qt.MatchFlag.MatchExactly)
                 if item:
                     listOfModes.setCurrentItem(item[0])
         
@@ -7427,12 +7420,12 @@ Create a new SketchPlus object\n\
         SketchPlus(obj)
         SketchPlusVP(obj.ViewObject)
         addToActiveObject(obj)
-        sel = FreeCADGui.Selection.getSelection()
+        sel = Gui.Selection.getSelection()
         skipAttach = False
         if len(sel) == 1:
             if sel[0].isDerivedFrom("Sketcher::SketchObject"):
                 items = ["Duplicate selected sketch", "Do not duplicate"]
-                item, ok = QtGui.QInputDialog.getItem(FreeCADGui.getMainWindow(), "Duplicate selected sketch", f"Do you wish to duplicate the selected sketch: {sel[0].Label}?", items)
+                item, ok = QtWidgets.QInputDialog.getItem(Gui.getMainWindow(), "Duplicate selected sketch", f"Do you wish to duplicate the selected sketch: {sel[0].Label}?", items)
                 if ok and item == items[0]:
                     skipAttach = True
                     sk = sel[0]
@@ -7506,8 +7499,8 @@ into a face, or downgrade objects in the other direction.")}
 
     def Activated(self):
         doc = FreeCAD.ActiveDocument
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        if (modifiers == QtCore.Qt.ControlModifier):
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if (modifiers == QtCore.Qt.KeyboardModifier.ControlModifier):
             doc.openTransaction("Draft downgrade")
             Draft.downgrade(self.objs)
             doc.recompute()
@@ -7524,7 +7517,7 @@ into a face, or downgrade objects in the other direction.")}
                 FreeCAD.Gui.Selection.addSelection(sel)
         doc.commitTransaction()
         
-        #QtGui.QApplication.restoreOverrideCursor()
+        #QtWidgets.QApplication.restoreOverrideCursor()
         return
 
    
@@ -7594,8 +7587,8 @@ class MeshRemodelSelectionObserver():
         self.setPreselection(self.lastObj.Document.Name, self.lastObj.Name, f"Vertex{idx + 1}")
         
     def setPreselection(self,doc,obj,sub):                # Preselection object
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        if not modifiers & QtCore.Qt.ControlModifier:
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if not modifiers & QtCore.Qt.KeyboardModifier.ControlModifier:
             return
         self.lastObj = FreeCAD.ActiveDocument.getObject(obj)
         self.lastSubs.append(sub)
@@ -7713,18 +7706,18 @@ Alt+Click = remove last added point
 """}
 
     def on_clicked(self):
-        modifiers = QtGui.QApplication.keyboardModifiers()
-        if modifiers & QtCore.Qt.ControlModifier:
+        modifiers = QtWidgets.QApplication.keyboardModifiers()
+        if modifiers & QtCore.Qt.KeyboardModifier.ControlModifier:
             skipOne = False
-            if modifiers & QtCore.Qt.ShiftModifier:
+            if modifiers & QtCore.Qt.KeyboardModifier.ShiftModifier:
                 skipOne = True
                 FreeCAD.Console.PrintMessage("skipping one = true\n")
             self.sel.addNearestPoint(skipOne)
-        elif modifiers & QtCore.Qt.AltModifier:
+        elif modifiers & QtCore.Qt.KeyboardModifier.AltModifier:
             self.sel.removeLastPoint()
         else:
             self.bar.removeWidget(self.btn)
-            FreeCADGui.Selection.removeObserver(self.sel)
+            Gui.Selection.removeObserver(self.sel)
             self.bar = None
             self.btn = None
             self.sel = None
@@ -7734,8 +7727,8 @@ Alt+Click = remove last added point
         doc = FreeCAD.ActiveDocument
         if not self.sel:
             self.sel = MeshRemodelSelectionObserver()
-            FreeCADGui.Selection.addObserver(self.sel)
-            self.btn = QtGui.QPushButton("Cancel Preselect Mode")
+            Gui.Selection.addObserver(self.sel)
+            self.btn = QtWidgets.QPushButton("Cancel Preselect Mode")
             self.btn.setToolTip("Cancel Preselect selection mode and remove observer")
             self.btn.clicked.connect(self.on_clicked)
             self.bar = Gui.getMainWindow().statusBar()
@@ -7743,17 +7736,17 @@ Alt+Click = remove last added point
             self.btn.show()
             global_picked.clear()
         else:
-            modifiers = QtGui.QApplication.keyboardModifiers()
-            if modifiers & QtCore.Qt.ControlModifier: #add nearest point
+            modifiers = QtWidgets.QApplication.keyboardModifiers()
+            if modifiers & QtCore.Qt.KeyboardModifier.ControlModifier: #add nearest point
                 self.on_clicked()
                 return
-            if modifiers & QtCore.Qt.AltModifier: #remove last point
+            if modifiers & QtCore.Qt.KeyboardModifier.AltModifier: #remove last point
                 self.on_clicked()
                 return
-            FreeCADGui.Selection.removeObserver(self.sel)
+            Gui.Selection.removeObserver(self.sel)
             self.sel = None
             self.bar.removeWidget(self.btn)
-            FreeCADGui.Selection.removeObserver(self.sel)
+            Gui.Selection.removeObserver(self.sel)
             self.bar = None
             self.btn = None
             global_picked.clear()
@@ -7792,7 +7785,7 @@ class MeshRemodelMergeSketchesCommandClass(object):
             if hasattr(o,"ViewObject"):
                 o.ViewObject.Visibility=False
         #doc.commitTransaction()
-        #QtGui.QApplication.restoreOverrideCursor()
+        #QtWidgets.QApplication.restoreOverrideCursor()
         Gui.activateWorkbench("MeshRemodelWorkbench")
         return
    

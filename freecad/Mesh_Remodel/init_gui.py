@@ -20,12 +20,15 @@
 ################################################################################
 
 import freecad.Mesh_Remodel.meshremodelwb_locator as meshremodelwb_locator
-meshremodelWBPath = os.path.dirname(meshremodelwb_locator.__file__)
-meshremodelWB_icons_path = os.path.join(meshremodelWBPath,'Resources','icons')
+from FreeCAD import Gui , Console , ParamGet
+from os.path import dirname , join
+
+meshremodelWBPath = dirname(meshremodelwb_locator.__file__)
+meshremodelWB_icons_path = join(meshremodelWBPath,'Resources','icons')
 
 global main_meshremodelWB_Icon
 
-main_meshremodelWB_Icon = os.path.join(meshremodelWB_icons_path , 'CreatePointsObject.svg')
+main_meshremodelWB_Icon = join(meshremodelWB_icons_path , 'CreatePointsObject.svg')
 
 
 #def myFunc(string):
@@ -40,7 +43,7 @@ main_meshremodelWB_Icon = os.path.join(meshremodelWB_icons_path , 'CreatePointsO
 
 ####################################################################################
 # Initialize the workbench 
-class MeshRemodelWorkbench(Workbench):
+class MeshRemodelWorkbench(Gui.Workbench):
  
 
     global main_meshremodelWB_Icon
@@ -131,7 +134,7 @@ class MeshRemodelWorkbench(Workbench):
         
         # Example usage
         def update_callback(latest_version):
-            FreeCAD.Console.PrintWarning(f"MeshRemodel {latest_version} is now available in the Addon Manager.\n")
+            Console.PrintWarning(f"MeshRemodel {latest_version} is now available in the Addon Manager.\n")
         
         import freecad.Mesh_Remodel.MeshRemodelCmd as MeshRemodelCmd
         current_version = MeshRemodelCmd.__version__
@@ -140,7 +143,7 @@ class MeshRemodelWorkbench(Workbench):
         branch = "master"
         
         # Check for updates
-        pg = FreeCAD.ParamGet("User parameter:/Plugins/MeshRemodel")
+        pg = ParamGet("User parameter:/Plugins/MeshRemodel")
         checkUpdates = pg.GetBool("CheckForUpdates", True)
         #print(f"checkUpdates = {checkUpdates}")
         if checkUpdates:
@@ -153,17 +156,15 @@ class MeshRemodelWorkbench(Workbench):
 
         #FreeCAD will hide our menu and toolbar upon exiting the wb, so we setup a singleshot
         #to unhide them once FreeCAD is finished, 2 seconds later
-        from PySide import QtCore
+        from .Qt import Core as QtCore
         QtCore.QTimer.singleShot(2000, self.showMenu)
         return 
 
     def askAboutToolbar(self):
-        try:
-            from PySide import QtWidgets
-        except:
-            from PySide import QtGui
-            QtWidgets = QtGui
-        parent=FreeCADGui.getMainWindow()
+        
+        from .Qt import Widgets as QtWidgets
+
+        parent=Gui.getMainWindow()
         title = "Keep toolbar active?"
         message = \
 """
@@ -179,10 +180,10 @@ MeshRemodel settings dialog.
         msgBox.setWindowTitle(title)
         msgBox.setText(message)
     
-        enableAlwaysButton = msgBox.addButton("Enable always", QtWidgets.QMessageBox.AcceptRole)
-        enableOnceButton = msgBox.addButton("Enable this time", QtWidgets.QMessageBox.RejectRole)
-        disableAlwaysButton = msgBox.addButton("Disable always", QtWidgets.QMessageBox.AcceptRole)
-        disableOnceButton = msgBox.addButton("Disable this time", QtWidgets.QMessageBox.AcceptRole)
+        enableAlwaysButton = msgBox.addButton("Enable always", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+        enableOnceButton = msgBox.addButton("Enable this time", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+        disableAlwaysButton = msgBox.addButton("Disable always", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+        disableOnceButton = msgBox.addButton("Disable this time", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
         msgBox.setDefaultButton(enableOnceButton)
     
         msgBox.exec_()
@@ -201,11 +202,11 @@ MeshRemodel settings dialog.
         return clickedButton
         
     def showMenu(self):
-        from PySide import QtGui
-        window = QtGui.QApplication.activeWindow()
+        from .Qt import Widgets as QtWidgets
+        window = QtWidgets.QApplication.activeWindow()
         #freecad hides wb toolbars on leaving wb, we unhide ours here to keep it around
         #if the user has it set in parameters to do so
-        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        pg = ParamGet("User parameter:Plugins/MeshRemodel")
         ask = pg.GetBool("AskToolbar", True)
         keep = pg.GetBool('KeepToolbar',True)
         if ask:
@@ -227,7 +228,7 @@ MeshRemodel settings dialog.
 
         if not keep:
             return
-        tb = window.findChildren(QtGui.QToolBar) if window else []
+        tb = window.findChildren(QtWidgets.QToolBar) if window else []
         for bar in tb:
             if "MeshRemodel Commands" in bar.objectName():
                 bar.setVisible(True)
