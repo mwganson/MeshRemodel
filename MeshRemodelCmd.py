@@ -2,7 +2,6 @@
 # SPDX-FileCopyrightText: 2019 Mark Ganson <mwganson@gmail.com>
 # SPDX-FileNotice: Part of the Mesh Remodel addon.
 
-# -*- coding: utf-8 -*-
 ###################################################################################
 #
 #  MeshRemodelCmd.py
