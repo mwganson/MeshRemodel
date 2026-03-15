@@ -14,8 +14,8 @@
 
     <freecadmin>1.1.0</freecadmin>
     <pythonmin>3.11</pythonmin>
-    <version>1.10.38</version>
-    <date>2025.07.30</date>
+    <version>1.11.0</version>
+    <date>2026.03.15</date>
 
     <!--[ Dependencies : Python ]――――――――――――――――――――――――――――――――――――――――――――-->
 

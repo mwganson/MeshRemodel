@@ -22,8 +22,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2025.07.30"
-__version__ = "1.10.38"
+__date__    = "2026.03.15"
+__version__ = "1.11.0"
 
 import FreeCAD , math
 
