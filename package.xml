@@ -1,25 +1,112 @@
-<?xml version="1.0" encoding="utf-8" standalone="no" ?>
-<package format="1">
-  <name>MeshRemodel</name>
-  <description>Workbench for aid in remodeling mesh objects into FreeCAD format</description>
-  <version>1.10.38</version>
-  <date>2025.07.30</date> <!-- YYYY.MM.DD of new release goes here -->
-  <maintainer email="mwganson@gmail.com">TheMarkster</maintainer>
-  <license file="LICENSE">LGPL-2.1</license>
-  <url type="repository" branch="master">https://github.com/mwganson/MeshRemodel</url>
-  <url type="documentation">https://github.com/mwganson/MeshRemodel</url>
+<?xml
+    version = '1.0'
+    encoding = 'UTF-8'
+    standalone = 'no'
+?>
+<!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
+<!-- SPDX-FileNotice: Part of the Mesh Remodel addon. -->
+<package
+    format = '1'
+    xmlns = 'https://wiki.freecad.org/Package_Metadata'
+>
 
-  <content>
-    <workbench>
-      <name>MeshRemodel</name>
-      <classname>MeshRemodelWorkbench</classname>
-      <description>Workbench for aid in remodeling and repairing mesh objects into FreeCAD format</description>
-      <version>1.10.38</version>
-      <subdirectory>./</subdirectory>
-      <icon>Resources/icons/MeshRemodel_workbench_icon.svg</icon>
-      <freecadmin>0.20.0</freecadmin>
-      <tag>mesh</tag>
-    </workbench>
-  </content>
+    <!--[ Versions ]―――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <freecadmin>1.1.0</freecadmin>
+    <pythonmin>3.11</pythonmin>
+    <version>1.10.38</version>
+    <date>2025.07.30</date>
+
+    <!--[ Dependencies : Python ]――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <depend
+        version_gte = '6.10.2'
+        type = 'python'
+    >shiboken6</depend>
+
+    <depend
+        version_gte = '2.32.5'
+        type = 'python'
+    >requests</depend>
+
+    <depend
+        version_gte = '2.4.3'
+        type = 'python'
+    >numpy</depend>
+
+    <!--[ Dependencies : Internal ]――――――――――――――――――――――――――――――――――――――――――-->
+
+    <depend
+        type = 'internal'
+    >draft</depend>
+
+    <depend
+        type = 'internal'
+    >mesh</depend>
+
+    <depend
+        type = 'internal'
+    >part</depend>
+
+    <!--[ Info ]―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <description>Workbench for remodeling and repairing mesh objects.</description>
+    <name>Mesh Remodel</name>
+
+    <!--[ Tags ]―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <tag>Remodel</tag>
+    <tag>Repair</tag>
+    <tag>Mesh</tag>
+
+    <!--[ Maintainers ]――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <maintainer
+        email = 'mwganson@gmail.com'
+    >Mark Ganson</maintainer>
+
+    <!--[ Authors ]――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <author
+        email = 'mwganson@gmail.com'
+    >Mark Ganson</author>
+
+    <!--[ Licenses ]―――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <license
+        file = 'LICENSE'
+    >LGPL-2.1-or-later</license>
+
+    <!--[ Icon ]―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <icon>freecad/Mesh_Remodel/Resources/Icons/MeshRemodel_workbench_icon.svg</icon>
+
+    <!--[ Urls ]―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <url
+        type = 'documentation'
+    >https://github.com/mwganson/MeshRemodel</url>
+
+    <url
+        branch = 'master'
+        type = 'repository'
+    >https://github.com/mwganson/MeshRemodel</url>
+
+    <url
+        type = 'bugtracker'
+    >https://github.com/mwganson/MeshRemodel/issues</url>
+
+    <url
+        type = 'readme'
+    >https://raw.githubusercontent.com/mwganson/MeshRemodel/refs/heads/master/README.md</url>
+
+    <!--[ Content ]――――――――――――――――――――――――――――――――――――――――――――――――――――――――――-->
+
+    <content>
+        <workbench>
+            <subdirectory>.</subdirectory>
+            <classname>MeshRemodelWorkbench</classname>
+        </workbench>
+    </content>
 
 </package>

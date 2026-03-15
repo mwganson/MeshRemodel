@@ -1,36 +1,26 @@
-# -*- coding: utf-8 -*-
-###################################################################################
-#
-#  InitGui.py
-#  
-#  Copyright 2019 Mark Ganson <TheMarkster> mwganson at gmail
-#  
-#  This program is free software; you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
-#  (at your option) any later version.
-#  
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#  
-#  You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA 02110-1301, USA.
-#  
-#  
-###################################################################################
+# SPDX-License-Identifier: LGPL-2.1-or-later
+# SPDX-FileCopyrightText: 2019 Mark Ganson <mwganson@gmail.com>
+# SPDX-FileNotice: Part of the Mesh Remodel addon.
 
-import meshremodelwb_locator
-meshremodelWBPath = os.path.dirname(meshremodelwb_locator.__file__)
-meshremodelWB_icons_path = os.path.join(meshremodelWBPath,'Resources','icons')
+################################################################################
+#                                                                              #
+#   This addon is free software: you can redistribute it and/or modify it      #
+#   under the terms of the GNU Lesser General Public License as published      #
+#   by the Free Software Foundation, either version 2.1 of the License,        #
+#   or (at your option) any later version.                                     #
+#                                                                              #
+#   This addon is distributed in the hope that it will be useful,              #
+#   but WITHOUT ANY WARRANTY; without even the implied warranty                #
+#   of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.                    #
+#   See the GNU Lesser General Public License for more details.                #
+#                                                                              #
+#   You should have received a copy of the GNU Lesser General Public           #
+#   License along with this addon. If not, see https://www.gnu.org/licenses    #
+#                                                                              #
+################################################################################
 
-global main_meshremodelWB_Icon
-
-main_meshremodelWB_Icon = os.path.join(meshremodelWB_icons_path , 'CreatePointsObject.svg')
-
+from FreeCAD import Gui , Console , ParamGet
+from .Misc import asIcon
 
 #def myFunc(string):
 #    print (string)
@@ -43,22 +33,18 @@ main_meshremodelWB_Icon = os.path.join(meshremodelWB_icons_path , 'CreatePointsO
 #mw.workbenchActivated.connect(myFunc)
 
 ####################################################################################
-# Initialize the workbench 
-class MeshRemodelWorkbench(Workbench):
- 
-
-    global main_meshremodelWB_Icon
+# Initialize the workbench
+class MeshRemodelWorkbench(Gui.Workbench):
 
     MenuText = "Mesh Remodel"
     ToolTip = "MeshRemodel workbench"
-    Icon = main_meshremodelWB_Icon #defined in package.xml
-    
+    Icon = asIcon('CreatePointsObject')
+
     def __init__(self):
         pass
 
     def Initialize(self):
         "This function is executed when FreeCAD starts"
-        import MeshRemodelCmd #needed files for FreeCAD commands
         self.list = [
                     "MeshRemodelGroupCommandPointsObjects",
                   #  "MeshRemodelCreatePointsObject",
@@ -95,19 +81,19 @@ class MeshRemodelWorkbench(Workbench):
                     # "MeshRemodelPartCheckGeometry",
                     # "MeshRemodelSubShapeBinder",
                     # "MeshRemodelSettings",
-                    
+
                     ] # A list of command names created in the line above
         self.appendToolbar("MeshRemodel Commands",self.list) # leave settings, validate sketch and merge sketch off toolbar
         self.appendMenu("Mesh&Remodel",self.list) # creates a new menu
         #considered putting the menu inside the Edit menu, but decided against it
         #self.appendMenu(["&Edit","MeshRemodel"],self.list) # appends a submenu to an existing menu
 
- 
+
     def Activated(self):
         "This function is executed when the workbench is activated"
         import requests
         import xml.etree.ElementTree as ET
-        
+
         def get_remote_version(user, repo, branch='master'):
             # GitHub raw URL for package.xml
             url = f"https://raw.githubusercontent.com/{user}/{repo}/{branch}/package.xml"
@@ -127,47 +113,44 @@ class MeshRemodelWorkbench(Workbench):
             except Exception as e:
                 print(f"Error fetching or parsing package.xml: {e}")
                 return None
-        
+
         def check_for_update(current_version, user, repo, branch, callback):
             latest_version = get_remote_version(user, repo, branch)
             if latest_version and latest_version > current_version:
                 callback(latest_version)
-        
+
         # Example usage
         def update_callback(latest_version):
-            FreeCAD.Console.PrintWarning(f"MeshRemodel {latest_version} is now available in the Addon Manager.\n")
-        
-        import MeshRemodelCmd
-        current_version = MeshRemodelCmd.__version__
+            Console.PrintWarning(f"MeshRemodel {latest_version} is now available in the Addon Manager.\n")
+
+        from .MeshRemodelCmd import __version__ as current_version
         user = "mwganson"
         repo = "MeshRemodel"
         branch = "master"
-        
+
         # Check for updates
-        pg = FreeCAD.ParamGet("User parameter:/Plugins/MeshRemodel")
+        pg = ParamGet("User parameter:/Plugins/MeshRemodel")
         checkUpdates = pg.GetBool("CheckForUpdates", True)
         #print(f"checkUpdates = {checkUpdates}")
         if checkUpdates:
             check_for_update(current_version, user, repo, branch, update_callback)
 
         return
- 
+
     def Deactivated(self):
         "This function is executed when the workbench is deactivated"
 
         #FreeCAD will hide our menu and toolbar upon exiting the wb, so we setup a singleshot
         #to unhide them once FreeCAD is finished, 2 seconds later
-        from PySide import QtCore
+        from .Qt import Core as QtCore
         QtCore.QTimer.singleShot(2000, self.showMenu)
-        return 
+        return
 
     def askAboutToolbar(self):
-        try:
-            from PySide import QtWidgets
-        except:
-            from PySide import QtGui
-            QtWidgets = QtGui
-        parent=FreeCADGui.getMainWindow()
+
+        from .Qt import Widgets as QtWidgets
+
+        parent=Gui.getMainWindow()
         title = "Keep toolbar active?"
         message = \
 """
@@ -178,19 +161,19 @@ enable this 'keep the toolbar active' feature?
 If you choose Enable always or Disable always
 you can re-enable this popup question in the
 MeshRemodel settings dialog.
-"""        
+"""
         msgBox = QtWidgets.QMessageBox(parent)
         msgBox.setWindowTitle(title)
         msgBox.setText(message)
-    
-        enableAlwaysButton = msgBox.addButton("Enable always", QtWidgets.QMessageBox.AcceptRole)
-        enableOnceButton = msgBox.addButton("Enable this time", QtWidgets.QMessageBox.RejectRole)
-        disableAlwaysButton = msgBox.addButton("Disable always", QtWidgets.QMessageBox.AcceptRole)
-        disableOnceButton = msgBox.addButton("Disable this time", QtWidgets.QMessageBox.AcceptRole)
+
+        enableAlwaysButton = msgBox.addButton("Enable always", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+        enableOnceButton = msgBox.addButton("Enable this time", QtWidgets.QMessageBox.ButtonRole.RejectRole)
+        disableAlwaysButton = msgBox.addButton("Disable always", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
+        disableOnceButton = msgBox.addButton("Disable this time", QtWidgets.QMessageBox.ButtonRole.AcceptRole)
         msgBox.setDefaultButton(enableOnceButton)
-    
+
         msgBox.exec_()
-        
+
         if msgBox.clickedButton() == enableAlwaysButton:
             clickedButton = "Enable always"
         elif msgBox.clickedButton() == enableOnceButton:
@@ -201,15 +184,15 @@ MeshRemodel settings dialog.
             clickedButton = "Disable once"
         else:
             clickedButton = None
-    
+
         return clickedButton
-        
+
     def showMenu(self):
-        from PySide import QtGui
-        window = QtGui.QApplication.activeWindow()
+        from .Qt import Widgets as QtWidgets
+        window = QtWidgets.QApplication.activeWindow()
         #freecad hides wb toolbars on leaving wb, we unhide ours here to keep it around
         #if the user has it set in parameters to do so
-        pg = FreeCAD.ParamGet("User parameter:Plugins/MeshRemodel")
+        pg = ParamGet("User parameter:Plugins/MeshRemodel")
         ask = pg.GetBool("AskToolbar", True)
         keep = pg.GetBool('KeepToolbar',True)
         if ask:
@@ -231,7 +214,7 @@ MeshRemodel settings dialog.
 
         if not keep:
             return
-        tb = window.findChildren(QtGui.QToolBar) if window else []
+        tb = window.findChildren(QtWidgets.QToolBar) if window else []
         for bar in tb:
             if "MeshRemodel Commands" in bar.objectName():
                 bar.setVisible(True)
@@ -240,14 +223,10 @@ MeshRemodel settings dialog.
         "This is executed whenever the user right-clicks on screen"
         # "recipient" will be either "view" or "tree"
         self.appendContextMenu("MeshRemodel",self.list) # add commands to the context menu
- 
-    def GetClassName(self): 
+
+    def GetClassName(self):
         # this function is mandatory if this is a full python workbench
         return "Gui::PythonWorkbench"
 wb = MeshRemodelWorkbench()
 Gui.addWorkbench(wb)
-
-
-
-
 

@@ -1,9 +1,12 @@
+<!-- SPDX-License-Identifier: LGPL-2.1-or-later -->
+<!-- SPDX-FileNotice: Part of the Mesh Remodel addon. -->
+
 # MeshRemodel Workbench
-<img src="Resources/icons/CreatePointsObject.svg" alt="icon">
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreatePointsObject.svg" alt="icon">
 <br/>
 
 ## Toolbar Icon
-Download the <a href = "https://github.com/mwganson/MeshRemodel/blob/master/Resources/icons/CreatePointsObject.svg">SVG Toolbar Icon</a><br/>
+Download the <a href = "https://github.com/mwganson/MeshRemodel/blob/master/freecad/Mesh_Remodel/Resources/Icons/CreatePointsObject.svg">SVG Toolbar Icon</a><br/>
 
 ## Installation
 Can be installed via the AddonManager in Tools menu -> AddonManager.  After restarting the AddonManager you should find MeshRemodel in the list of workbenches you can install.
@@ -17,7 +20,7 @@ Use this workbench to aid in remodeling imported mesh objects.  The preferred wo
 [![IMAGE ALT TEXT](http://img.youtube.com/vi/a1opdfll5OE/0.jpg)](http://www.youtube.com/watch?v=a1opdfll5OE "MeshRemodel introductory video part 3")<br/>
 <br/>
 ## Create Points Object (mesh objects)
-<img src="Resources/icons/CreatePointsObject.svg" alt="create points object"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreatePointsObject.svg" alt="create points object"><br/>
 Select the mesh object in the tree, then use this command to create a points object containing all the vertices of the selected mesh object.  The points object is a compound consisting of Part Point (vertex) objects, one per vertex in the selected mesh.  The purpose of this object is to provide selectable points in the 3d view.  We can use these selectable points with the other tools in the workbench to create the lines, circles, arcs, and polygons needed to remodel the mesh.  These can also be used in repairing meshes in conjunction with the remove point, move point, and add or remove facet tools.<br/>
 See also the Create WireFrame object, which can be used for the same purpose.  Which to use is up to you, but I recommend using this Points object because it is much, much faster to recompute.  Also, when adding facets to the mesh object, which is going to be the most common usage of the tool, you need to select points instead of edges anyway in order to better control the order of selection of the points, which is critical to the process.  Edge selection, although a bit easier than vertex selection doesn't work as well for adding multiple consecutive facets.<br/>
 **Tip: I have found when selecting the vertices to add a facet that if I select them in counter-clockwise fashion the facets created are more likely to have the proper normal orientation.**
@@ -27,27 +30,27 @@ If you hold Ctrl key down while invoking this command the mesh object will be ma
 Update: As of v1.82 you can now also create a points object from a Points cloud object created in Points workbench, which are non-selectable.  So, if you need to be able to select the individual points in a points cloud use this tool to create the selected points object.  Because the Points cloud object points are non-selectable the algorithm uses the first 3 points in the object to define the plane.  If those 3 points are colinear then it won't work.<br/>
 <br/>
 ## Create WireFrame Object (mesh objects)
-<img src="Resources/icons/CreateWireFrameObject.svg" alt="create wireframe object"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreateWireFrameObject.svg" alt="create wireframe object"><br/>
 Creates a parametric object based on Part::FeaturePython class from the selected mesh object.  The lines and vertices
 of this object serve as a proxy for the lines and vertices of the mesh object, which are not selectable individually in FreeCAD.  You select the edges and vertices of the proxy object and MeshRemodel will translate those selections into selections of the mesh object for the purposes of the various mesh repair tools available in MeshRemodel, including the move point too, the remove point too, and the add/remove facet tool.  See also the Create Points Object command.<br/>
 <br/>
 ## Mesh Boundary Wires (mesh objects)
-<img src="Resources/icons/MeshBoundaryWires.svg" alt="mesh boundary wires"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/MeshBoundaryWires.svg" alt="mesh boundary wires"><br/>
 Creates wires from the holes in a mesh.  If a wire is planar, then a meshed face is also produced.  This meshed face may be merged with the original mesh in the Mesh workbench to fill in the hole left after a mesh is trimmed with a plane in that workbench.  The mesh will need to repaired after this merger because at the very least there will be some duplicated points that must be removed.<br/>
 This function is a good diagnostic tool to help find holes in a mesh that might not be evident upon a brief examination.  It can also show defects that are difficult to find, such as where 2 points are very close to each other and the mesh has tiny facets that need to be fixed.
 ## Move Point (mesh objects)
-<img src="Resources/icons/MovePoint.svg" alt="Move a point in a mesh object"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/MovePoint.svg" alt="Move a point in a mesh object"><br/>
 This tool works on mesh objects.  You need to create a points object or a wireframe object from the mesh first in order to have selectable points to work with.  Select the mesh object and a point from the points object to be moved, then click the toolbar icon.  You will get a dialog in which you can set the new coordinates for the point.  The changes the mesh object, but you can use Undo to undo the changes.<br/>
 <img src="Resources/media/move_point_scr1.png" alt="move point screenshot"><br/>
 Notice in the above screenshot there is a red dot on the screen.  This shows the new position of the point once you click OK.  The Normal spinbox at the bottom of the dialog is used to move the point along its normal vector.  If you change the Normal field it resets the other X, Y, and Z fields to their defaults, and then applies the calculations needed to move them in the point's normal direction by the amount specified in the Normal field.  For Mesh objects the normal direction of a point is a direction outward from the mesh, calculated from the angles of the facets connected to that point.  This value can be positive or negative, depending on which way you wish to move the point.  Keep in mind this changes the mesh topology and could create issues, such as self-intersections or folds on surface.  It's a good idea to check your mesh after adding the point with the Mesh workbench analyze tool.  If moving the point has introduced defects to the mesh, then you have the option of using Undo to undo the changes.<br/>
 In addition to selecting a point and moving it via the dialog, you can also select 2 points.  The first point selected is the point to be moved, and the second point is the destination.  In this manner you can merge the 2 points together.<br/>
 ## Remove Point (mesh objects)
-<img src="Resources/icons/RemovePoint.svg" alt="Remove a point"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/RemovePoint.svg" alt="Remove a point"><br/>
 With this tool you can remove a point from (or add a new point to) a mesh.  When the point is removed all of the facets connecting to it are also removed.  Not to worry, it's fairly simple to add facets back to replace the ones that get removed by using the add facet tool, described below.  If you don't want to lose the facets it might be possible to move the point to another point in the mesh instead.  This will preserve the facets and bind them to the other point.<br/>
 To add a point you must first select an edge that already contains 2 points in the mesh.  Then use Alt+Click to add the new point.  This splits the facets that share the edge, creating 2 new facets at the picked point on the edge.<br/>
 Another way to add a new point is by adding a new facet with the add facet tool.  The point to be added is a picked point you have selected that is not already part of the mesh when you add the new facet.  Use the create point object command to add a new point to select or use a vertex of another object, such as a cube.<br/>
 ## Add or remove facet(s) (mesh objects)
-<img src="Resources/icons/AddOrRemoveFacet.svg" alt="add or remove facet(s)"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/AddOrRemoveFacet.svg" alt="add or remove facet(s)"><br/>
 This is a great tool for repairing defective mesh objects, perhaps eliminating the need for remodeling them in many cases.  Usage: first create either a points object or a wireframe object from the mesh object.  With that done, select the 3 points that define the new facet (or 2 edges that contain all 3 points) and click the toolbar icon to add it to the mesh.  This operation changes the mesh topology directly, so it could be a good idea to first duplicate the mesh object and work on the duplicate instead of the original.  That way you can always go back to that original object state if things don't work out as planned.<br/>
 
 Often times the new facet will have its normal flipped, meaning it is facing inwards instead of outwards.  To remedy this when it happens, use Alt+Click on the toolbar icon.  This will remove the facet. Then use Ctrl+Click again to flip it around so its normal side is facing out.  How to tell whether the normal is flipped?  The back side of the facet will be black while the front side will be default gray.  With the object selected (as required by this command to be active) the colors will be dark green for the back side and a lighter shade of green for the front side.  Against the backdrop of other back sides of the mesh it can appear at times that no facet was created.  <br/>
@@ -56,7 +59,7 @@ Adding a facet or 2 can be relatively easy, but when there are many facets to ad
 Another tool you will want to become familiar with when repairing meshes is the analyze and repair tool, also available in the context menu.  Use it to analyze and repair the mesh, and then use add facets in MeshRemodel to add any facets back that were removed by the repair tool.  Usually, the new replacement facets will be good, so don't worry too much that you will be adding facets that will only get removed again by the repair tool.  You can keep the repair tool dialog open while working to add the facets and periodically recheck to ensure the new facets are not defective as you work.  There is a button at the bottom of the repair tool dialog that applies the analyze tool of all the tests in one go.<br/>
 
 ## Mesh Expander (mesh objects)
-<img src="Resources/icons/ExpandMesh.svg" alt = "expand a mesh with a plane"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/ExpandMesh.svg" alt = "expand a mesh with a plane"><br/>
 
 This tool creates a new parametric Mesh::FeaturePython object that is a copy of the original object, but that is expanded at the position of a plane.  You must supply a plane object, which can be either a Part::Plane or a PartDesign::DatumPlane.  The new feature python object is named MeshExpander and it will claim as a child in the tree view the original mesh object, which has now been hidden.  The mesh is expanded at the position of the plane, 5 mm by default in the normal direction of the plane.  Note that the plane is treated as an infinite object here.  Experiment with the Expansion and ExpansionRev properties to see how this works.  An example usage would be where you would like to make some mesh object longer in one direction, but you don't want to scale it.  Look for some place in the mesh where there is already a uniform length of material.<br/>
 The MeshExpander object is parametric to any changes to the original mesh and to any changes you make to any of its properties, but it is not parametric to the plane object.  You can move the plane, for example without affecting the MeshExpander object.  The plane is used at creation time to calculate the Base and Normal properties of the MeshExpander object.  You can modify those directly if you want to reposition the plane.  (Alternatively, delete the MeshExpander object, reposition the plane, and create a new MeshExpander.)<br/>
@@ -68,14 +71,14 @@ Note: The oppositive function (collapsing a mesh) is not supported.<br/>
 There is a boolean property named ShowCrossSection.  If this is set to true, then on each recompute you get a new object in the tree, which is the cross-section of the mesh at the location of the plane, again, the plane is treated as an infinite object.  Cross-sections can be useful for remodeling a mesh, so this a side-effect feature that you might want to keep in mind is available.
 
 ## Mesh simple copy
-<img src="Resources/icons/MeshSimpleCopy.svg" alt="Mesh simple copy"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/MeshSimpleCopy.svg" alt="Mesh simple copy"><br/>
 Select a mesh and run this command to make a simple non-parametric copy of it.  Sometimes a non-parametric copy is needed when you are working with a parametric mesh object, such as the MeshExpander object or one of the Mesh primitives in the Mesh workbench, such as the Cube or the Cylinder.  It is also a good idea to make a copy of a mesh and work on the copy rather than the original.  That way if things don't go well you can always make another copy of he original and begin again from that starting point.<br/>
 
 This operation will also create a new empty mesh if nothing is selected to duplicate.  This can be useful if you are
 going to be duplicating facets from one mesh to another.<br/>
 
 ## MeshOffset
-<img src="Resources/icons/OffsetMesh.svg" alt="Mesh offset"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/OffsetMesh.svg" alt="Mesh offset"><br/>
 Offset a mesh by moving it's points along their normals by the specified distance in the Offset property.  Offset is a floating point property that gets interpreted as mm.  This might not always work as expected and can cause defects in the mesh, so it's a good idea to run mesh evaluate and repair on the results.  But it can also in some cases cure some defects in the mesh.  In particular I have found it can cure some folds on surface errors.<br/>
 
 If the source mesh is a non-solid mesh, meaning only a single wall, then you can set the Merge Source property to True and it will merge the original source mesh with the offset.  This will still leave a gap that will need to be filled manually using the add facet tool.  Since this is a parametric object that will recompute itself it is a good idea to make a simple copy of it and work on the copy instead of working to repair this object directly.  Otherwise it might recompute and undo all of your repairs.<br/>
@@ -83,7 +86,7 @@ If the source mesh is a non-solid mesh, meaning only a single wall, then you can
 The ZMin and ZMax properties are provided by the python API, but I am not sure exactly what they do.  There are 2 offset functions available for mesh objects: mesh.offset() and mesh.offsetSpecial(), the latter of which accepts the additional ZMin and ZMax arguments.  If you set these to 0.0 (the default) then the normal mesh.offset() function is used.<br/>
 
 ## SubObjectLoft
-<img src="Resources/icons/SubObjectLoft.svg" alt="SubObjectLoft icon"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/SubObjectLoft.svg" alt="SubObjectLoft icon"><br/>
 Select 2 subobjects in the 3d view, then run this command to loft between those subobjects.  Uses the new SubObjectLoft object for some selection types, the new ParametricLine type for some, and Part::Loft for others.<br/>
 <br/>
 Selection type -> result
@@ -99,7 +102,7 @@ This is a parametric line object.  Select 2 vertices, and then run the SubObject
 This object lofts between a face and a vertex or 2 faces to each other.  It supports faces with inner wires where Part::Loft fails, but it does not support more than 2 sections, unlike Part::Loft, which supports any number of sections.  When the loft is between a face and a vertex a scaled copy of the face is made, which is positioned at the location of the vertex and pointed towards the original face, and then the loft is made between those 2 faces.  There are 2 hidden properties that are shown when a vertex is one of the subobjects: VertexFaceScale and VertexFaceRotation.  The scale option controls the scale factor.  The rotation property controls the rotation of the scaled face.  This can be used where you want to loft a face to a scaled and rotated copy of itself.  Here, the rotation property acts much like an attachment offset property, with the Z axis always being the face normal.  You can use the rotation to better control the seamlines of the loft to prevent some twisting.
 
 ## Create GridSurface Object
-<img src="Resources/icons/CreateGridSurface.svg" alt="create grid surface object"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreateGridSurface.svg" alt="create grid surface object"><br/>
 Creates a GridSurface object.  Along with the Grid Surface object are created individual Part::Vertex objects, each assigned to a row and column in a grid.  The vertices serve as points for creating the GridSurface object shape, which can be a surface or a series of bspline edges or polyline wires.  As the individual vertices are moved the GridSurface object automatically recomputes its shape.  If the Output property is set to Surface, then the surface that is created can be done in a couple different ways: lofting the edges/wires and by directly interpolating the points into a surface.  Lofting generally works better and is the default.  An even better surface can usually be had by setting the Output to Gordon Surface Template, and then creating a Gordon Surface using the Curves workbench Gordon Surface tool with the Grid Surface object as the source.
 
 ### Dimensions property group
@@ -132,11 +135,11 @@ In the context menu you manipulate a number of the above described properties.  
 
 
 ## Create Cross-Sections Object
-<img src="Resources/icons/CreateCrossSections.svg" alt="create cross-sections object"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreateCrossSections.svg" alt="create cross-sections object"><br/>
 Select the mesh object in the tree, then use this command to create one or more cross-section objects.  This is just a convenience link to the Cross-sections tool in the Mesh Design workbench.  These cross-sections should not be directly used as wires, but rather as references for creating the wires within the MeshRemodel workbench.  This is because these cross-section objects will have extra points and multiple line segments where only one segment is desired.<br/>
 
 ## Create Coplanar Points Object
-<img src="Resources/icons/CreateCoplanar.svg" alt = "create coplanar"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreateCoplanar.svg" alt = "create coplanar"><br/>
 Select 3 (non-colinear) points from the points object in the 3d view to enable this command.  It creates a new points object filtered to contain only those points that are coplanar with the 3 selected points.  You can recreate the profile inside the sketch using those external links and the sketcher tools or directly in the 3d view using the MeshRemodel tools.  The Coplanar Points Object (CPO) is now a feature python object.<br/>
 <br/>
 In order to filter the original points object into a set of coplanar points aligned on the plane defined by the 3 selected points an internal isCoplanar algorithm is used.  There is a settings option for changing the tolerance level.  The smaller the number the fewer points get produced.  The filtering is done by using the 3 selected points and each other point in turn to create a tetrahedron.  If the 4 points are coplanar, then the tetrahedron should have volume ~= zero.  Default tolerance is 0.01 mm^3. If too high a tolerance value is used you will get points that are not truly coplanar, but they will forced into coplanarity by projecting them onto the plane.
@@ -163,7 +166,7 @@ Tolerance defines how the points that are coplanar are selected.  I will likely 
 ### Trio
 These are the 3 vertices you selected when you first created the CPO.  They are used in a number of ways.  If a sketch is created they are the support for the sketch attachment.  When the CPO is created they are used to define the plane.
 ## Add Selection Observer
-<img src="Resources/icons/AddSelectionObserver.svg" alt="add selection observer"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/AddSelectionObserver.svg" alt="add selection observer"><br/>
 This enables preselection mode where points get automatically selected by holding Ctrl key down while hovering over the point in the 3d view.  This is intended to make it easier to select all the points needed for making bsplines since there are usually very many points needing selection, but will work with all MeshRemodel tools that create objects from selected points.  DO NOT mix selection modes in the same operation.  For example, if you select any of the points using Ctrl+preselect mode, then do not click on any points to select them in the usual way for the same operation or else it is likely to fail.<br/>
 <br/>
 Click the icon to enable or to disable Auto Preselection Mode.  There is also a button that will appear in the status bar when this mode is active to indicate you are in Auto Preselection Mode.  You can also click that button to remove the selection observer and return to normal selection mode.<br/>
@@ -173,7 +176,7 @@ The way the selection observer works is it monitors the preselection of points (
 New for version 1.10.9, now you can use this to automatically add the next nearest point to the last point you added.  This is done by holding down Ctrl while clicking the toolbar icon, presuming you are already in auto selection mode and have already added at least one point.  Ctrl+Shift+Click will add the next nearest point, skipping the closest point.  Alt+Click removes last added point.<Lbr/>
 <br/>
 ## Part Solid
-<img src="Resources/icons/PartSolid.svg" alt="Part Solid"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/PartSolid.svg" alt="Part Solid"><br/>
 Convenience link to 4 commonly used tools to create Solids in Part Workbench.  Links to the Sweep, Loft, Revolve, and Extrude commands.  Some preprocessing is done in order to sometimes enable solid creation while bypassing the Gui dialogs.  For example, you can select the Sweep profile in the tree view and the edge to sweep the profile along in the 3D view to create the Sweep without ever opening the Sweep dialog.  If you don't get the selections right then the dialog will appear as it normally does in Part Workbench.
 ### Part Extrude
 Usage: Select your profile object in either the tree view or the 3D view, then optionally select and edge to be used as a direction, and then click the toolbar Part Solid icon.  If the profile is closed and planar we set Solid = True, else Solid is set to False.  Be sure to check the Solid property of the created Extrude object.  If it's not set to Solid = True, then chances are the wire used wasn't closed or wasn't planar.  If an edge is selected it is linked to the Extrude object and becomes a dependency.  The LengthFwd property is set to the length of the selected edge.  If no edge is selected 10 mm is the LengthFwd and the direction mode is set to "Normal".  If the normal can't be determined the direction mode is set to "Custom", which defaults to Z = 1 direction.  If the Extrude is done in the wrong direction, just toggle Reversed to True in the Extrude property view.<br/>
@@ -185,18 +188,18 @@ Usage: Select your profiles in the tree view or in the 3D view and Shift + Click
 ### Part Revolution
 Usage: Select your profile in the tree view or the 3D view and optionally your edge to serve as an axis of revolution, and Alt + Click the toolbar icon.
 ## Create Point Object
-<img src="Resources/icons/CreatePointObject.svg" alt="create point object"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreatePointObject.svg" alt="create point object"><br/>
 Select a vertex (or any arbitrary point along any edge or face as of version 1.61) in the 3d view, then use this command to create a point object at that location.  The point object is a Part::Vertex that we can use in some operations, such as Part::Loft or in subsequent Mesh Remodel operations, such as creating a line segment or arc.  You must select some object first.  A point cannot be created in any arbitrary empty location, but you can create a point on an edge, for example, and then move it to the desired location.<br/>
 <br/>
 ## Create Line
-<img src="Resources/icons/CreateLine.svg" alt = "create line"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreateLine.svg" alt = "create line"><br/>
 Select 2 points or 1 edge in the 3d view to enable this command.  It creates a Part Line object using the 2 selected points or the selected edge as a reference.  Note: any 2 selectable points may be used, even points that are part of an edge (the edge is shown selected in the 3d view, but the point at the mouse position is the one used), sketch, 3d object vertex, circle, etc.  If you can see it in the 3d view and select it, then it most likely can be used with this function.  If you select an edge the first point and the last point of the edge are the points used, so curved edges will likely produce unexpected results.<br/>
 <br/>
 Use Ctrl+Click to include a point at the midpoint of the line.  Use Ctrl+Shift+Click if only the midpoint is desired.<br/>
 In the report view you will find some basic information about the line, including its length and coordinates of its midpoint.<br/>
 <br/>
 ## Create Polygon
-<img src="Resources/icons/CreatePolygon.svg" alt = "create polygon"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreatePolygon.svg" alt = "create polygon"><br/>
 You may elect to remodel the object inside the sketcher using the sketcher line tools instead of this, but it is here for those who wish to use it instead.  The reason it was previously recommended to use the sketcher is some of the polygons created with this tool might not be coplanar, and might give problems with future operations.  But I have found that when you have a coplanar issue you can usually (usually) click upgrade (Create a wire tool) twice (first to make a wire, second to create a face), then use the face successfully where the wire might have failed.<br/>
 <br/>
 Select 3 or more points or 2 or more edges in the 3d view to enable this command.  It creates a polygon from the selected points or edges.  You should **not** mix points and edges in the same polygon.  Choose either one object type or the other, but not both.  Note: this is not a regular polygon, meaning the side lengths are not necessarily all equal to each other.  The order of selection is important.  By default the polygon will be closed, but you can prevent this with Shift+Click when selecting points.  When selecting edges the polygon will only be closed if the last edge connects back to the first edge.<br/>
@@ -206,13 +209,13 @@ When selecting using Shift+B, block selection, the points will generally need to
 The polygon object created is made up of individual Part Lines.  This will enable you to delete any lines you would prefer not to have, for example if you get a closed polygon, but would prefer it not to be closed or if some lines get crossed, etc.  Use the Create wire tool to upgrade the individual lines to a single wire object, and then click it again to create a face from the wire.  My experience is faces created in this manner are much less likely to fail in a future sweep or extrude due to being non-coplanar.<br/>
 <br/>
 ## Create BSpline
-<img src="Resources/icons/CreateBSpline.svg" alt = "create bspline"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreateBSpline.svg" alt = "create bspline"><br/>
 Select 3 or more points in the 3d view to enable this command.  It creates a BSpline from the selected points.  The order of selection is important.  By default the BSpline will be closed, but you can prevent this with Shift+Click.  The points need not all lie on the same plane, but if they are not all on the same plane you will not be able to create a sketch from this later.  Sometimes points that appear to lie on the same plane are not actually on the same plane.  It is better to create the bspline in the sketcher.<br/>
 <br/>
 This command supports block selections (Shift+B, draw rectangle).  Generally, the points will need to be sorted when using that block selection method.  Use Alt+Click to sort.  See the section on Create polygon for details on the sorting algorithm used.<br/>
 <br/>
 ## Create Plane
-<img src="Resources/icons/CreatePlane.svg" alt = "create plane"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreatePlane.svg" alt = "create plane"><br/>
 Create a 50 x 50 Part::Plane object.  Position it on the plane defined
 by selected subobjects:<br/>
 * 3 points = plane defined by the 3 points
@@ -222,25 +225,25 @@ by selected subobjects:<br/>
 * 1 face = face normal
 * no selection = xy plane at origin
 ## Create Circle
-<img src="Resources/icons/CreateCircle.svg" alt = "create circle"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreateCircle.svg" alt = "create circle"><br/>
 Select 3 (or more) points in the 3d view to enable this command.  It creates a circle from those first 3 selected points.  Any points after the first 3 are ignored, but you are allowed to select more.  This is to support easier block selection mode (Shift+B, draw rectangle).  Use Ctrl+Click to add a point at the center of the new circle.  Use Ctrl+Shift+Click if only the center is desired.<br/>
 <br/>
 In the report view you will find some basic information about the circle, including its radius and coordinates of the center.<br/>
 <br/>
 ## Create Arc
-<img src="Resources/icons/CreateArc.svg" alt = "create arc"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreateArc.svg" alt = "create arc"><br/>
 Select 3 points in the 3d view to enable this command.  It creates a Part Arc (internally using Part.ArcOfCircle() function) from those 3 selected points.  Use Ctrl+Click to include a point at the center of the arc.  Use Ctrl+Shift+Click if only the center is desired.<br/>
 <br/>
 In the report view you will find some basic information about the arc, including its radius and coordinates of its center.<br/>
 <br/>
 ## Create Wire
-<img src="Resources/icons/CreateWire.svg" alt = "create wire"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreateWire.svg" alt = "create wire"><br/>
 New for version 1.9.0.  This function can create a wire from connected edges and force the wire into coplanarity.  If it can do so, it makes a face from the wire.  It can be used on subobjects selected in the 3D view or on objects selected from the tree.  If the objects are selected from the tree, then all the edges in the objects are used, otherwise only the subobjects (edges) selected in the 3D view are used.  The subobjects can be from multiple objects, but the ends should be connected or at least nearly so.  If used on open edges you might get unexpected results.  Can be used on SubShapeBinders to make a face from nonplanar wires.<br/>
 <br/>
 If Alt+Click is used when executing the command, then the current camera view is used to determine the normal of the plane.  Otherwise the function searches for a circle, and the first circle found will define the normal (and the base) of the plane.  If not circles are found, then the algorithm uses 3 key points to try to make a plane from 3 points.  Key points are the ends of line segments, the ends of arcs, the ends of bsplines, the ends of ellipses, the edge vertices on circles, etc.  The first point, the last point, and a point in the center of the key points list are used to form the plane, so the order of selection can play a role in defining the plane, too.  Best way to define the plane is to position the camera, for example by using the Top view, and then Alt+Click on the toolbar icon.  This forces everything to be on the xy plane or at least parallel to it.  Note: when using Alt+Click all circles are converted to bsplines, otherwise the circles are kept as circles/arcs.  Ellipses are always converted to bsplines.  Line segments are always kept as line segments.<br/>
 
 ## TugBoat Object
-<img src="Resources/icon/TugBoat.svg" alt = "TugBoat icon"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/TugBoat.svg" alt = "TugBoat icon"><br/>
 Creates a virtual tugboat that can be used for hauling other objects around.  The key thing to understand when it comes to using these objects is this: the TugBoat will move itself to the destination, and then apply the same transformation to the vessel it is hauling, aka the tow object. You have to "go get" the object by moving the TugBoat to it and positioning it relative to the vessel the same way you want the destination relatively positioned with the vessel. By default the destination is the origin, but this can also be another tugboat being used as a marker for the destination.  Supported objects (vessels) to be hauled include: Part::Feature based objects (anything with a shape), Meshes, and Points workbench points objects.  Essentially, anything with a Placement property can be hauled because that is how the hauling is done internally, by modifying the vessel shape property.  If the vessel is attached, then the vessel AttachmentOffset property gets modified for the haul operation.  For a sketch-based PartDesign feature, the sketch attachment offset gets updated to reflect the new position, and if the sketch is not attached, then the sketch placement gets adjusted.<br>
 <br>
 Often when a mesh or step file is imported you get objects that are not at the origin, sometimes not even oriented on the base planes or parallel to them.  And since these objects are given the identity placement upon import/creation moving them to the origin is not as simple as editing their placement to all zeros (identity placement).  This is where the TugBoat object comes in.  First, you must position the tugboat on the object at the point you wish to put onto the origin.  You can also rotate the tugboat so its orientation is in alignment with the object orientation such that when the haul operation is performed the vessel will be aligned to the origin planes as desired.  The tugboat is represented as an LCS object with 3 line segments, one for each axis, color-coded as Blue = Z, Green = Y, and Red = X, the same standard convention in FreeCAD.  It also has 3 circles and a vertex at the center of the object.  That vertex should be placed on the object where you want the object to be on the origin after the move.  The blue Z axis line segment should be oriented relative to the object the way you want the origin Z axis oriented to the object after the haul, and so on for the other axes.  You can attach the tug to the object, if desired, in fact it is recommended.  That way the tug will remain positioned to the object for further hauls, if needed.  Or, the tug can be deleted after the move if it is no longer needed.<br/>
@@ -281,7 +284,7 @@ If you wish, you may use these to scale the circles and line segments that repre
 Default = True.  By default there is a small gap between the center vertex of the TugBoat object and the axis line segments.  Set this to false if you do not want the gap, but rather would prefer the line segments meet and intersect at the center.
 
 ## Rotate Object
-<img src="Resources/icons/RotateObject.svg" alt = "rotate object"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/RotateObject.svg" alt = "rotate object"><br/>
 Rotate an object in place based on a selected subobject of that object.  For example, select the round face of a cylinder and click the toolbar icon to rotate the cylinder about the center of that face with the axis of the rotation being the normal direction of that face.  Select a vertical seam of the cylinder to rotate the object about that seam.  Select an edge of a cube to rotate it about that edge.  Select the face of a cube to rotate it about its center.<br/>
 <br/>
 Subobject selection options:
@@ -309,7 +312,7 @@ In the case of 3 vertices or 2 lines, the angle will be the angle needed to rota
 In the above screenshot the 3 vertex selection technique is shown.  Note the order of selection and the result after clicking the toolbar icon.<br/>
 
 ## Move Axial
-<img src="Resources/icons/MoveAxial.svg" alt = "move axial"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/MoveAxial.svg" alt = "move axial"><br/>
 Move an object in the axial direction of the selected subobject(s).  If one subobject is selected, then the parent object of the subobject will be the object that moves.  For example, select the edge of a cube and click the toolbar icon to move the cube along the axis defined by the edge, in other words, in the same direction as the edge.  Select a face of the cube to move the cube in the normal direction of that face.  Select a vertex of the cube, and then select another vertex of the cube or a vertex of another object to put the first selected vertex at the same location as the 2nd vertex.  For example, select the front top right vertex of a cube, and then select the front left vertex of another cube, and then click the icon.  Now the first cube has moved and the selected vertices are now coincident.<br/>
 
 If only one subobject is selected, then the object moves as follows:
@@ -327,7 +330,7 @@ Think of Ctrl as giving you more fine control of the movement and Shift as shift
 Face/Circle selection supported, in which case the direction and distance is center to center.  If a face/circle is first subobject, and 2 vertices are selected, then the angle will be that needed to rotate the vertices into alignment if they are on the same plane as the face/circle.<br/>
 
 ## Go back selection
-<img src="Resources/icons/GoBackSelection.svg" alt="Go back selection"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/GoBackSelection.svg" alt="Go back selection"><br/>
 Goes back to a previous selection state.  This function works by parsing the selection history kept in the python console as comments.  Therefore, clearing the console would clear the history.<br/>
 Example usage:<br/>
 Select some edges, then click in empty 3d space to clear the selection.  Now select some faces, and then clear them by clicking somewhere in open 3d space.  Click the toolbar icon to bring up the selection dialog.  The dialog features a column of buttons labeled Block 1, Block 2, etc.  The tooltip for each button will show the Gui selection commands that will be run in order to reselect those objects and subobjects. Note that the buttons are only for the active document, based on the name of the document, and the selection commands within each block are only for objects that exist in the current active document.  The active document is based on the name of the document, so if you have Unnamed documents, then there could be some confusion or if the name of one document is a substring of the name of another, example Unnamed and Unnamed2 or Container and Lid_For_Container.  An object that was deleted that was part of the selection previously will not appear in the selection block, but if you undo the deletion and try again it will appear back in the selection block.<br/>
@@ -335,7 +338,7 @@ Select some edges, then click in empty 3d space to clear the selection.  Now sel
 Note that previously modifier keys were used to determine the number of selections to go back to, but this proved to be too confusing in practice, so the dialog was created.
 
 ## Create SketchPlus object
-<img src="Resources/icons/CreateSketch.svg" alt = "create sketchplus object"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/CreateSketch.svg" alt = "create sketchplus object"><br/>
 Formerly, this command created a new sketch from selected objects, but now it just creates a new SketchPlus object.  A SketchPlus object is a feature python object based on Sketcher::SketchObjectPython.  It is a sketch, but with some additional capabilities, including offsetting, scaling, arrays, and the ability to show external and construction geometry as normal geometry.  All of the additional features are applied to the sketch shape after the sketch is closed, and because these are property-based they are parametric.<br/>
 ### SketchPlus object creation
 If there is an active body, the sketchplus goes into the active body.  If not, and there is an active part, then the sketchplus goes into the active part.  Otherwise it is placed into the document as a top level object.  It can be dragged into a body or part if desired.<br/>
@@ -380,29 +383,29 @@ So, why use this rather than the tool available inside the sketch editor?  If yo
 <br/>
 
 ## Draft Upgrade
-<img src="Resources/icons/DraftUpgrade.svg" alt="Draft upgrade icon"> <br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/DraftUpgrade.svg" alt="Draft upgrade icon"> <br/>
 Select 2 or more objects to enable this command.  It uses Draft.upgrade() to connect the objects into a single wire.  It is here as a convenience.  Note: the selected objects should all be connected together, but need not necessarily form a closed loop.  For example, you might have an arc and 2 lines connected one to each end of the arc.  You should not include circles unless you wish to connect them to other objects (not common).  The idea here to create wires from connected lines, open polygons, and arcs, then use these new wires, along with existing (coplanar) circles and closed polygons to create a sketch with the Create Sketch tool or you can also use the wires directly with Part workbench tools like, extrude or sweep.  As noted in other sections of this document, it is often useful to use this again on the created wire to form it into a face. Faces tend to work better with other tools rather than wires, particularly in cases where the tool complains the wire is not coplanar.  If you get that error message run this tool again on the wire and upgrade it to a face.  Then try the tool that complained the wire was not coplanar again.<br/>
 <br/>
 ## Open Edge Finder tool
-<img src="Resources/icons/OpenEdgeFinder.svg" alt = "open edge finder icon"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/OpenEdgeFinder.svg" alt = "open edge finder icon"><br/>
 This is a sketch validation tool.  It looks for open edges, crossed edges, and T-Sections.  The issues will be depicted visually as red spheres on the screen at the problematic vertex locations.  The object can be deleted once the issues are corrected.
 ## Parametric Mesh
-<img src="Resources/icons/ParametricMesh.svg" alt = "parametric mesh icon"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/ParametricMesh.svg" alt = "parametric mesh icon"><br/>
 Creates a parametric mesh from the selected shape object, or you can edit the Shape property to point to an object after creating the ParametricMesh object.  It uses the standard mesher only.  When the original object changes, the ParametricMesh object automatically updates.  There is a property to disable recomputes.<br/>
 <br/>
 I have noticed a rendering issue can sometimes occur when the original shape object contains bsplines.  I don't know the cause of this bug, and it might be hardware-related, and not something you will experience.  The workaround for me is to close and reopen the document to reset the rendering back to normal.<br/>
 
 ## Merge Sketches
-<img src="Resources/icons/MergeSketches.svg" alt = "merge sketches"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/MergeSketches.svg" alt = "merge sketches"><br/>
 Select 2 or more sketches to enable this command.  This uses Sketcher workbench merge sketches command.  It is here as a convenience.
 <br/>
 <br/>
 ## Validate Sketch
-<img src="Resources/icons/ValidateSketch.svg" alt = "validate sketch"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/ValidateSketch.svg" alt = "validate sketch"><br/>
 Opens Sketch workbench validate sketch tool.  Enabled only if you have 1 sketch selected.  It is here as a convenience.  Occasionally, sketches will have missing coincidence constraints.  That tool is good for fixing that issue.  It can also be used to easily remove all links to external geometry.<br/>
 <br/>
 ## Settings
-<img src="Resources/icons/Settings.svg" alt="settings"><br/>
+<img src="freecad/Mesh_Remodel/Resources/Icons/Settings.svg" alt="settings"><br/>
 ### Keep toolbar active
 This setting will keep the toolbar active after leaving the workbench, but you have to open the workbench at least once each session.  After that, if this is enabled, when you leave the workbench the toolbar will appear in the new workbench after a couple seconds.  This can be a great time saver as you would often use this tool in conjunction with Part workbench in remodeling a mesh.  This would prevent the need to switch back and forth between workbenches.<br/>
 <br/>
