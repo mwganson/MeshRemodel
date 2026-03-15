@@ -427,6 +427,7 @@ This sets the tolerance to use when determining which points lie on the same pla
 ### WireFrameTolerance
 Used when creating WireFrame objects from selected mesh objects.  Points closer than WireFrameTolerance distance from one another will be treated as if they are the same point.  Default: .01 mm.
 #### Release notes:
+* 2026.03.15 (1.11.0) -- updated for newer 1.2.0 and later FreeCAD versions, changed folder hierarchy mostly.
 * 2025.07.30 (1.10.38) -- fixed some typographical errors -- thanks luzpaz
 * 2025.02.28 (1.10.37) -- avoid using __*__ functions in checking python version
 * 2025.01.25 (1.10.36) -- fix crash where user is on PySide2, but also has shiboken6 installed
