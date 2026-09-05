@@ -22,8 +22,8 @@
 __title__   = "MeshRemodel"
 __author__  = "Mark Ganson <TheMarkster>"
 __url__     = "https://github.com/mwganson/MeshRemodel"
-__date__    = "2026.03.15"
-__version__ = "1.11.0"
+__date__    = "2026.09.05"
+__version__ = "1.12.0"
 
 import FreeCAD , math
 
@@ -8330,7 +8330,7 @@ mesh complexity.""").AngularDeflection = 10
         obj.addProperty("App::PropertyBool", "Relative", grp, """
 When set to True, LinearDeflection is scaled relative to the overall bounding box
 size of the Shape, creating a proportional level of detail regardless of the shape's
-absolute size.""").Relative = False
+absolute size.""").Relative = True
         obj.addProperty("App::PropertyBool","Segments",grp,"""
 Enables segmentation of the mesh if set to True, which might help retain the 
 segmentation from the original shape's topology.""").Segments = False
